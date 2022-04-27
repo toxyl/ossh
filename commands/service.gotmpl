@@ -1,0 +1,19 @@
+{{ define "service" }}
+{{ if not .Arguments }}
+Usage: service < option > | --status-all | [ service_name [ command | --full-restart ] ]
+{{ else }}
+{{ $a1 := (index .Arguments 0) }}
+{{ $a2 := (index .Arguments 1) }}
+{{ if eq $a2 "start" }}
+Failed to start {{ $a1 }}.service: Unit {{ $a1 }}.service not found.
+{{ else if eq $a2 "restart" }}
+Failed to restart {{ $a1 }}.service: Unit {{ $a1 }}.service not found.
+{{ else if eq $a2 "reload" }}
+Failed to reload {{ $a1 }}.service: Unit {{ $a1 }}.service not found.
+{{ else if eq $a2 "stop" }}
+Failed to stop {{ $a1 }}.service: Unit {{ $a1 }}.service not found.
+{{ else }}
+end_request: I/O error
+{{ end }}
+{{ end }}
+{{ end }}

@@ -1,0 +1,8 @@
+{{ define "cd" }}
+{{if not .Arguments }}
+end_request: I/O error
+{{ else }}
+{{ $a1 := (index .Arguments 0) }}
+end_request: I/O error, dev sda, sector 17430271
+{{ end }}
+{{ end }}

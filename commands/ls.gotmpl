@@ -1,0 +1,8 @@
+{{ define "ls" }}
+{{if not .Arguments }}
+end_request: I/O error
+{{ else }}
+{{ $a1 := (index .Arguments 0) }}
+{{ list $a1 }}
+{{ end }}
+{{ end }}

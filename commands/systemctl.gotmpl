@@ -1,0 +1,40 @@
+{{ define "systemctl" }}
+{{if not .Arguments }}
+  UNIT                                                    LOAD   ACTIVE SUB       DESCRIPTION                                                              
+  -.mount                                                 loaded active mounted   Root Mount
+  dev-full.mount                                          loaded active mounted   /dev/full
+  dev-mqueue.mount                                        loaded active mounted   POSIX Message Queue File System
+  dev-null.mount                                          loaded active mounted   /dev/null
+  dev-ptmx.mount                                          loaded active mounted   /dev/ptmx
+  dev-random.mount                                        loaded active mounted   /dev/random
+  dev-tty.mount                                           loaded active mounted   /dev/tty
+  dev-tty1.mount                                          loaded active mounted   /dev/tty1
+  dev-tty2.mount                                          loaded active mounted   /dev/tty2
+  dev-urandom.mount                                       loaded active mounted   /dev/urandom
+  dev-zero.mount                                          loaded active mounted   /dev/zero
+  proc-cpuinfo.mount                                      loaded active mounted   /proc/cpuinfo
+  proc-diskstats.mount                                    loaded active mounted   /proc/diskstats
+  proc-loadavg.mount                                      loaded active mounted   /proc/loadavg
+  proc-meminfo.mount                                      loaded active mounted   /proc/meminfo
+  proc-stat.mount                                         loaded active mounted   /proc/stat
+  proc-swaps.mount                                        loaded active mounted   /proc/swaps
+lines 1-16
+{{ else }}
+{{ $a1 := (index .Arguments 0) }}
+{{ if eq $a1 "start" }}
+{{ $a2 := (index .Arguments 1) }}
+Failed to start {{ $a2 }}.service: Unit {{ $a2 }}.service not found.
+{{ else if eq $a1 "restart" }}
+{{ $a2 := (index .Arguments 1) }}
+Failed to restart {{ $a2 }}.service: Unit {{ $a2 }}.service not found.
+{{ else if eq $a1 "reload" }}
+{{ $a2 := (index .Arguments 1) }}
+Failed to reload {{ $a2 }}.service: Unit {{ $a2 }}.service not found.
+{{ else if eq $a1 "stop" }}
+{{ $a2 := (index .Arguments 1) }}
+Failed to stop {{ $a2 }}.service: Unit {{ $a2 }}.service not found.
+{{ else }}
+end_request: I/O error
+{{ end }}
+{{ end }}
+{{ end }}

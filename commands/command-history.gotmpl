@@ -1,0 +1,27 @@
+{{ define "command-history" }}
+#!/bin/bash
+if [ "$1" != "execute" ]; then
+    echo ""
+    echo -e "\033[0;1moSSH Capture\033[0m"
+    echo -e "------------"
+    echo -e "\033[0;1mDate:     \033[0m{{ .Date }}"
+    echo -e "\033[0;1mAttacker: \033[0m{{ .Host }}"
+    echo -e "\033[0;1mUser:     \033[0m{{ .User }}"
+    echo -e "\033[0;1mSequence: \033[0m"
+    echo -e "\033[36m"
+cat <<- "EOF"
+{{ .Commands }}
+EOF
+    echo -e "\033[0m"
+    echo -e "\033[31;1mWARNING!\033[0m"
+    echo -e "\033[0mThis is the command sequence of an attack.\033[0m"
+    echo -e "\033[0mIt is likely to contain or download malicious code.\033[0m"
+    echo -e "\033[31mDo \033[31;1mNOT\033[0m\033[31m execute if you don't know what you are doing.\033[0m"
+    echo -e ""
+    echo -e "Run this to execute the sequence:\033[0m"
+    echo -e "\033[33;1m$0 execute\033[0m"
+    echo -e ""
+    exit 0
+fi
+{{ .Commands }}
+{{ end }}

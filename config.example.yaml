@@ -1,0 +1,160 @@
+host_name: nasty-pot
+version: OpenSSH_8.4p1 Ubuntu-6ubuntu2.1
+host: 0.0.0.0
+port: 2200
+max_idle: 3600 # seconds before idling bots are kicked
+ratelimit: 125 # in chars/second
+input_delay: 25 # in ms/char
+sync:
+  interval: 1 # in minutes
+  nodes:
+    - host: 127.0.0.1
+      port: 22
+      user: 8fe36196f2c4bb5a63f390c3e2e1152a3ababcd3f41c1295b86f773c9c53c632
+      password: 3061559b1baa386f6b5a3d1c73caa75617fbf78e3a49c23f272ac6d855f315b9
+commands:
+  rewriters:
+    - [ ";\\s*", "\n" ]
+    - [ "sudo\\s*", "" ]
+    - [ "/ip\\s*", "ifconfig" ]
+  exit:
+    - logout
+    - logoff
+    - shutdown
+    - poweroff
+    - exit
+  simple:
+    - [ "fsb", "Fat Sucker Bunch" ]
+    - [ "fbi", "Fat Bureaucrat Investigators" ]
+    - [ "cia", "Central Idiots Agency" ]
+    - [ "nsa", "National Suckers Agency" ]
+    - [ "ru", "Russian warship, go fuck yourself!" ]
+    - [ "sh", "/bin/bash^M: bad interpreter: No such file or directory" ]
+    - [ "tftp", "Error: TFTP, Opcode: Error Code(5)" ]
+    - [ "pkill", "" ]
+    - [ "hive-passwd", "" ]
+    - [ "history -c", "" ]
+    - [ "uname -a", "Linux {{ .HostName }} 5.13.19-2-pve #1 SMP PVE 5.13.19-4 (Mon, 29 Nov 2021 12:10:09 +0100) x86_64 x86_64 x86_64 GNU/Linux" ]
+    - [ "uname -v", "#1 SMP PVE 5.13.19-4 (Mon, 29 Nov 2021 12:10:09 +0100)" ]
+    - [ "uname -r", "5.13.19-2-pve" ]
+    - [ "uname -n", "{{ .HostName }}" ]
+    - [ "uname -s", "Linux" ]
+    - [ "uname -m", "x86_64" ]
+    - [ "uname -p", "x86_64" ]
+    - [ "uname -i", "x86_64" ]
+    - [ "uname -o", "GNU/Linux" ]
+    - [ "uname", "Linux" ]
+    - [ "nproc", "128" ]
+    - [ "whoami", "{{ .User }}" ]
+    - [ "id", "uid=0({{ .User }}) gid=0({{ .User }}) groups=0({{ .User }})" ]
+    - [ "echo", "{{ .InputRaw }}" ]
+    - [ "command", "What is your wish, {{ .User }}?" ]
+    - [ "ifconfig", "ifconfig has been deprecated, use ip instead." ]
+  permission_denied:
+    - sudo
+    - arch
+    - chcon
+    - chgrp
+    - chmod
+    - chown
+    - chroot
+    - env
+    - unlink
+    - ftpget
+  disk_error:
+    - base64
+    - cksum
+    - cp
+    - dd
+    - dir
+    - df
+    - dirname
+    - du
+    - pwd
+    - readlink
+    - realpath
+    - rm
+    - rmdir
+    - scp
+    - history
+  command_not_found:
+    - date
+    - false
+    - md5sum
+    - fold
+    - link
+    - ps
+  file_not_found:
+    - basename
+    - groups
+    - sha1sum
+    - sha224sum
+    - sha256sum
+    - sha384sum
+    - sha512sum
+  not_implemented:
+    - cal
+    - comm
+    - csplit
+    - cut
+    - dircolors
+    - expand
+    - expr
+    - factor
+    - fmt
+    - head
+    - hostid
+    - install
+    - join
+    - ln
+    - logname
+    - mkdir
+    - mkfifo
+    - mknod
+    - mktemp
+    - mv
+    - nice
+    - nl
+    - nohup
+    - numfmt
+    - od
+    - paste
+    - pathchk
+    - pinky
+    - pr
+    - printenv
+    - printf
+    - ptx
+    - runcon
+    - seq
+    - shred
+    - shuf
+    - sleep
+    - sort
+    - split
+    - stat
+    - stdbuf
+    - stty
+    - sum
+    - sync
+    - tac
+    - tail
+    - tee
+    - test
+    - timeout
+    - touch
+    - tr
+    - true
+    - truncate
+    - tsort
+    - tty
+    - uname
+    - unexpand
+    - uniq
+    - uptime
+    - users
+    - vdir
+    - wc
+    - who
+    - xxd
+    - yes
