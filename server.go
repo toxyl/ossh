@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -172,26 +173,27 @@ func (ossh *OSSHServer) saveCapture(stats *FakeShellStats) {
 		Commands: strings.Join(stats.CommandHistory, "\n"),
 	}
 	resSha1 := StringToSha1(data.Commands)
+	res := ParseTemplateToString("command-history", data)
 	f := fmt.Sprintf("%s/ocap-%s-%s.sh", Conf.PathCaptures, stats.Host, resSha1)
 
-	if FileExists(f) {
-		return // no need to save, we already have this attack
+	if !FileExists(f) {
+		err := os.WriteFile(f, []byte("\n"+res+"\n\n"), 0744)
+		if err == nil {
+			Log('✓', "Capture saved: %s\n", colorWrap(f, 214))
+		}
 	}
 
+	ossh.savePayload(resSha1, res)
 	ossh.addFingerprint(resSha1)
+}
 
-	res := ParseTemplateToString("command-history", data)
-	err := os.WriteFile(f, []byte("\n"+res+"\n\n"), 0744)
-	if err == nil {
-		Log('✓', "Capture saved: %s\n", colorWrap(f, 214))
-	}
-
-	f = fmt.Sprintf("%s/payload-%s.sh", Conf.PathCaptures, resSha1)
+func (ossh *OSSHServer) savePayload(sha1, payload string) {
+	f := fmt.Sprintf("%s/payload-%s.sh", Conf.PathCaptures, sha1)
 	if FileExists(f) {
-		return // no need to save, we already have this attack
+		return // no need to save, we already have this payload
 	}
 
-	err = os.WriteFile(f, []byte("\n"+res+"\n\n"), 0744)
+	err := os.WriteFile(f, []byte("\n"+payload+"\n\n"), 0744)
 	if err == nil {
 		Log('✓', "Payload saved: %s\n", colorWrap(f, 214))
 	}
@@ -225,7 +227,24 @@ func (ossh *OSSHServer) hasHost(host string) bool {
 	return true
 }
 
-func (ossh *OSSHServer) getSyncSecrets(host string) (SyncNode, error) {
+func (ossh *OSSHServer) hasPayload(sha1 string) bool {
+	return FileExists(fmt.Sprintf("%s/payload-%s.sh", Conf.PathCaptures, sha1))
+}
+
+func (ossh *OSSHServer) getPayload(sha1 string) (string, error) {
+	f := fmt.Sprintf("%s/payload-%s.sh", Conf.PathCaptures, sha1)
+	if !FileExists(f) {
+		return "", fmt.Errorf("Payload %s was not found.", sha1)
+	}
+
+	data, err := os.ReadFile(f)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
+}
+
+func (ossh *OSSHServer) getSyncNode(host string) (SyncNode, error) {
 	for _, node := range Conf.Sync.Nodes {
 		if node.Host == host {
 			return node, nil
@@ -244,6 +263,30 @@ func (ossh *OSSHServer) addFingerprint(sha1 string) {
 		ossh.Stats.Fingerprints[sha1] = 0
 	}
 	ossh.Stats.Fingerprints[sha1]++
+
+	ossh.addPayload(sha1)
+}
+
+func (ossh *OSSHServer) addPayload(sha1 string) {
+	sha1 = strings.TrimSpace(sha1)
+	if sha1 == "" {
+		return
+	}
+
+	if !Server.hasPayload(sha1) {
+		// let's check if any of the nodes we know has a copy of the payload
+		for _, n := range Conf.Sync.Nodes {
+			payload := strings.TrimSpace(executeSSHCommand(n.Host, n.Port, n.User, n.Password, fmt.Sprintf("get-payload %s", sha1)))
+			if payload != "" {
+				p, err := base64.RawStdEncoding.DecodeString(payload)
+				if err == nil {
+					pdec := strings.TrimSpace(string(p))
+					Server.savePayload(sha1, pdec)
+				}
+				break
+			}
+		}
+	}
 }
 
 func (ossh *OSSHServer) addUser(usr string) {

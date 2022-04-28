@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -95,7 +96,7 @@ func (fs *FakeShell) Exec(line string) bool {
 
 		switch instrCmd {
 		case "check":
-			ss, err := Server.getSyncSecrets(data.IP)
+			ss, err := Server.getSyncNode(data.IP)
 			if err != nil {
 				Log('x', "Sync with %s failed: %s\n",
 					colorWrap(data.IP, 229),
@@ -110,7 +111,7 @@ func (fs *FakeShell) Exec(line string) bool {
 		case "sync":
 			hash := strings.Split(line, " ")[1]
 			if Server.statsHash() != hash {
-				ss, err := Server.getSyncSecrets(data.IP)
+				node, err := Server.getSyncNode(data.IP)
 				if err != nil {
 					Log('x', "Sync with %s failed: %s\n",
 						colorWrap(data.IP, 229),
@@ -118,7 +119,7 @@ func (fs *FakeShell) Exec(line string) bool {
 					)
 					return true
 				}
-				clientData := executeSSHCommand(ss.Host, ss.Port, ss.User, ss.Password, "get-data")
+				clientData := executeSSHCommand(node.Host, node.Port, node.User, node.Password, "get-data")
 				cd := StatsJSON{}
 				err = json.Unmarshal([]byte(clientData), &cd)
 				if err != nil {
@@ -152,6 +153,7 @@ func (fs *FakeShell) Exec(line string) bool {
 						Server.addFingerprint(fingerprint)
 						cf++
 					}
+
 				}
 				if ch > 0 || cu > 0 || cp > 0 || cf > 0 {
 					Log('i', "[sync] Added %s host(s), %s user name(s), %s password(s) and %s fingerprint(s) from %s\n",
@@ -166,6 +168,17 @@ func (fs *FakeShell) Exec(line string) bool {
 			return true
 		case "get-data":
 			fs.writer.WriteLnUnlimited(Server.statsJSON())
+			return true
+		case "get-payload":
+			hash := strings.Split(line, " ")[1]
+			payload, err := Server.getPayload(hash)
+			if err != nil {
+				return true
+			}
+			if payload != "" {
+				payload = base64.RawStdEncoding.EncodeToString([]byte(payload))
+			}
+			fs.writer.WriteLnUnlimited(payload)
 			return true
 		default:
 			Log('x', "[sync] Command unknown: %s\n", colorWrap(instrCmd, 229))
