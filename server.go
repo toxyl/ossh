@@ -179,10 +179,21 @@ func (ossh *OSSHServer) saveCapture(stats *FakeShellStats) {
 	}
 
 	ossh.addFingerprint(resSha1)
+
 	res := ParseTemplateToString("command-history", data)
 	err := os.WriteFile(f, []byte("\n"+res+"\n\n"), 0744)
 	if err == nil {
 		Log('✓', "Capture saved: %s\n", colorWrap(f, 214))
+	}
+
+	f = fmt.Sprintf("%s/payload-%s.sh", Conf.PathCaptures, resSha1)
+	if FileExists(f) {
+		return // no need to save, we already have this attack
+	}
+
+	err = os.WriteFile(f, []byte("\n"+res+"\n\n"), 0744)
+	if err == nil {
+		Log('✓', "Payload saved: %s\n", colorWrap(f, 214))
 	}
 }
 
