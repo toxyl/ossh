@@ -99,8 +99,8 @@ func (fs *FakeShell) Exec(line string) bool {
 			ss, err := Server.getSyncNode(data.IP)
 			if err != nil {
 				Log('x', "Sync with %s failed: %s\n",
-					colorWrap(data.IP, 229),
-					colorWrap(err.Error(), 51),
+					colorWrap(data.IP, colorBrightYellow),
+					colorWrap(err.Error(), colorCyan),
 				)
 				return true
 			}
@@ -114,8 +114,8 @@ func (fs *FakeShell) Exec(line string) bool {
 				node, err := Server.getSyncNode(data.IP)
 				if err != nil {
 					Log('x', "Sync with %s failed: %s\n",
-						colorWrap(data.IP, 229),
-						colorWrap(err.Error(), 51),
+						colorWrap(data.IP, colorBrightYellow),
+						colorWrap(err.Error(), colorCyan),
 					)
 					return true
 				}
@@ -124,8 +124,8 @@ func (fs *FakeShell) Exec(line string) bool {
 				err = json.Unmarshal([]byte(clientData), &cd)
 				if err != nil {
 					Log('x', "Sync with %s failed, could not unmarshal remote data: %s\n",
-						colorWrap(data.IP, 229),
-						colorWrap(err.Error(), 51),
+						colorWrap(data.IP, colorBrightYellow),
+						colorWrap(err.Error(), colorCyan),
 					)
 					return true
 				}
@@ -157,11 +157,11 @@ func (fs *FakeShell) Exec(line string) bool {
 				}
 				if ch > 0 || cu > 0 || cp > 0 || cf > 0 {
 					Log('i', "[sync] Added %s host(s), %s user name(s), %s password(s) and %s fingerprint(s) from %s\n",
-						colorWrap(fmt.Sprint(ch), 229),
-						colorWrap(fmt.Sprint(cu), 229),
-						colorWrap(fmt.Sprint(cp), 229),
-						colorWrap(fmt.Sprint(cf), 229),
-						colorWrap(data.IP, 229),
+						colorWrap(fmt.Sprint(ch), colorBrightYellow),
+						colorWrap(fmt.Sprint(cu), colorBrightYellow),
+						colorWrap(fmt.Sprint(cp), colorBrightYellow),
+						colorWrap(fmt.Sprint(cf), colorBrightYellow),
+						colorWrap(data.IP, colorBrightYellow),
 					)
 				}
 			}
@@ -181,7 +181,7 @@ func (fs *FakeShell) Exec(line string) bool {
 			fs.writer.WriteLnUnlimited(payload)
 			return true
 		default:
-			Log('x', "[sync] Command unknown: %s\n", colorWrap(instrCmd, 229))
+			Log('x', "[sync] Command unknown: %s\n", colorWrap(instrCmd, colorBrightYellow))
 			fs.writer.WriteLnUnlimited("Illegal sync command")
 			return true
 		}

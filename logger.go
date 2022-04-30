@@ -6,23 +6,44 @@ func colorWrap(str string, color uint) string {
 	return fmt.Sprintf("\033[38;5;%dm%s\033[0m", color, str)
 }
 
+const (
+	// #005fff
+	colorLightBlue = 27
+	// #00af00
+	colorOliveGreen = 34
+	// #00ff00
+	colorGreen = 46
+	// #00ffff
+	colorCyan = 51
+	// #d70000
+	colorDarkRed = 160
+	// #ff0000
+	colorRed = 196
+	// #ff8700
+	colorOrange = 208
+	// #ffffaf
+	colorBrightYellow = 229
+	// #bcbcbc
+	colorGray = 250
+)
+
 func Log(indicator rune, format string, a ...interface{}) {
 	prefix := "[ ]"
 	switch indicator {
 	case 'i':
-		prefix = colorWrap("[i]", 27)
+		prefix = colorWrap("[i]", colorLightBlue)
 	case '+':
-		prefix = colorWrap("[+]", 34)
+		prefix = colorWrap("[+]", colorOliveGreen)
 	case '✓':
-		prefix = colorWrap("[✓]", 46)
+		prefix = colorWrap("[✓]", colorGreen)
 	case '-':
-		prefix = colorWrap("[-]", 160)
+		prefix = colorWrap("[-]", colorDarkRed)
 	case 'x':
-		prefix = colorWrap("[x]", 196)
+		prefix = colorWrap("[x]", colorRed)
 	case '!':
-		prefix = colorWrap("[!]", 208)
+		prefix = colorWrap("[!]", colorOrange)
 	case ' ':
-		prefix = colorWrap("[ ]", 250)
+		prefix = colorWrap("[ ]", colorGray)
 	}
 	fmt.Printf(prefix+" "+format, a...)
 }
