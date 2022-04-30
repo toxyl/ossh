@@ -179,7 +179,7 @@ func (ossh *OSSHServer) saveCapture(stats *FakeShellStats) {
 	if !FileExists(f) {
 		err := os.WriteFile(f, []byte("\n"+res+"\n\n"), 0744)
 		if err == nil {
-			Log('✓', "Capture saved: %s\n", colorWrap(f, 214))
+			Log('✓', "Capture saved: %s\n", colorWrap(f, colorOrange))
 		}
 	}
 
@@ -195,7 +195,7 @@ func (ossh *OSSHServer) savePayload(sha1, payload string) {
 
 	err := os.WriteFile(f, []byte("\n"+payload+"\n\n"), 0744)
 	if err == nil {
-		Log('✓', "Payload saved: %s\n", colorWrap(f, 214))
+		Log('✓', "Payload saved: %s\n", colorWrap(f, colorOrange))
 	}
 }
 
@@ -337,7 +337,17 @@ func (ossh *OSSHServer) addLoginFailure(usr, pwd, host, reason string) {
 	ossh.addHost(host)
 	ossh.Stats.Logins.Attempts = ossh.incCounter(ossh.Stats.Logins.Attempts, host)
 	ossh.Stats.Logins.Failed = ossh.incCounter(ossh.Stats.Logins.Failed, host)
-	Log('-', "%s@%s failed to login with password %s: %s. (%d attempts; %d failed; %d success)\n", colorWrap(usr, 193), colorWrap(host, 229), colorWrap(pwd, 157), colorWrap(reason, 208), ossh.Stats.Logins.Attempts[host], ossh.Stats.Logins.Failed[host], ossh.Stats.Logins.OK[host])
+	Log(
+		'-',
+		"%s@%s failed to login with password %s: %s. (%d attempts; %d failed; %d success)\n",
+		colorWrap(usr, colorGreen),
+		colorWrap(host, colorBrightYellow),
+		colorWrap(pwd, colorGreen),
+		colorWrap(reason, colorOrange),
+		ossh.Stats.Logins.Attempts[host],
+		ossh.Stats.Logins.Failed[host],
+		ossh.Stats.Logins.OK[host],
+	)
 }
 
 func (ossh *OSSHServer) addLoginSuccess(usr, pwd, host, reason string) {
@@ -349,7 +359,17 @@ func (ossh *OSSHServer) addLoginSuccess(usr, pwd, host, reason string) {
 	ossh.addHost(host)
 	ossh.Stats.Logins.Attempts = ossh.incCounter(ossh.Stats.Logins.Attempts, host)
 	ossh.Stats.Logins.OK = ossh.incCounter(ossh.Stats.Logins.OK, host)
-	Log('+', "%s@%s logged in with password %s: %s. (%d attempts; %d failed; %d success)\n", colorWrap(usr, 193), colorWrap(host, 229), colorWrap(pwd, 157), colorWrap(reason, 121), ossh.Stats.Logins.Attempts[host], ossh.Stats.Logins.Failed[host], ossh.Stats.Logins.OK[host])
+	Log(
+		'+',
+		"%s@%s logged in with password %s: %s. (%d attempts; %d failed; %d success)\n",
+		colorWrap(usr, colorGreen),
+		colorWrap(host, colorBrightYellow),
+		colorWrap(pwd, colorGreen),
+		colorWrap(reason, colorOrange),
+		ossh.Stats.Logins.Attempts[host],
+		ossh.Stats.Logins.Failed[host],
+		ossh.Stats.Logins.OK[host],
+	)
 }
 
 func (ossh *OSSHServer) incCounter(stat map[string]uint, host string) map[string]uint {
@@ -368,10 +388,10 @@ func (ossh *OSSHServer) sessionHandler(s ssh.Session) {
 		ossh.Stats.TimeWasted += int(stats.TimeSpent)
 
 		Log('✓', "%s@%s spent %s running %s command(s)\n",
-			colorWrap(fs.User(), 193),
-			colorWrap(host, 229),
-			colorWrap(time.Duration(stats.TimeSpent*uint(time.Second)).String(), 123),
-			colorWrap(fmt.Sprintf("%d", stats.CommandsExecuted), 51),
+			colorWrap(fs.User(), colorGreen),
+			colorWrap(host, colorBrightYellow),
+			colorWrap(time.Duration(stats.TimeSpent*uint(time.Second)).String(), colorCyan),
+			colorWrap(fmt.Sprintf("%d", stats.CommandsExecuted), colorCyan),
 		)
 	}
 
@@ -389,9 +409,9 @@ func (ossh *OSSHServer) sessionHandler(s ssh.Session) {
 
 func (ossh *OSSHServer) localPortForwardingCallback(ctx ssh.Context, bindHost string, bindPort uint32) bool {
 	Log('!', "%s@%s tried to locally forward port %s. Request denied!\n",
-		colorWrap(ctx.User(), 193),
-		colorWrap(bindHost, 229),
-		colorWrap(fmt.Sprintf("%d", bindPort), 51),
+		colorWrap(ctx.User(), colorGreen),
+		colorWrap(bindHost, colorBrightYellow),
+		colorWrap(fmt.Sprintf("%d", bindPort), colorCyan),
 	)
 
 	return false
@@ -399,9 +419,9 @@ func (ossh *OSSHServer) localPortForwardingCallback(ctx ssh.Context, bindHost st
 
 func (ossh *OSSHServer) reversePortForwardingCallback(ctx ssh.Context, bindHost string, bindPort uint32) bool {
 	Log('!', "%s@%s tried to reverse forward port %s. Request denied!\n",
-		colorWrap(ctx.User(), 193),
-		colorWrap(bindHost, 229),
-		colorWrap(fmt.Sprintf("%d", bindPort), 51),
+		colorWrap(ctx.User(), colorGreen),
+		colorWrap(bindHost, colorBrightYellow),
+		colorWrap(fmt.Sprintf("%d", bindPort), colorCyan),
 	)
 
 	return false
@@ -413,9 +433,9 @@ func (ossh *OSSHServer) ptyCallback(ctx ssh.Context, pty ssh.Pty) bool {
 		return true
 	}
 	Log('+', "%s@%s started %s PTY session\n",
-		colorWrap(ctx.User(), 193),
-		colorWrap(host, 229),
-		colorWrap(pty.Term, 51),
+		colorWrap(ctx.User(), colorGreen),
+		colorWrap(host, colorBrightYellow),
+		colorWrap(pty.Term, colorCyan),
 	)
 	return true
 }
@@ -426,9 +446,9 @@ func (ossh *OSSHServer) sessionRequestCallback(sess ssh.Session, requestType str
 		return true
 	}
 	Log('+', "%s@%s requested %s session\n",
-		colorWrap(sess.User(), 193),
-		colorWrap(host, 229),
-		colorWrap(requestType, 51),
+		colorWrap(sess.User(), colorGreen),
+		colorWrap(host, colorBrightYellow),
+		colorWrap(requestType, colorCyan),
 	)
 	return true
 }
@@ -439,17 +459,17 @@ func (ossh *OSSHServer) connectionFailedCallback(conn net.Conn, err error) {
 		if ossh.hasHost(host) {
 			if _, ok := ossh.shells[host]; ok {
 				Log('!', "%s@%s's connection failed: %s\n",
-					colorWrap(ossh.shells[host].stats.User, 193),
-					colorWrap(host, 229),
-					colorWrap(err.Error(), 208),
+					colorWrap(ossh.shells[host].stats.User, colorGreen),
+					colorWrap(host, colorBrightYellow),
+					colorWrap(err.Error(), colorOrange),
 				)
 				return
 			}
 		}
 
 		Log('!', "%s's connection failed: %s\n",
-			colorWrap(host, 229),
-			colorWrap(err.Error(), 208),
+			colorWrap(host, colorBrightYellow),
+			colorWrap(err.Error(), colorOrange),
 		)
 	}
 }
@@ -517,7 +537,7 @@ func (ossh *OSSHServer) init() {
 }
 
 func (ossh *OSSHServer) Start() {
-	Log(' ', "Starting oSSH Server on %v\n", colorWrap(ossh.server.Addr, 229))
+	Log(' ', "Starting oSSH Server on %v\n", colorWrap(ossh.server.Addr, colorBrightYellow))
 	log.Fatal(ossh.server.ListenAndServe())
 }
 
