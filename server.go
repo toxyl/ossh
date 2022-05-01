@@ -303,6 +303,10 @@ func (ossh *OSSHServer) addHost(host string) {
 		return
 	}
 
+	if isIPWhitelisted(host) {
+		return // we don't want stats for whitelisted IPs
+	}
+
 	if !ossh.hasHost(host) {
 		ossh.Stats.Hosts[host] = 0
 		ossh.Stats.Logins.Attempts[host] = 0
@@ -316,6 +320,18 @@ func (ossh *OSSHServer) addLoginFailure(usr, pwd, host, reason string) {
 	if pwd == "" {
 		pwd = "(empty)"
 	}
+
+	if isIPWhitelisted(host) {
+		Log(
+			'-',
+			"%s@%s failed to login: %s.\n",
+			colorWrap(usr, colorGreen),
+			colorWrap(host, colorBrightYellow),
+			colorWrap(reason, colorOrange),
+		)
+		return // we don't want stats for whitelisted IPs
+	}
+
 	ossh.addUser(usr)
 	ossh.addPassword(pwd)
 	ossh.addHost(host)
@@ -338,6 +354,17 @@ func (ossh *OSSHServer) addLoginSuccess(usr, pwd, host, reason string) {
 	if pwd == "" {
 		pwd = "(empty)"
 	}
+
+	if isIPWhitelisted(host) {
+		Log(
+			'+',
+			"%s@%s logged in.\n",
+			colorWrap(usr, colorGreen),
+			colorWrap(host, colorBrightYellow),
+		)
+		return // we don't want stats for whitelisted IPs
+	}
+
 	ossh.addUser(usr)
 	ossh.addPassword(pwd)
 	ossh.addHost(host)
@@ -368,7 +395,7 @@ func (ossh *OSSHServer) sessionHandler(s ssh.Session) {
 	ossh.shells[host] = fs
 	stats := fs.Process()
 
-	if !ossh.syncClients[host] {
+	if !ossh.syncClients[host] && !isIPWhitelisted(host) {
 		ossh.Stats.TimeWasted += int(stats.TimeSpent)
 
 		Log('✓', "%s@%s spent %s running %s command(s)\n",
@@ -384,7 +411,7 @@ func (ossh *OSSHServer) sessionHandler(s ssh.Session) {
 	ossh.saveHosts()
 	ossh.saveFingerprints()
 
-	if !ossh.syncClients[host] {
+	if !ossh.syncClients[host] && !isIPWhitelisted(host) {
 		ossh.saveCapture(stats)
 	}
 
@@ -413,7 +440,7 @@ func (ossh *OSSHServer) reversePortForwardingCallback(ctx ssh.Context, bindHost 
 
 func (ossh *OSSHServer) ptyCallback(ctx ssh.Context, pty ssh.Pty) bool {
 	host := strings.Split(ctx.RemoteAddr().String(), ":")[0]
-	if ossh.syncClients[host] {
+	if ossh.syncClients[host] || isIPWhitelisted(host) {
 		return true
 	}
 	Log('+', "%s@%s started %s PTY session\n",
@@ -426,7 +453,7 @@ func (ossh *OSSHServer) ptyCallback(ctx ssh.Context, pty ssh.Pty) bool {
 
 func (ossh *OSSHServer) sessionRequestCallback(sess ssh.Session, requestType string) bool {
 	host := strings.Split(sess.RemoteAddr().String(), ":")[0]
-	if ossh.syncClients[host] {
+	if ossh.syncClients[host] || isIPWhitelisted(host) {
 		return true
 	}
 	Log('+', "%s@%s requested %s session\n",
@@ -469,6 +496,11 @@ func (ossh *OSSHServer) authHandler(ctx ssh.Context, pwd string) bool {
 			return true
 		}
 		ossh.syncClients[host] = false
+	}
+
+	if isIPWhitelisted(host) {
+		ossh.addLoginSuccess(usr, pwd, host, "host is whitelisted")
+		return true // I know you, have fun
 	}
 
 	if ossh.hasHost(host) {
