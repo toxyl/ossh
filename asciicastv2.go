@@ -18,16 +18,16 @@ type ASCIICastV2Theme struct {
 }
 
 type ASCIICastV2Header struct {
-	Version       int               `json:"version"`         // (required) must be 2
-	Width         int               `json:"width"`           // (required) in columns
-	Height        int               `json:"height"`          // (required) in rows
-	Timestamp     int               `json:"timestamp"`       // (optional) unix epoch
-	Duration      float64           `json:"duration"`        // (optional) in seconds
-	IdleTimeLimit float64           `json:"idle_time_limit"` // (optional) in seconds
-	Command       string            `json:"command"`         // (optional) name of the command that was recorded
-	Title         string            `json:"title"`           // (optional) name of the asciicast
-	Env           map[string]string `json:"env"`             // (optional) key-value pair
-	Theme         ASCIICastV2Theme  `json:"theme"`           // (optional) color scheme of recorded terminal
+	Version       int               `json:"version"`                   // (required) must be 2
+	Width         int               `json:"width"`                     // (required) in columns
+	Height        int               `json:"height"`                    // (required) in rows
+	Timestamp     int               `json:"timestamp,omitempty"`       // (optional) unix epoch
+	Duration      float64           `json:"duration,omitempty"`        // (optional) in seconds
+	IdleTimeLimit float64           `json:"idle_time_limit,omitempty"` // (optional) in seconds
+	Command       string            `json:"command,omitempty"`         // (optional) name of the command that was recorded
+	Title         string            `json:"title,omitempty"`           // (optional) name of the asciicast
+	Env           map[string]string `json:"env,omitempty"`             // (optional) key-value pair
+	Theme         ASCIICastV2Theme  `json:"theme,omitempty"`           // (optional) color scheme of recorded terminal
 }
 
 func (ac2h *ASCIICastV2Header) String() string {
@@ -170,25 +170,14 @@ func (ac2 *ASCIICastV2) Load(file string) {
 	}
 }
 
-func NewASCIICastV2(term string, width int, height int, title, command string) *ASCIICastV2 {
+func NewASCIICastV2(width int, height int) *ASCIICastV2 {
 	ac2 := &ASCIICastV2{
 		Header: ASCIICastV2Header{
-			Version:       2,
-			Width:         width,
-			Height:        height,
-			Timestamp:     int(time.Now().Unix()),
-			Duration:      0,
-			IdleTimeLimit: 1.0,
-			Command:       command,
-			Title:         title,
-			Env: map[string]string{
-				"TERM": term,
-			},
-			Theme: ASCIICastV2Theme{
-				FG:      "#d0d0d0",
-				BG:      "#212121",
-				Palette: "#151515:#ac4142:#7e8e50:#e5b567:#6c99bb:#9f4e85:#7dd6cf:#d0d0d0:#505050:#ac4142:#7e8e50:#e5b567:#6c99bb:#9f4e85:#7dd6cf:#f5f5f5",
-			},
+			Version:   2,
+			Width:     width,
+			Height:    height,
+			Timestamp: int(time.Now().Unix()),
+			Duration:  0,
 		},
 		EventStream: []ASCIICastV2Event{},
 	}
@@ -196,7 +185,7 @@ func NewASCIICastV2(term string, width int, height int, title, command string) *
 }
 
 func OpenASCIICastV2(file string) *ASCIICastV2 {
-	ac2 := NewASCIICastV2("", 0, 0, "", "")
+	ac2 := NewASCIICastV2(fakeShellInitialWidth, fakeShellInitialHeight)
 	ac2.Load(file)
 	return ac2
 }

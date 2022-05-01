@@ -362,16 +362,12 @@ func NewFakeShell(s ssh.Session) *FakeShell {
 			CommandHistory:   []string{},
 			Host:             "",
 			User:             s.User(),
-			recording:        nil,
+			recording:        NewASCIICastV2(fakeShellInitialWidth, fakeShellInitialHeight),
 		},
 	}
 	fs.terminal = term.NewTerminal(s, "")
 	fs.writer = NewSlowWriter(fs.terminal)
 	fs.stats.Host = fs.Host()
-	// TODO: the terminal name is available in the server's PtyCallback function, but does not seem to be available later.
-	// I've encountered that with a few things relating to the SSH connection (e.g. the password used). We could implement
-	// something to keep track of session metadata, so we can read it here (and in other places). For now I'm using hardcoded values.
-	fs.stats.recording = NewASCIICastV2("", fakeShellInitialWidth, fakeShellInitialHeight, "/bin/bash", "ossh")
 
 	fs.UpdatePrompt("~")
 	return fs
