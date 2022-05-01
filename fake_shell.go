@@ -199,38 +199,12 @@ func (fs *FakeShell) Exec(line string) bool {
 		}
 	}
 
-	if isIPWhitelisted(rmtH) {
-		// 1) check if it's an admin command
-		if strings.TrimSpace(line) == "my-little-pony" { // = stats
-			fs.writer.WriteLnUnlimited(ParseTemplateFromString(`
-	Hosts:        {{ .CntHosts }}
-	Users:        {{ .CntUsers }}
-	Passwords:    {{ .CntPasswords }}
-	Fingerprints: {{ .CntFingerprints }}
-	Time wasted:  {{ .TimeWasted }}
-	`, struct {
-				CntHosts        int
-				CntPasswords    int
-				CntUsers        int
-				CntFingerprints int
-				TimeWasted      string
-			}{
-				CntHosts:        len(Server.Stats.Hosts),
-				CntPasswords:    len(Server.Stats.Passwords),
-				CntUsers:        len(Server.Stats.Users),
-				CntFingerprints: len(Server.Stats.Fingerprints),
-				TimeWasted:      time.Duration(Server.Stats.TimeWasted * int(time.Second)).String(),
-			}))
-			return true
-		}
-	}
-
-	// 2) make sure the client waits some time at least,
+	// 1) make sure the client waits some time at least,
 	//    the more input the more wait time, hehe
 	dly := time.Duration(len(line) * int(Conf.InputDelay))
 	time.Sleep(dly * time.Millisecond)
 
-	// 3) check if command should exit immediately
+	// 2) check if command should exit immediately
 	for _, cmd := range Conf.Commands.Exit {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
 			fs.RecordExec(line, "^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@") // just to waste some more time ;)
@@ -238,7 +212,7 @@ func (fs *FakeShell) Exec(line string) bool {
 		}
 	}
 
-	// 4) check if command matches a simple command
+	// 3) check if command matches a simple command
 	for _, cmd := range Conf.Commands.Simple {
 		if strings.HasPrefix(line+"  ", cmd[0]+" ") {
 			fs.RecordExec(line, ParseTemplateFromString(cmd[1], data))
@@ -246,7 +220,7 @@ func (fs *FakeShell) Exec(line string) bool {
 		}
 	}
 
-	// 5) check if command should return permission denied error
+	// 4) check if command should return permission denied error
 	for _, cmd := range Conf.Commands.PermissionDenied {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
 			fs.RecordExec(line, ParseTemplateFromString("{{ .Command }}: permission denied", data))
@@ -254,7 +228,7 @@ func (fs *FakeShell) Exec(line string) bool {
 		}
 	}
 
-	// 6) check if command should return disk i/o error
+	// 5) check if command should return disk i/o error
 	for _, cmd := range Conf.Commands.DiskError {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
 			fs.RecordExec(line, ParseTemplateFromString("end_request: I/O error", data))
@@ -262,7 +236,7 @@ func (fs *FakeShell) Exec(line string) bool {
 		}
 	}
 
-	// 7) check if command should return command not found error
+	// 6) check if command should return command not found error
 	for _, cmd := range Conf.Commands.CommandNotFound {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
 			fs.RecordExec(line, ParseTemplateFromString("{{ .Command }}: command not found", data))
@@ -270,7 +244,7 @@ func (fs *FakeShell) Exec(line string) bool {
 		}
 	}
 
-	// 8) check if command should return file not found error
+	// 7) check if command should return file not found error
 	for _, cmd := range Conf.Commands.FileNotFound {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
 			fs.RecordExec(line, ParseTemplateFromString("{{ .Command }}: No such file or directory", data))
@@ -278,7 +252,7 @@ func (fs *FakeShell) Exec(line string) bool {
 		}
 	}
 
-	// 9) check if command should return not implemented error
+	// 8) check if command should return not implemented error
 	for _, cmd := range Conf.Commands.NotImplemented {
 		if strings.HasPrefix(line+" ", cmd+" ") {
 			fs.RecordExec(line, ParseTemplateFromString("{{ .Command }}: Function not implemented", data))
@@ -286,7 +260,7 @@ func (fs *FakeShell) Exec(line string) bool {
 		}
 	}
 
-	// 10) check if we have a template for the command
+	// 9) check if we have a template for the command
 	fs.RecordExec(line, ParseTemplateToString(command, data))
 	return false
 }
