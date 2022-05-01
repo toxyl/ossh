@@ -4,6 +4,11 @@ ip_whitelist:
   - 127.0.0.1
 host: 0.0.0.0
 port: 2200
+webinterface: 
+  host: 0.0.0.0
+  port: 80
+  cert_file: 
+  key_file: 
 max_idle: 3600 # seconds before idling bots are kicked
 ratelimit: 125 # in chars/second
 input_delay: 25 # in ms/char

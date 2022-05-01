@@ -1,16 +1,9 @@
 package main
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
 	"log"
-	"regexp"
-	"strings"
-	"text/template"
-	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/spf13/viper"
 )
 
@@ -28,6 +21,7 @@ type Config struct {
 	PathUsers        string   `mapstructure:"path_users"`
 	PathHosts        string   `mapstructure:"path_hosts"`
 	PathCommands     string   `mapstructure:"path_commands"`
+	PathWebinterface string   `mapstructure:"path_webinterface"`
 	PathCaptures     string   `mapstructure:"path_captures"`
 	PathFFS          string   `mapstructure:"path_ffs"`
 	HostName         string   `mapstructure:"host_name"`
@@ -38,7 +32,13 @@ type Config struct {
 	MaxIdleTimeout   uint     `mapstructure:"max_idle"`
 	InputDelay       uint     `mapstructure:"input_delay"`
 	Ratelimit        float64  `mapstructure:"ratelimit"`
-	Sync             struct {
+	Webinterface     struct {
+		Host     string `mapstructure:"host"`
+		Port     uint   `mapstructure:"port"`
+		CertFile string `mapstructure:"cert_file"`
+		KeyFile  string `mapstructure:"key_file"`
+	} `mapstructure:"webinterface"`
+	Sync struct {
 		Interval int        `mapstructure:"interval"`
 		Nodes    []SyncNode `mapstructure:"nodes"`
 	} `mapstructure:"sync"`
@@ -100,6 +100,10 @@ func initConfig() {
 		Conf.PathCommands = fmt.Sprintf("%s/commands", Conf.PathData)
 	}
 
+	if Conf.PathWebinterface == "" {
+		Conf.PathWebinterface = fmt.Sprintf("%s/webinterface", Conf.PathData)
+	}
+
 	if Conf.PathFFS == "" {
 		Conf.PathFFS = fmt.Sprintf("%s/ffs", Conf.PathData)
 	}
@@ -126,83 +130,7 @@ func initConfig() {
 		User: "root",
 	}
 
-	templateFunctions = template.FuncMap{
-		"nl": func() string {
-			return "\n"
-		},
-		"subint": func(a, b int) int {
-			return a - b
-		},
-		"sub": func(a, b float64) float64 {
-			return a - b
-		},
-		"add": func(a, b interface{}) float64 {
-			af, _ := GetFloat(a)
-			bf, _ := GetFloat(b)
-			return af + bf
-		},
-		"div": func(a, b float64) float64 {
-			return a / b
-		},
-		"mul": func(a, b float64) float64 {
-			return a * b
-		},
-		"file": func(path string) string {
-			return FFS.Read(path)
-		},
-		"list": func(path string) string {
-			files := FFS.List(path)
-			return strings.Join(files, " ")
-		},
-		"sha1": func(s string) string {
-			return StringToSha1(s)
-		},
-		"sha256": func(s string) string {
-			return StringToSha256(s)
-		},
-		"replace": func(s, re, repl string) string {
-			rx := regexp.MustCompile(re)
-			s = rx.ReplaceAllString(s, repl)
-			return s
-		},
-		"lower": func(s string) string {
-			return strings.ToLower(s)
-		},
-		"upper": func(s string) string {
-			return strings.ToUpper(s)
-		},
-		"trim": func(s string) string {
-			return strings.Trim(s, " \r\n")
-		},
-		"time": func(prefix, suffix string) string {
-			return fmt.Sprintf("%s%d%s", prefix, time.Now().Unix(), suffix)
-		},
-		"concat": func(a, b string) string {
-			return fmt.Sprintf("%s%s", a, b)
-		},
-		"dict": func(values ...interface{}) (map[string]interface{}, error) {
-			if len(values)%2 != 0 {
-				return nil, errors.New("invalid dict call")
-			}
-			dict := make(map[string]interface{}, len(values)/2)
-			for i := 0; i < len(values); i += 2 {
-				key, ok := values[i].(string)
-				if !ok {
-					return nil, errors.New("dict keys must be strings")
-				}
-				dict[key] = values[i+1]
-			}
-			return dict, nil
-		},
-		"dump": func(v interface{}) string {
-			spew.Dump(v)
-			return ""
-		},
-		"template_string": func(name string, values interface{}) (string, error) {
-			var tpl bytes.Buffer
-			_ = ParseTemplate(name, &tpl, values)
-			return strings.ReplaceAll(strings.Trim(tpl.String(), " \r\n\t"), "\n", ""), nil
-		},
-	}
+	InitTemplaterFunctions()
+	InitTemplaterFunctionsHTML()
 
 }
