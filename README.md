@@ -177,8 +177,7 @@ Within that directory you will find bind a bunch of files with data collected by
 | `fingerprints.txt` | List of payload fingerprints |
 
 ### Captures directory
-The subdirectory `captures` is the collection of payloads received from bots. Whenever a bot connects oSSH will record what it's doing and then save that recording as a shell script that by default prints the recorded sequence. By adding the `execute` parameter you can also execute the sequence. Be careful, though, the recorded sequences will most likely contain or download malicious code.
-Captures are saved per host, so you can, e.g., identify especially aggressive bots. The last part of the file name is the fingerprint of the sequence. Existing files will not be overwritten.
+The subdirectory `captures` is the collection of payloads received from bots. Whenever a bot connects oSSH will record what it's doing and then save that recording as an ASCIICast v2 (you can use [`asciinema`](https://asciinema.org/) to play them back). Captures are saved per host, so you can, e.g., identify especially aggressive bots. The last part of the file name is the fingerprint of the sequence. Existing files will not be overwritten. 
 
 ### Fake File System (FFS) 
 The subdirectory `ffs` contains the files and directories bots can browse. You can modify the directory content at runtime to react to new payloads. For example: if bots commonly `cat` a specific file, you can create a very lengthy fake version of that file in the `ffs` directory. Next time a bot `cat`s it, it will be waiting for a long time :D 
