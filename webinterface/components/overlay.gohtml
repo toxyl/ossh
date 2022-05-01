@@ -1,0 +1,12 @@
+{{ define "overlay" }}
+<script>
+    function show_overlay_{{ .Name | rawjs }}() {
+        $('#overlay{{ .Name }}').show();
+    }
+
+    function hide_overlay_{{ .Name | rawjs }}() {
+        $('#overlay{{ .Name }}').hide();
+    }
+</script>
+<div id="overlay{{ .Name }}" class="overlay" style="display: none">Please wait, {{ .Reason }}...</div>
+{{ end }}

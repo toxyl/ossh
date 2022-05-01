@@ -1,0 +1,51 @@
+{{ define "tab_console" }}
+<script type="text/javascript">
+    var current_log_filter = "*";
+
+    function filter_log(category) {
+        current_log_filter = category.toUpperCase();
+        $('.log').each(function(index) {
+            if (current_log_filter == "*" || $(this).hasClass(`log${current_log_filter.replace(/[^a-zA-Z0-9]+/g, '')}`)) {
+                $(this).show();
+                return;
+            }
+            $(this).hide();
+        });
+    }
+
+    function log_console(str) {
+        if (str.trim() == "")
+            return;
+
+        var cs = $("#tConsole");
+        var re = /(.*?)\s+\[(.*?)\]\s+(.*)\s*/;    
+        var dt = str.replace(re, '$1');
+        var ct = str.replace(re, '$2').toUpperCase();
+        var msg = str.replace(re, '$3');
+
+        cs.prepend(`<tr class='log log${ct.replace(/[^a-zA-Z0-9]+/g, '')}'><td class="w10 left"><tag class='bg-${log_to_class(ct)}'>${ct}</tag></td><td  class="w20 left">${dt}</td><td class="w70 left">${msg}</td></tr>`);
+        if (current_log_filter != "*" && current_log_filter != ct) {
+            $(`.log.log${ct.replace(/[^a-zA-Z0-9]+/g, '')}`).hide();
+        }
+        if (cs.children().length > 500) {
+            cs.children().slice(500).remove();
+        }
+    }
+
+    function ws_con_open(evt) { hide_overlay_connection(); }
+    function ws_con_close(evt) { show_overlay_connection(); }
+    function ws_con_preconnect(evt) { }
+    function ws_con_receive(message) { log_console(message); }
+    function ws_con_receive_complete() { }
+    function ws_con_send() { }
+</script>
+{{ template "ws_conn" dict "Scheme" .Scheme "Name" "console" "OpenFn" "ws_con_open" "CloseFn" "ws_con_close" "PreConnectFn" "ws_con_preconnect" "ReceiveFn" "ws_con_receive" "ReceiveCompleteFn" "ws_con_receive_complete" "SendFn" "ws_con_send" }}
+<div id="tabConsole" class="w3-display-container w3-dark-gray tab" style="display:none">
+    <div>{{ template "tags_logs" }}</div>
+    <table id="tConsole"></table>
+    <br><br><br><br>
+</div>
+<script>
+    ws_console_connect();
+</script>
+{{ end }}

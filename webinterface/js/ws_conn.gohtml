@@ -1,0 +1,61 @@
+{{ define "ws_conn" }}
+{{ $scheme := .Scheme }}
+{{ $name := .Name }}
+{{ $fnOpen := .OpenFn | rawjs }}
+{{ $fnClose := .CloseFn | rawjs }}
+{{ $fnPreConnect := .PreConnectFn | rawjs }}
+{{ $fnReceive := .ReceiveFn | rawjs }}
+{{ $fnReceiveComplete := .ReceiveCompleteFn | rawjs }}
+{{ $fnSend := .SendFn | rawjs }}
+{{ $var := printf "ws_%s" $name | rawjs }}
+<script>
+    /*
+        .Scheme                                             either wss or ws
+        .Name                                               used for var names and last element of endpoint
+        .OpenFn             function(evt:event):void        executed when connection is opened
+        .CloseFn            function(evt:event):void        executed when connection is closed
+        .PreConnectFn       function(evt:event):void        executed before reconnecting
+        .ReceiveFn          function(message:string):void   executed on each message received
+        .ReceiveCompleteFn  function():void                 executed on each message received
+        .SendFn             function():string               returns the message to send
+    */
+    function {{ $var }}_connect(){
+        wssupported = false;
+        if ("WebSocket" in window){
+            wssupported = true;
+        }
+
+        if (wssupported == false){
+            return;
+        }
+
+        if (typeof({{ $var }}) == 'undefined' || {{ $var }}.readyState === undefined || {{ $var }}.readyState > 1){
+            {{ $var }} = new WebSocket("{{ $scheme }}://" + document.location.host + "/{{ $name }}");
+            {{ $var }}.onopen = function (evt) {
+                {{ if $fnOpen }}{{ $fnOpen }}(evt);{{ end }}
+            }
+            {{ $var }}.onclose = function (evt) {
+                console.log("{{ $var }} has been closed:");
+                console.log(evt);
+                {{ if $fnClose }}{{ $fnClose }}(evt);{{ end }}               
+                setTimeout(() => {
+                    {{ if $fnPreConnect }}{{ $fnPreConnect }}(evt);{{ end }}
+                    {{ $var }}_connect();
+                }, 5000); // let's try to reconnect in 5 seconds   
+            };
+            {{ $var }}.onmessage = function (evt) {
+                var messages = evt.data.split('\n');
+                $(messages).each(function (i, m) {
+                    {{ if $fnReceive }}{{ $fnReceive }}(m);{{ end }}
+                });
+                {{ if $fnReceiveComplete }}{{ $fnReceiveComplete }}();{{ end }}
+            };
+            return;
+        }
+    }
+
+    function {{ $var }}_send(data){
+        {{ if $fnSend }}{{ $var }}.send({{ $fnSend }}(data));{{ end }}
+    }
+</script>
+{{ end }}

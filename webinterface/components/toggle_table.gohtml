@@ -1,0 +1,14 @@
+{{ define "toggle_table" }}
+
+{{ $name := concat "tblWrapper" .Name }}
+{{ $id := concat "#" $name }}
+{{ $hidden := "hidden" }}
+{{ $status := "+" }}
+{{ if .Open }}
+{{ $status = "-" }}
+{{ $hidden = "" }}
+{{ end }}
+{{ template "toggle_header" dict "Name" .Name "ID" $id "Status" $status }}
+<table id="{{ $name | rawjs }}" class="{{ $hidden }}"><tr><td class="right no-padding"><table id="tbl{{ .Name }}" class="right w100 no-padding no-margin"></table></td></tr></table>
+
+{{ end }}

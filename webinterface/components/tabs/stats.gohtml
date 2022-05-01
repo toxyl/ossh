@@ -1,0 +1,25 @@
+{{ define "tab_stats" }}
+<script type="text/javascript">
+    function ws_st_open(evt) { hide_overlay_connection(); }
+    function ws_st_close(evt) { show_overlay_connection(); }
+    function ws_st_preconnect(evt) { }
+
+    function ws_st_receive(message) {
+        if (message.trim() == "")
+            return;
+
+        m = JSON.parse(message);
+    }
+
+    function ws_st_receive_complete() { }
+    function ws_st_send() { }
+</script>
+{{ template "ws_conn" dict "Scheme" .Scheme "Name" "stats" "OpenFn" "ws_st_open" "CloseFn" "ws_st_close" "PreConnectFn" "ws_st_preconnect" "ReceiveFn" "ws_st_receive" "ReceiveCompleteFn" "ws_st_receive_complete" "SendFn" "ws_st_send" }}
+<div id="tabStats" class="w3-display-container w3-dark-gray tab">
+    {{ template "toggle_table" dict "Open" true "Name" "Overall" }}
+    <br><br><br><br>
+</div>
+<script>
+    ws_stats_connect();
+</script>
+{{ end }}
