@@ -199,28 +199,30 @@ func (fs *FakeShell) Exec(line string) bool {
 		}
 	}
 
-	// 1) check if it's an admin command
-	if strings.TrimSpace(line) == "my-little-pony" { // = stats
-		fs.writer.WriteLnUnlimited(ParseTemplateFromString(`
-Hosts:        {{ .CntHosts }}
-Users:        {{ .CntUsers }}
-Passwords:    {{ .CntPasswords }}
-Fingerprints: {{ .CntFingerprints }}
-Time wasted:  {{ .TimeWasted }}
-`, struct {
-			CntHosts        int
-			CntPasswords    int
-			CntUsers        int
-			CntFingerprints int
-			TimeWasted      string
-		}{
-			CntHosts:        len(Server.Stats.Hosts),
-			CntPasswords:    len(Server.Stats.Passwords),
-			CntUsers:        len(Server.Stats.Users),
-			CntFingerprints: len(Server.Stats.Fingerprints),
-			TimeWasted:      time.Duration(Server.Stats.TimeWasted * int(time.Second)).String(),
-		}))
-		return true
+	if isIPWhitelisted(rmtH) {
+		// 1) check if it's an admin command
+		if strings.TrimSpace(line) == "my-little-pony" { // = stats
+			fs.writer.WriteLnUnlimited(ParseTemplateFromString(`
+	Hosts:        {{ .CntHosts }}
+	Users:        {{ .CntUsers }}
+	Passwords:    {{ .CntPasswords }}
+	Fingerprints: {{ .CntFingerprints }}
+	Time wasted:  {{ .TimeWasted }}
+	`, struct {
+				CntHosts        int
+				CntPasswords    int
+				CntUsers        int
+				CntFingerprints int
+				TimeWasted      string
+			}{
+				CntHosts:        len(Server.Stats.Hosts),
+				CntPasswords:    len(Server.Stats.Passwords),
+				CntUsers:        len(Server.Stats.Users),
+				CntFingerprints: len(Server.Stats.Fingerprints),
+				TimeWasted:      time.Duration(Server.Stats.TimeWasted * int(time.Second)).String(),
+			}))
+			return true
+		}
 	}
 
 	// 2) make sure the client waits some time at least,

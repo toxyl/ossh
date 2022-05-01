@@ -22,21 +22,22 @@ type SyncNode struct {
 }
 
 type Config struct {
-	PathData         string  `mapstructure:"path_data"`
-	PathFingerprints string  `mapstructure:"path_fingerprints"`
-	PathPasswords    string  `mapstructure:"path_passwords"`
-	PathUsers        string  `mapstructure:"path_users"`
-	PathHosts        string  `mapstructure:"path_hosts"`
-	PathCommands     string  `mapstructure:"path_commands"`
-	PathCaptures     string  `mapstructure:"path_captures"`
-	PathFFS          string  `mapstructure:"path_ffs"`
-	HostName         string  `mapstructure:"host_name"`
-	Version          string  `mapstructure:"version"`
-	Host             string  `mapstructure:"host"`
-	Port             uint    `mapstructure:"port"`
-	MaxIdleTimeout   uint    `mapstructure:"max_idle"`
-	InputDelay       uint    `mapstructure:"input_delay"`
-	Ratelimit        float64 `mapstructure:"ratelimit"`
+	PathData         string   `mapstructure:"path_data"`
+	PathFingerprints string   `mapstructure:"path_fingerprints"`
+	PathPasswords    string   `mapstructure:"path_passwords"`
+	PathUsers        string   `mapstructure:"path_users"`
+	PathHosts        string   `mapstructure:"path_hosts"`
+	PathCommands     string   `mapstructure:"path_commands"`
+	PathCaptures     string   `mapstructure:"path_captures"`
+	PathFFS          string   `mapstructure:"path_ffs"`
+	HostName         string   `mapstructure:"host_name"`
+	Version          string   `mapstructure:"version"`
+	IPWhitelist      []string `mapstructure:"ip_whitelist"`
+	Host             string   `mapstructure:"host"`
+	Port             uint     `mapstructure:"port"`
+	MaxIdleTimeout   uint     `mapstructure:"max_idle"`
+	InputDelay       uint     `mapstructure:"input_delay"`
+	Ratelimit        float64  `mapstructure:"ratelimit"`
 	Sync             struct {
 		Interval int        `mapstructure:"interval"`
 		Nodes    []SyncNode `mapstructure:"nodes"`
@@ -56,6 +57,15 @@ type Config struct {
 var cfgFile string
 var Conf Config
 var FFS FakeFileSystem
+
+func isIPWhitelisted(ip string) bool {
+	for _, wip := range Conf.IPWhitelist {
+		if ip == wip {
+			return true
+		}
+	}
+	return false
+}
 
 func initConfig() {
 	if cfgFile != "" {
