@@ -157,43 +157,27 @@ func (ossh *OSSHServer) saveHosts() {
 }
 
 func (ossh *OSSHServer) saveCapture(stats *FakeShellStats) {
-	date := time.Now().String()
-	if _, ok := ossh.shells[stats.Host]; ok {
-		date = ossh.shells[stats.Host].created.String()
-	}
-	data := struct {
-		Commands string
-		Host     string
-		User     string
-		Date     string
-	}{
-		Host:     stats.Host,
-		User:     stats.User,
-		Date:     date,
-		Commands: strings.Join(stats.CommandHistory, "\n"),
-	}
-	resSha1 := StringToSha1(data.Commands)
-	res := ParseTemplateToString("command-history", data)
-	f := fmt.Sprintf("%s/ocap-%s-%s.sh", Conf.PathCaptures, stats.Host, resSha1)
+	resSha1 := StringToSha1(strings.Join(stats.CommandHistory, "\n"))
+	f := fmt.Sprintf("%s/ocap-%s-%s.cast", Conf.PathCaptures, stats.Host, resSha1)
 
 	if !FileExists(f) {
-		err := os.WriteFile(f, []byte("\n"+res+"\n\n"), 0744)
+		err := stats.recording.Save(f)
 		if err == nil {
 			Log('✓', "Capture saved: %s\n", colorWrap(f, colorOrange))
 		}
 	}
 
-	ossh.savePayload(resSha1, res)
+	ossh.savePayload(resSha1, stats.recording.String())
 	ossh.addFingerprint(resSha1)
 }
 
 func (ossh *OSSHServer) savePayload(sha1, payload string) {
-	f := fmt.Sprintf("%s/payload-%s.sh", Conf.PathCaptures, sha1)
+	f := fmt.Sprintf("%s/payload-%s.cast", Conf.PathCaptures, sha1)
 	if FileExists(f) {
 		return // no need to save, we already have this payload
 	}
 
-	err := os.WriteFile(f, []byte("\n"+payload+"\n\n"), 0744)
+	err := os.WriteFile(f, []byte(payload), 0744)
 	if err == nil {
 		Log('✓', "Payload saved: %s\n", colorWrap(f, colorOrange))
 	}

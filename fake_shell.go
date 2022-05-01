@@ -14,13 +14,18 @@ import (
 	"golang.org/x/term"
 )
 
+const (
+	fakeShellInitialWidth  = 80
+	fakeShellInitialHeight = 40
+)
+
 type FakeShell struct {
 	session  ssh.Session
 	terminal *term.Terminal
-	log      []string
 	writer   *SlowWriter
 	created  time.Time
 	stats    *FakeShellStats
+	prompt   string
 }
 
 func (fs *FakeShell) User() string {
@@ -44,7 +49,14 @@ func (fs *FakeShell) Close() {
 }
 
 func (fs *FakeShell) UpdatePrompt(path string) {
-	fs.terminal.SetPrompt(fmt.Sprintf("%s@%s:%s# ", fs.User(), Conf.HostName, path))
+	fs.prompt = fmt.Sprintf("%s@%s:%s# ", fs.User(), Conf.HostName, path)
+	fs.terminal.SetPrompt(fs.prompt)
+}
+
+func (fs *FakeShell) RecordExec(input, output string) {
+	fs.stats.recording.AddInputEvent(fs.prompt + input)
+	fs.writer.WriteLn(output)
+	fs.stats.recording.AddOutputEvent(output)
 }
 
 func (fs *FakeShell) Exec(line string) bool {
@@ -219,7 +231,7 @@ Time wasted:  {{ .TimeWasted }}
 	// 3) check if command should exit immediately
 	for _, cmd := range Conf.Commands.Exit {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.writer.WriteLn("^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@") // just to waste some more time ;)
+			fs.RecordExec(line, "^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@") // just to waste some more time ;)
 			return true
 		}
 	}
@@ -227,7 +239,7 @@ Time wasted:  {{ .TimeWasted }}
 	// 4) check if command matches a simple command
 	for _, cmd := range Conf.Commands.Simple {
 		if strings.HasPrefix(line+"  ", cmd[0]+" ") {
-			fs.writer.WriteLn(ParseTemplateFromString(cmd[1], data))
+			fs.RecordExec(line, ParseTemplateFromString(cmd[1], data))
 			return false
 		}
 	}
@@ -235,7 +247,7 @@ Time wasted:  {{ .TimeWasted }}
 	// 5) check if command should return permission denied error
 	for _, cmd := range Conf.Commands.PermissionDenied {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.writer.WriteLn(ParseTemplateFromString("{{ .Command }}: permission denied", data))
+			fs.RecordExec(line, ParseTemplateFromString("{{ .Command }}: permission denied", data))
 			return false
 		}
 	}
@@ -243,7 +255,7 @@ Time wasted:  {{ .TimeWasted }}
 	// 6) check if command should return disk i/o error
 	for _, cmd := range Conf.Commands.DiskError {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.writer.WriteLn(ParseTemplateFromString("end_request: I/O error", data))
+			fs.RecordExec(line, ParseTemplateFromString("end_request: I/O error", data))
 			return false
 		}
 	}
@@ -251,7 +263,7 @@ Time wasted:  {{ .TimeWasted }}
 	// 7) check if command should return command not found error
 	for _, cmd := range Conf.Commands.CommandNotFound {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.writer.WriteLn(ParseTemplateFromString("{{ .Command }}: command not found", data))
+			fs.RecordExec(line, ParseTemplateFromString("{{ .Command }}: command not found", data))
 			return false
 		}
 	}
@@ -259,7 +271,7 @@ Time wasted:  {{ .TimeWasted }}
 	// 8) check if command should return file not found error
 	for _, cmd := range Conf.Commands.FileNotFound {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.writer.WriteLn(ParseTemplateFromString("{{ .Command }}: No such file or directory", data))
+			fs.RecordExec(line, ParseTemplateFromString("{{ .Command }}: No such file or directory", data))
 			return false
 		}
 	}
@@ -267,13 +279,13 @@ Time wasted:  {{ .TimeWasted }}
 	// 9) check if command should return not implemented error
 	for _, cmd := range Conf.Commands.NotImplemented {
 		if strings.HasPrefix(line+" ", cmd+" ") {
-			fs.writer.WriteLn(ParseTemplateFromString("{{ .Command }}: Function not implemented", data))
+			fs.RecordExec(line, ParseTemplateFromString("{{ .Command }}: Function not implemented", data))
 			return false
 		}
 	}
 
 	// 10) check if we have a template for the command
-	fs.writer.WriteLn(ParseTemplateToString(command, data))
+	fs.RecordExec(line, ParseTemplateToString(command, data))
 	return false
 }
 
@@ -342,7 +354,6 @@ func NewFakeShell(s ssh.Session) *FakeShell {
 	fs := &FakeShell{
 		session:  s,
 		terminal: nil,
-		log:      []string{},
 		writer:   nil,
 		created:  time.Now(),
 		stats: &FakeShellStats{
@@ -351,11 +362,13 @@ func NewFakeShell(s ssh.Session) *FakeShell {
 			CommandHistory:   []string{},
 			Host:             "",
 			User:             s.User(),
+			recording:        NewASCIICastV2(fakeShellInitialWidth, fakeShellInitialHeight),
 		},
 	}
 	fs.terminal = term.NewTerminal(s, "")
 	fs.writer = NewSlowWriter(fs.terminal)
 	fs.stats.Host = fs.Host()
+
 	fs.UpdatePrompt("~")
 	return fs
 }
