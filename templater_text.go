@@ -108,13 +108,6 @@ func InitTemplaterFunctions() {
 		"mul": func(a, b float64) float64 {
 			return a * b
 		},
-		"file": func(path string) string {
-			return FFS.Read(path)
-		},
-		"list": func(path string) string {
-			files := FFS.List(path)
-			return strings.Join(files, " ")
-		},
 		"sha1": func(s string) string {
 			return StringToSha1(s)
 		},

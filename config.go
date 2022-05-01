@@ -127,6 +127,7 @@ func initConfig() {
 
 	InitTemplaterFunctions()
 	InitTemplaterFunctionsHTML()
+}
 
 func getConfig() string {
 	cfg, err := os.ReadFile(cfgFile)
