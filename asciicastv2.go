@@ -104,7 +104,7 @@ func (ac2 *ASCIICastV2) AddInputEvent(data string) {
 }
 
 func (ac2 *ASCIICastV2) AddOutputEvent(data string) {
-	ac2.addEvent("o", data)
+	ac2.addEvent("o", fmt.Sprintf("%s\r\n\u001b[?2004l\r", data))
 }
 
 func (ac2 *ASCIICastV2) String() string {
@@ -115,17 +115,13 @@ func (ac2 *ASCIICastV2) String() string {
 	return strings.Join(output, "\n")
 }
 
-func (ac2 *ASCIICastV2) Save(file string) {
+func (ac2 *ASCIICastV2) Save(file string) error {
 	data := ac2.String()
-	err := os.WriteFile(file, []byte(data), 0755)
+	err := os.WriteFile(file, []byte(data), 0744)
 	if err != nil {
-		Log(
-			'x',
-			"Could not save ASCIICastV2 to file '%s': %s\n",
-			colorWrap(file, colorOrange),
-			colorWrap(err.Error(), colorRed),
-		)
+		return err
 	}
+	return nil
 }
 
 func (ac2 *ASCIICastV2) Load(file string) {

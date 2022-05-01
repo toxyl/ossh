@@ -8,10 +8,10 @@ input_delay: 25 # in ms/char
 sync:
   interval: 1 # in minutes
   nodes:
-    - host: 127.0.0.1
-      port: 22
-      user: 8fe36196f2c4bb5a63f390c3e2e1152a3ababcd3f41c1295b86f773c9c53c632
-      password: 3061559b1baa386f6b5a3d1c73caa75617fbf78e3a49c23f272ac6d855f315b9
+    # - host: 127.0.0.1
+    #   port: 22
+    #   user: 8fe36196f2c4bb5a63f390c3e2e1152a3ababcd3f41c1295b86f773c9c53c632
+    #   password: 3061559b1baa386f6b5a3d1c73caa75617fbf78e3a49c23f272ac6d855f315b9
 commands:
   rewriters:
     - [ ";\\s*", "\n" ]

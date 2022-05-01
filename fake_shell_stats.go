@@ -6,4 +6,5 @@ type FakeShellStats struct {
 	TimeSpent        uint
 	CommandsExecuted uint
 	CommandHistory   []string
+	recording        *ASCIICastV2
 }
