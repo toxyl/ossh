@@ -66,9 +66,6 @@ Commands are evaluated in the following order:
 #### `rewriters` (config)
 These are pairs of regular expressions and replacements and will be executed in the given order on any user/bot input. Be aware that captures are made after rewriters have been applied.
 
-#### `my-little-pony`
-When this command is encountered oSSH will print a list with stats, such as amounts of collected user names and passwords. Consider it to be an admin-command which you can use to get stats. It cannot be configured and is included in this list for the sake of completeness.
-
 #### `exit` (config)
 If a command matches this list the connection will be terminated with a time-wasting response: 
 `^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@`
