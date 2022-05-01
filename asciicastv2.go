@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 )
@@ -46,7 +47,7 @@ func (ac2e *ASCIICastV2Event) String() string {
 	if ac2e.Type != "o" && ac2e.Type != "i" {
 		Log(
 			'x',
-			"Could not convert ASCIICastV2Event to string, type '%s' is unknown.",
+			"Could not convert ASCIICastV2Event to string, type '%s' is unknown.\n",
 			colorWrap(ac2e.Type, colorOrange),
 		)
 		return ""
@@ -66,12 +67,18 @@ type ASCIICastV2 struct {
 	EventStream []ASCIICastV2Event
 }
 
-func (ac2 *ASCIICastV2) addEvent(eventtype, data string) {
+func (ac2 *ASCIICastV2) addEventRaw(eventtype, data string, time float64) {
 	ac2.EventStream = append(ac2.EventStream, ASCIICastV2Event{
-		Time: float64(int(time.Now().Unix()) - ac2.Header.Timestamp),
+		Time: time,
 		Type: eventtype,
 		Data: data,
 	})
+}
+
+func (ac2 *ASCIICastV2) addEvent(eventtype, data string) {
+	t := float64(int(time.Now().Unix()) - ac2.Header.Timestamp)
+	ac2.Header.Duration = t
+	ac2.addEventRaw(eventtype, data, t)
 }
 
 func (ac2 *ASCIICastV2) AddInputEvent(data string) {
@@ -90,6 +97,65 @@ func (ac2 *ASCIICastV2) String() string {
 	return strings.Join(output, "\n")
 }
 
+func (ac2 *ASCIICastV2) Save(file string) {
+	data := ac2.String()
+	err := os.WriteFile(file, []byte(data), 0755)
+	if err != nil {
+		Log(
+			'x',
+			"Could not save ASCIICastV2 to file '%s': %s\n",
+			colorWrap(file, colorOrange),
+			colorWrap(err.Error(), colorRed),
+		)
+	}
+}
+
+func (ac2 *ASCIICastV2) Load(file string) {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		Log(
+			'x',
+			"Could not load ASCIICastV2 from file '%s': %s\n",
+			colorWrap(file, colorOrange),
+			colorWrap(err.Error(), colorRed),
+		)
+		return
+	}
+	lines := strings.Split(string(data), "\n")
+	if len(lines) > 0 {
+		meta := lines[0]
+		lines = lines[1:]
+		err = json.Unmarshal([]byte(meta), &ac2.Header)
+		if err != nil {
+			Log(
+				'x',
+				"Could not unmarshal ASCIICastV2Header from file '%s': %s\n",
+				colorWrap(file, colorOrange),
+				colorWrap(err.Error(), colorRed),
+			)
+			return
+		}
+		ac2.EventStream = []ASCIICastV2Event{}
+		for _, line := range lines {
+			var ed []interface{}
+			err := json.Unmarshal([]byte(line), &ed)
+
+			if err != nil {
+				Log(
+					'x',
+					"Could not unmarshal ASCIICastV2Event from file '%s': %s (input was: '%s')\n",
+					colorWrap(file, colorOrange),
+					colorWrap(err.Error(), colorRed),
+					colorWrap(line, colorCyan),
+				)
+				continue
+			}
+
+			ac2.addEventRaw(ed[1].(string), ed[2].(string), ed[0].(float64))
+		}
+	}
+}
+
 func NewASCIICastV2(width int, height int, title, command string) *ASCIICastV2 {
 	ac2 := &ASCIICastV2{
 		Header: ASCIICastV2Header{
@@ -97,7 +163,7 @@ func NewASCIICastV2(width int, height int, title, command string) *ASCIICastV2 {
 			Width:         width,
 			Height:        height,
 			Timestamp:     int(time.Now().Unix()),
-			Duration:      0, // not known yet, we'll set it later
+			Duration:      0,
 			IdleTimeLimit: 0, // TODO: not yet sure what a good default is
 			Command:       command,
 			Title:         title,
