@@ -77,7 +77,6 @@ commands:
     - df
     - dirname
     - du
-    - pwd
     - readlink
     - realpath
     - rm
@@ -149,7 +148,6 @@ commands:
     - tee
     - test
     - timeout
-    - touch
     - tr
     - true
     - truncate
