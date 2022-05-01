@@ -66,7 +66,7 @@
 </script>
 {{ template "ws_conn" dict "Scheme" .Scheme "Name" "console" "OpenFn" "ws_con_open" "CloseFn" "ws_con_close" "PreConnectFn" "ws_con_preconnect" "ReceiveFn" "ws_con_receive" "ReceiveCompleteFn" "ws_con_receive_complete" "SendFn" "ws_con_send" }}
 <div id="tabConsole" class="w3-display-container w3-dark-gray tab">
-    <div>{{ template "tags_logs" }}</div>
+    <div style="padding-top: 7px;">{{ template "tags_logs" }}</div>
     <table id="tConsole"></table>
     <br><br><br><br>
 </div>
