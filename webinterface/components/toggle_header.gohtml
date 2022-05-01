@@ -1,7 +1,0 @@
-{{ define "toggle_header" }}
-<table>
-    <tr onclick="toggle_header('{{ .Name }}', '{{ .ID }}', event)" style="cursor: pointer;">
-        <td class="left"><h3 class="left w3-medium no-margin">{{ if eq .Status "-" }}{{ template "icon-open" }}{{ else }}{{ template "icon-closed" }}{{ end }}{{ .Name }}</h3></td>
-    </tr>
-</table>
-{{ end }}

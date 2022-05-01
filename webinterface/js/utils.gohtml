@@ -1,11 +1,5 @@
 {{ define "utils" }} 
 <script type="text/javascript">
-    function toggle_header(name, id, event) {
-        $(id).toggle();
-        $(event.currentTarget.children[0].firstElementChild).html(($(id).is(":visible") ? '{{ template_string "icon-open" nil }}' : '{{ template_string "icon-closed" nil }}') + " " + name);
-    }
-
-
     function log_to_class(category) {
         category = category.toUpperCase();
         var map = {

@@ -40,6 +40,29 @@ type OSSHServer struct {
 	}
 }
 
+func (ossh *OSSHServer) statsJSONSimple() string {
+	data := struct {
+		CntHosts        int    `json:"hosts"`
+		CntPasswords    int    `json:"passwords"`
+		CntUsers        int    `json:"users"`
+		CntFingerprints int    `json:"fingerprints"`
+		TimeWasted      string `json:"time_wasted"`
+	}{
+		CntHosts:        len(Server.Stats.Hosts),
+		CntPasswords:    len(Server.Stats.Passwords),
+		CntUsers:        len(Server.Stats.Users),
+		CntFingerprints: len(Server.Stats.Fingerprints),
+		TimeWasted:      time.Duration(Server.Stats.TimeWasted * int(time.Second)).String(),
+	}
+	json, err := json.Marshal(data)
+	if err != nil {
+		LogError("Could not marshal web interface stats data: %s\n", err.Error())
+		return ""
+	}
+
+	return string(json)
+}
+
 func (ossh *OSSHServer) statsJSON() string {
 	data := StatsJSON{
 		Hosts:        maps.Keys(Server.Stats.Hosts),
@@ -594,6 +617,7 @@ func NewOSSHServer() *OSSHServer {
 			for _, node := range Conf.Sync.Nodes {
 				_ = executeSSHCommand(node.Host, node.Port, node.User, node.Password, "check")
 			}
+			WebServer.PushStats(Server.statsJSONSimple())
 		}
 	}()
 	return ossh
