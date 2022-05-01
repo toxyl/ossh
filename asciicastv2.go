@@ -10,21 +10,24 @@ import (
 
 // {"version": 2, "width": 80, "height": 24, "timestamp": 1504467315, "title": "Demo", "env": {"TERM": "xterm-256color", "SHELL": "/bin/zsh"}}
 // color format: #rrggbb
+
+type ASCIICastV2Theme struct {
+	FG      string `json:"fg"`      // text color
+	BG      string `json:"bg"`      // background color
+	Palette string `json:"palette"` // list of 8 or 16 colors, separated by colon character
+}
+
 type ASCIICastV2Header struct {
 	Version       int               `json:"version"`         // (required) must be 2
 	Width         int               `json:"width"`           // (required) in columns
 	Height        int               `json:"height"`          // (required) in rows
 	Timestamp     int               `json:"timestamp"`       // (optional) unix epoch
 	Duration      float64           `json:"duration"`        // (optional) in seconds
-	IdleTimeLimit float64           `json:"idle_time_limit"` // (optional) "This should be used by an asciicast player to reduce all terminal inactivity (delays between frames) to maximum of idle_time_limit value."
+	IdleTimeLimit float64           `json:"idle_time_limit"` // (optional) in seconds
 	Command       string            `json:"command"`         // (optional) name of the command that was recorded
 	Title         string            `json:"title"`           // (optional) name of the asciicast
 	Env           map[string]string `json:"env"`             // (optional) key-value pair
-	Theme         struct {          // (optional) color scheme of recorded terminal
-		FG      string `json:"fg"`      // normal text color
-		BG      string `json:"bg"`      // normal background color
-		Palette string `json:"palette"` // list of 8 or 16 colors, separated by colon character
-	} `json:"theme"`
+	Theme         ASCIICastV2Theme  `json:"theme"`           // (optional) color scheme of recorded terminal
 }
 
 func (ac2h *ASCIICastV2Header) String() string {
@@ -53,13 +56,17 @@ func (ac2e *ASCIICastV2Event) String() string {
 		return ""
 	}
 
-	json, err := json.Marshal(ac2e.Data)
+	json, err := json.Marshal([]any{
+		ac2e.Time,
+		ac2e.Type,
+		ac2e.Data,
+	})
 	if err != nil {
 		Log('x', "Could not marshal ASCIICastV2Event data: %s\n", err.Error())
 		return ""
 	}
 
-	return fmt.Sprintf("[%f, \"%s\", %s]", ac2e.Time, ac2e.Type, json)
+	return string(json)
 }
 
 type ASCIICastV2 struct {
@@ -76,13 +83,24 @@ func (ac2 *ASCIICastV2) addEventRaw(eventtype, data string, time float64) {
 }
 
 func (ac2 *ASCIICastV2) addEvent(eventtype, data string) {
-	t := float64(int(time.Now().Unix()) - ac2.Header.Timestamp)
-	ac2.Header.Duration = t
-	ac2.addEventRaw(eventtype, data, t)
+	timeStart := time.Unix(int64(ac2.Header.Timestamp), 0)
+	timeNow := time.Now()
+	timeSinceStart := timeNow.Sub(timeStart)
+	secondsSinceStart := timeSinceStart.Seconds()
+
+	ac2.Header.Duration = secondsSinceStart
+	ac2.addEventRaw(eventtype, data, secondsSinceStart)
 }
 
 func (ac2 *ASCIICastV2) AddInputEvent(data string) {
-	ac2.addEvent("i", data)
+	// asciinema records an event for every character of input
+	// and stores one input event _and_ one output event for it.
+	// the input event sequence is concluded with a \r and
+	// the output event sequence with \r\n\u001b[?2004l\r.
+	// for simplicity (no need to emulate typing, maybe later?)
+	// we make only two events from that
+	ac2.addEvent("i", fmt.Sprintf("%s\r", data))
+	ac2.addEvent("o", fmt.Sprintf("%s\r\n\u001b[?2004l\r", data))
 }
 
 func (ac2 *ASCIICastV2) AddOutputEvent(data string) {
@@ -137,7 +155,7 @@ func (ac2 *ASCIICastV2) Load(file string) {
 		}
 		ac2.EventStream = []ASCIICastV2Event{}
 		for _, line := range lines {
-			var ed []interface{}
+			var ed []any
 			err := json.Unmarshal([]byte(line), &ed)
 
 			if err != nil {
@@ -156,7 +174,7 @@ func (ac2 *ASCIICastV2) Load(file string) {
 	}
 }
 
-func NewASCIICastV2(width int, height int, title, command string) *ASCIICastV2 {
+func NewASCIICastV2(term string, width int, height int, title, command string) *ASCIICastV2 {
 	ac2 := &ASCIICastV2{
 		Header: ASCIICastV2Header{
 			Version:       2,
@@ -164,17 +182,25 @@ func NewASCIICastV2(width int, height int, title, command string) *ASCIICastV2 {
 			Height:        height,
 			Timestamp:     int(time.Now().Unix()),
 			Duration:      0,
-			IdleTimeLimit: 0, // TODO: not yet sure what a good default is
+			IdleTimeLimit: 1.0,
 			Command:       command,
 			Title:         title,
-			Env:           map[string]string{},
-			Theme: struct {
-				FG      string "json:\"fg\""
-				BG      string "json:\"bg\""
-				Palette string "json:\"palette\""
-			}{},
+			Env: map[string]string{
+				"TERM": term,
+			},
+			Theme: ASCIICastV2Theme{
+				FG:      "#d0d0d0",
+				BG:      "#212121",
+				Palette: "#151515:#ac4142:#7e8e50:#e5b567:#6c99bb:#9f4e85:#7dd6cf:#d0d0d0:#505050:#ac4142:#7e8e50:#e5b567:#6c99bb:#9f4e85:#7dd6cf:#f5f5f5",
+			},
 		},
 		EventStream: []ASCIICastV2Event{},
 	}
+	return ac2
+}
+
+func OpenASCIICastV2(file string) *ASCIICastV2 {
+	ac2 := NewASCIICastV2("", 0, 0, "", "")
+	ac2.Load(file)
 	return ac2
 }
