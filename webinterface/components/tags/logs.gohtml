@@ -1,6 +1,10 @@
 {{ define "tags_logs" }}
-<tag class="w3-button w3-text-black bg-color-1" onclick="filter_log('ERROR')">ERROR</tag>
-<tag class="w3-button w3-text-black bg-color-5" onclick="filter_log('WARNING')">WARNING</tag>
-<tag class="w3-button w3-text-black bg-color-6" onclick="filter_log('INFO')">INFO</tag>
+<tag class="w3-button w3-text-black bg-color-1" onclick="filter_log('INFO')">INFO</tag>
+<tag class="w3-button w3-text-black bg-color-2" onclick="filter_log('WARNING')">WARNING</tag>
+<tag class="w3-button w3-text-black bg-color-3" onclick="filter_log('ERROR')">ERROR</tag>
+<tag class="w3-button w3-text-black bg-color-4" onclick="filter_log('NOT OK')">NOT OK</tag>
+<tag class="w3-button w3-text-black bg-color-5" onclick="filter_log('OK')">OK</tag>
+<tag class="w3-button w3-text-black bg-color-6" onclick="filter_log('SUCCESS')">SUCCESS</tag>
+<tag class="w3-button w3-text-black bg-color-7" onclick="filter_log('OTHER')">OTHER</tag>
 <tag class="w3-button w3-text-black bg-color-8" onclick="filter_log('*')">All</tag>
 {{ end }}

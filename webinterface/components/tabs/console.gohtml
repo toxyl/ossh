@@ -18,12 +18,37 @@
             return;
 
         var cs = $("#tConsole");
-        var re = /(.*?)\s+\[(.*?)\]\s+(.*)\s*/;    
-        var dt = str.replace(re, '$1');
-        var ct = str.replace(re, '$2').toUpperCase();
-        var msg = str.replace(re, '$3');
+        var re = /.*?m\[(.*?)\].*?\s+(.*)\s*/;    
+        var ct = str.replace(re, '$1');
+        switch (ct) {
+            case 'i':
+                ct = "INFO";
+                break;
+            case '!':
+                ct = "WARNING";
+                break;
+            case 'x':
+                ct = "ERROR";
+                break;
+            case '-':
+                ct = "NOT OK";
+                break;
+            case '+':
+                ct = "OK";
+                break;
+            case '✓':
+                ct = "SUCCESS";
+                break;
+        
+            default:
+                ct = "OTHER";
+                break;
+        }
+        var msg = str.replace(re, '$2');
+        var ansi_up = new AnsiUp;
+        msg = ansi_up.ansi_to_html(msg);
 
-        cs.prepend(`<tr class='log log${ct.replace(/[^a-zA-Z0-9]+/g, '')}'><td class="w10 left"><tag class='bg-${log_to_class(ct)}'>${ct}</tag></td><td  class="w20 left">${dt}</td><td class="w70 left">${msg}</td></tr>`);
+        cs.prepend(`<tr class='log log${ct.replace(/[^a-zA-Z0-9]+/g, '')}'><td class="w5 left"><tag class='bg-${log_to_class(ct)}'>${ct}</tag></td><td  class="w15 left monospace">${(new Date()).toISOString()}</td><td class="w80 left monospace">${msg}</td></tr>`);
         if (current_log_filter != "*" && current_log_filter != ct) {
             $(`.log.log${ct.replace(/[^a-zA-Z0-9]+/g, '')}`).hide();
         }
@@ -40,7 +65,7 @@
     function ws_con_send() { }
 </script>
 {{ template "ws_conn" dict "Scheme" .Scheme "Name" "console" "OpenFn" "ws_con_open" "CloseFn" "ws_con_close" "PreConnectFn" "ws_con_preconnect" "ReceiveFn" "ws_con_receive" "ReceiveCompleteFn" "ws_con_receive_complete" "SendFn" "ws_con_send" }}
-<div id="tabConsole" class="w3-display-container w3-dark-gray tab" style="display:none">
+<div id="tabConsole" class="w3-display-container w3-dark-gray tab">
     <div>{{ template "tags_logs" }}</div>
     <table id="tConsole"></table>
     <br><br><br><br>

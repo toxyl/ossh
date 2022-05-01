@@ -45,7 +45,12 @@ func Log(indicator rune, format string, a ...interface{}) {
 	case ' ':
 		prefix = colorWrap("[ ]", colorGray)
 	}
-	fmt.Printf(prefix+" "+format, a...)
+	msg := fmt.Sprintf(prefix+" "+format, a...)
+
+	fmt.Print(msg)
+	if WebServer != nil {
+		WebServer.PushLog(msg)
+	}
 }
 
 func LogDefault(format string, a ...interface{}) {

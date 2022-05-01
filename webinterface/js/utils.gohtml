@@ -4,5 +4,26 @@
         $(id).toggle();
         $(event.currentTarget.children[0].firstElementChild).html(($(id).is(":visible") ? '{{ template_string "icon-open" nil }}' : '{{ template_string "icon-closed" nil }}') + " " + name);
     }
+
+
+    function log_to_class(category) {
+        category = category.toUpperCase();
+        var map = {
+            "INFO": "color-1",
+            "WARNING": "color-2",
+            "ERROR": "color-3",
+            "NOTOK": "color-4",
+            "OK": "color-5",
+            "SUCCESS": "color-6",
+            "OTHER": "color-6",
+        }
+
+        if (map[category] == undefined) {
+            return "color-8";
+        }
+
+        return map[category];
+    }
+
 </script>
 {{ end }}

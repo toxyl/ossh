@@ -8,12 +8,13 @@
         <link href="https://fonts.googleapis.com/css2?family=Rajdhani" rel="stylesheet">
         <title>oSSH</title>
         {{ template "jquery" }} 
+        {{ template "ansi2html" }} 
         {{ template "utils" }} 
         {{ template "ace" }}
         {{ template "style" }} 
     </head>
     <body style="height: 100%; margin: 0; padding: 0; overflow: hidden;">
-        {{ template "overlay" dict "Name" "connection" "Reason" "connecting to server"}}
+        {{ template "overlay" dict "Name" "connection" "Reason" "connecting to server" }}
         <div class="w3-top">
             <div class="w3-bar">
                 {{ template "tabs" }}
