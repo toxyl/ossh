@@ -49,7 +49,7 @@ func (ossh *OSSHServer) statsJSON() string {
 	}
 	json, err := json.Marshal(data)
 	if err != nil {
-		Log('x', "Could not marshal sync data: %s\n", err.Error())
+		LogError("Could not marshal sync data: %s\n", err.Error())
 		return ""
 	}
 
@@ -64,12 +64,12 @@ func (ossh *OSSHServer) loadFingerprints() {
 	if FileExists(Conf.PathFingerprints) {
 		content, err := os.ReadFile(Conf.PathFingerprints)
 		if err != nil {
-			Log('x', "Failed to read fingerprints file: %s\n", err.Error())
+			LogError("Failed to read fingerprints file: %s\n", err.Error())
 			return
 		}
 		fingerprints := strings.Split(string(content), "\n")
 
-		Log('+', "Loading %d fingerprints\n", len(fingerprints))
+		LogOK("Loading %d fingerprints\n", len(fingerprints))
 		for _, fp := range fingerprints {
 			ossh.addFingerprint(fp)
 		}
@@ -80,12 +80,12 @@ func (ossh *OSSHServer) loadUsers() {
 	if FileExists(Conf.PathUsers) {
 		content, err := os.ReadFile(Conf.PathUsers)
 		if err != nil {
-			Log('x', "Failed to read users file: %s\n", err.Error())
+			LogError("Failed to read users file: %s\n", err.Error())
 			return
 		}
 		users := strings.Split(string(content), "\n")
 
-		Log('+', "Loading %d users\n", len(users))
+		LogOK("Loading %d users\n", len(users))
 		for _, eu := range users {
 			ossh.addUser(eu)
 		}
@@ -96,12 +96,12 @@ func (ossh *OSSHServer) loadPasswords() {
 	if FileExists(Conf.PathPasswords) {
 		content, err := os.ReadFile(Conf.PathPasswords)
 		if err != nil {
-			Log('x', "Failed to read passwords file: %s\n", err.Error())
+			LogError("Failed to read passwords file: %s\n", err.Error())
 			return
 		}
 		passwords := strings.Split(string(content), "\n")
 
-		Log('+', "Loading %d passwords\n", len(passwords))
+		LogOK("Loading %d passwords\n", len(passwords))
 		for _, ep := range passwords {
 			ossh.addPassword(ep)
 		}
@@ -112,12 +112,12 @@ func (ossh *OSSHServer) loadHosts() {
 	if FileExists(Conf.PathHosts) {
 		content, err := os.ReadFile(Conf.PathHosts)
 		if err != nil {
-			Log('x', "Failed to read hosts file: %s\n", err.Error())
+			LogError("Failed to read hosts file: %s\n", err.Error())
 			return
 		}
 		hosts := strings.Split(string(content), "\n")
 
-		Log('+', "Loading %d hosts\n", len(hosts))
+		LogOK("Loading %d hosts\n", len(hosts))
 		for _, eh := range hosts {
 			ossh.addHost(eh)
 		}
@@ -128,7 +128,7 @@ func (ossh *OSSHServer) saveFingerprints() {
 	data := strings.Join(maps.Keys(ossh.Stats.Fingerprints), "\n") + "\n"
 	err := os.WriteFile(Conf.PathFingerprints, []byte(data), 0644)
 	if err != nil {
-		Log('x', "Failed to write fingerprints file: %s\n", err.Error())
+		LogError("Failed to write fingerprints file: %s\n", err.Error())
 	}
 }
 
@@ -136,7 +136,7 @@ func (ossh *OSSHServer) saveUsers() {
 	data := strings.Join(maps.Keys(ossh.Stats.Users), "\n") + "\n"
 	err := os.WriteFile(Conf.PathUsers, []byte(data), 0644)
 	if err != nil {
-		Log('x', "Failed to write users file: %s\n", err.Error())
+		LogError("Failed to write users file: %s\n", err.Error())
 	}
 }
 
@@ -144,7 +144,7 @@ func (ossh *OSSHServer) savePasswords() {
 	data := strings.Join(maps.Keys(ossh.Stats.Passwords), "\n") + "\n"
 	err := os.WriteFile(Conf.PathPasswords, []byte(data), 0644)
 	if err != nil {
-		Log('x', "Failed to write passwords file: %s\n", err.Error())
+		LogError("Failed to write passwords file: %s\n", err.Error())
 	}
 }
 
@@ -152,7 +152,7 @@ func (ossh *OSSHServer) saveHosts() {
 	data := strings.Join(maps.Keys(ossh.Stats.Hosts), "\n") + "\n"
 	err := os.WriteFile(Conf.PathHosts, []byte(data), 0644)
 	if err != nil {
-		Log('x', "Failed to write hosts file: %s\n", err.Error())
+		LogError("Failed to write hosts file: %s\n", err.Error())
 	}
 }
 
@@ -163,7 +163,7 @@ func (ossh *OSSHServer) saveCapture(stats *FakeShellStats) {
 	if !FileExists(f) {
 		err := stats.recording.Save(f)
 		if err == nil {
-			Log('✓', "Capture saved: %s\n", colorWrap(f, colorOrange))
+			LogSuccess("Capture saved: %s\n", colorWrap(f, colorOrange))
 		}
 	}
 
@@ -179,7 +179,7 @@ func (ossh *OSSHServer) savePayload(sha1, payload string) {
 
 	err := os.WriteFile(f, []byte(payload), 0744)
 	if err == nil {
-		Log('✓', "Payload saved: %s\n", colorWrap(f, colorOrange))
+		LogSuccess("Payload saved: %s\n", colorWrap(f, colorOrange))
 	}
 }
 
@@ -322,8 +322,7 @@ func (ossh *OSSHServer) addLoginFailure(usr, pwd, host, reason string) {
 	}
 
 	if isIPWhitelisted(host) {
-		Log(
-			'-',
+		LogNotOK(
 			"%s@%s failed to login: %s.\n",
 			colorWrap(usr, colorGreen),
 			colorWrap(host, colorBrightYellow),
@@ -337,8 +336,7 @@ func (ossh *OSSHServer) addLoginFailure(usr, pwd, host, reason string) {
 	ossh.addHost(host)
 	ossh.Stats.Logins.Attempts = ossh.incCounter(ossh.Stats.Logins.Attempts, host)
 	ossh.Stats.Logins.Failed = ossh.incCounter(ossh.Stats.Logins.Failed, host)
-	Log(
-		'-',
+	LogNotOK(
 		"%s@%s failed to login with password %s: %s. (%d attempts; %d failed; %d success)\n",
 		colorWrap(usr, colorGreen),
 		colorWrap(host, colorBrightYellow),
@@ -356,8 +354,7 @@ func (ossh *OSSHServer) addLoginSuccess(usr, pwd, host, reason string) {
 	}
 
 	if isIPWhitelisted(host) {
-		Log(
-			'+',
+		LogOK(
 			"%s@%s logged in.\n",
 			colorWrap(usr, colorGreen),
 			colorWrap(host, colorBrightYellow),
@@ -370,8 +367,7 @@ func (ossh *OSSHServer) addLoginSuccess(usr, pwd, host, reason string) {
 	ossh.addHost(host)
 	ossh.Stats.Logins.Attempts = ossh.incCounter(ossh.Stats.Logins.Attempts, host)
 	ossh.Stats.Logins.OK = ossh.incCounter(ossh.Stats.Logins.OK, host)
-	Log(
-		'+',
+	LogOK(
 		"%s@%s logged in with password %s: %s. (%d attempts; %d failed; %d success)\n",
 		colorWrap(usr, colorGreen),
 		colorWrap(host, colorBrightYellow),
@@ -398,7 +394,7 @@ func (ossh *OSSHServer) sessionHandler(s ssh.Session) {
 	if !ossh.syncClients[host] && !isIPWhitelisted(host) {
 		ossh.Stats.TimeWasted += int(stats.TimeSpent)
 
-		Log('✓', "%s@%s spent %s running %s command(s)\n",
+		LogSuccess("%s@%s spent %s running %s command(s)\n",
 			colorWrap(fs.User(), colorGreen),
 			colorWrap(host, colorBrightYellow),
 			colorWrap(time.Duration(stats.TimeSpent*uint(time.Second)).String(), colorCyan),
@@ -419,7 +415,7 @@ func (ossh *OSSHServer) sessionHandler(s ssh.Session) {
 }
 
 func (ossh *OSSHServer) localPortForwardingCallback(ctx ssh.Context, bindHost string, bindPort uint32) bool {
-	Log('!', "%s@%s tried to locally forward port %s. Request denied!\n",
+	LogWarning("%s@%s tried to locally forward port %s. Request denied!\n",
 		colorWrap(ctx.User(), colorGreen),
 		colorWrap(bindHost, colorBrightYellow),
 		colorWrap(fmt.Sprintf("%d", bindPort), colorCyan),
@@ -429,7 +425,7 @@ func (ossh *OSSHServer) localPortForwardingCallback(ctx ssh.Context, bindHost st
 }
 
 func (ossh *OSSHServer) reversePortForwardingCallback(ctx ssh.Context, bindHost string, bindPort uint32) bool {
-	Log('!', "%s@%s tried to reverse forward port %s. Request denied!\n",
+	LogWarning("%s@%s tried to reverse forward port %s. Request denied!\n",
 		colorWrap(ctx.User(), colorGreen),
 		colorWrap(bindHost, colorBrightYellow),
 		colorWrap(fmt.Sprintf("%d", bindPort), colorCyan),
@@ -443,7 +439,7 @@ func (ossh *OSSHServer) ptyCallback(ctx ssh.Context, pty ssh.Pty) bool {
 	if ossh.syncClients[host] || isIPWhitelisted(host) {
 		return true
 	}
-	Log('+', "%s@%s started %s PTY session\n",
+	LogOK("%s@%s started %s PTY session\n",
 		colorWrap(ctx.User(), colorGreen),
 		colorWrap(host, colorBrightYellow),
 		colorWrap(pty.Term, colorCyan),
@@ -456,7 +452,7 @@ func (ossh *OSSHServer) sessionRequestCallback(sess ssh.Session, requestType str
 	if ossh.syncClients[host] || isIPWhitelisted(host) {
 		return true
 	}
-	Log('+', "%s@%s requested %s session\n",
+	LogOK("%s@%s requested %s session\n",
 		colorWrap(sess.User(), colorGreen),
 		colorWrap(host, colorBrightYellow),
 		colorWrap(requestType, colorCyan),
@@ -469,7 +465,7 @@ func (ossh *OSSHServer) connectionFailedCallback(conn net.Conn, err error) {
 		host := strings.Split(conn.RemoteAddr().String(), ":")[0]
 		if ossh.hasHost(host) {
 			if _, ok := ossh.shells[host]; ok {
-				Log('!', "%s@%s's connection failed: %s\n",
+				LogWarning("%s@%s's connection failed: %s\n",
 					colorWrap(ossh.shells[host].stats.User, colorGreen),
 					colorWrap(host, colorBrightYellow),
 					colorWrap(err.Error(), colorOrange),
@@ -478,7 +474,7 @@ func (ossh *OSSHServer) connectionFailedCallback(conn net.Conn, err error) {
 			}
 		}
 
-		Log('!', "%s's connection failed: %s\n",
+		LogWarning("%s's connection failed: %s\n",
 			colorWrap(host, colorBrightYellow),
 			colorWrap(err.Error(), colorOrange),
 		)
@@ -553,7 +549,7 @@ func (ossh *OSSHServer) init() {
 }
 
 func (ossh *OSSHServer) Start() {
-	Log(' ', "Starting oSSH Server on %v\n", colorWrap(ossh.server.Addr, colorBrightYellow))
+	LogDefault("Starting oSSH Server on %v\n", colorWrap(ossh.server.Addr, colorBrightYellow))
 	log.Fatal(ossh.server.ListenAndServe())
 }
 

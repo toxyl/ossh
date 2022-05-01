@@ -33,7 +33,7 @@ type ASCIICastV2Header struct {
 func (ac2h *ASCIICastV2Header) String() string {
 	json, err := json.Marshal(ac2h)
 	if err != nil {
-		Log('x', "Could not marshal ASCIICastV2Header: %s\n", err.Error())
+		LogError("Could not marshal ASCIICastV2Header: %s\n", err.Error())
 		return ""
 	}
 
@@ -48,8 +48,7 @@ type ASCIICastV2Event struct {
 
 func (ac2e *ASCIICastV2Event) String() string {
 	if ac2e.Type != "o" && ac2e.Type != "i" {
-		Log(
-			'x',
+		LogError(
 			"Could not convert ASCIICastV2Event to string, type '%s' is unknown.\n",
 			colorWrap(ac2e.Type, colorOrange),
 		)
@@ -62,7 +61,7 @@ func (ac2e *ASCIICastV2Event) String() string {
 		ac2e.Data,
 	})
 	if err != nil {
-		Log('x', "Could not marshal ASCIICastV2Event data: %s\n", err.Error())
+		LogError("Could not marshal ASCIICastV2Event data: %s\n", err.Error())
 		return ""
 	}
 
@@ -127,8 +126,7 @@ func (ac2 *ASCIICastV2) Save(file string) error {
 func (ac2 *ASCIICastV2) Load(file string) {
 	data, err := os.ReadFile(file)
 	if err != nil {
-		Log(
-			'x',
+		LogError(
 			"Could not load ASCIICastV2 from file '%s': %s\n",
 			colorWrap(file, colorOrange),
 			colorWrap(err.Error(), colorRed),
@@ -141,8 +139,7 @@ func (ac2 *ASCIICastV2) Load(file string) {
 		lines = lines[1:]
 		err = json.Unmarshal([]byte(meta), &ac2.Header)
 		if err != nil {
-			Log(
-				'x',
+			LogError(
 				"Could not unmarshal ASCIICastV2Header from file '%s': %s\n",
 				colorWrap(file, colorOrange),
 				colorWrap(err.Error(), colorRed),
@@ -155,8 +152,7 @@ func (ac2 *ASCIICastV2) Load(file string) {
 			err := json.Unmarshal([]byte(line), &ed)
 
 			if err != nil {
-				Log(
-					'x',
+				LogError(
 					"Could not unmarshal ASCIICastV2Event from file '%s': %s (input was: '%s')\n",
 					colorWrap(file, colorOrange),
 					colorWrap(err.Error(), colorRed),

@@ -110,7 +110,7 @@ func (fs *FakeShell) Exec(line string) bool {
 		case "check":
 			ss, err := Server.getSyncNode(data.IP)
 			if err != nil {
-				Log('x', "Sync with %s failed: %s\n",
+				LogError("Sync with %s failed: %s\n",
 					colorWrap(data.IP, colorBrightYellow),
 					colorWrap(err.Error(), colorCyan),
 				)
@@ -125,7 +125,7 @@ func (fs *FakeShell) Exec(line string) bool {
 			if Server.statsHash() != hash {
 				node, err := Server.getSyncNode(data.IP)
 				if err != nil {
-					Log('x', "Sync with %s failed: %s\n",
+					LogError("Sync with %s failed: %s\n",
 						colorWrap(data.IP, colorBrightYellow),
 						colorWrap(err.Error(), colorCyan),
 					)
@@ -135,7 +135,7 @@ func (fs *FakeShell) Exec(line string) bool {
 				cd := StatsJSON{}
 				err = json.Unmarshal([]byte(clientData), &cd)
 				if err != nil {
-					Log('x', "Sync with %s failed, could not unmarshal remote data: %s\n",
+					LogError("Sync with %s failed, could not unmarshal remote data: %s\n",
 						colorWrap(data.IP, colorBrightYellow),
 						colorWrap(err.Error(), colorCyan),
 					)
@@ -168,7 +168,7 @@ func (fs *FakeShell) Exec(line string) bool {
 
 				}
 				if ch > 0 || cu > 0 || cp > 0 || cf > 0 {
-					Log('i', "[sync] Added %s host(s), %s user name(s), %s password(s) and %s fingerprint(s) from %s\n",
+					LogInfo("[sync] Added %s host(s), %s user name(s), %s password(s) and %s fingerprint(s) from %s\n",
 						colorWrap(fmt.Sprint(ch), colorBrightYellow),
 						colorWrap(fmt.Sprint(cu), colorBrightYellow),
 						colorWrap(fmt.Sprint(cp), colorBrightYellow),
@@ -193,7 +193,7 @@ func (fs *FakeShell) Exec(line string) bool {
 			fs.writer.WriteLnUnlimited(payload)
 			return true
 		default:
-			Log('x', "[sync] Command unknown: %s\n", colorWrap(instrCmd, colorBrightYellow))
+			LogError("[sync] Command unknown: %s\n", colorWrap(instrCmd, colorBrightYellow))
 			fs.writer.WriteLnUnlimited("Illegal sync command")
 			return true
 		}

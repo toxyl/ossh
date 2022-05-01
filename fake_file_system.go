@@ -26,11 +26,11 @@ func (ffs *FakeFileSystem) sanitize(file string) (string, error) {
 	f := fmt.Sprintf("%s/%s", ffs.Root, file)
 	path, err := filepath.Rel(ffs.Root, f)
 	if err != nil {
-		Log('x', "Failed to resolve file '%s'.\nError: %s\n", file, err.Error())
+		LogError("Failed to resolve file '%s'.\nError: %s\n", file, err.Error())
 		return "", err
 	}
 	if path == "" || path[0:3] == "../" {
-		Log('!', "Something is fishy here, who wants '%s'?\n", path)
+		LogWarning("Something is fishy here, who wants '%s'?\n", path)
 		return "", fmt.Errorf("%s: No such file or directory", file)
 	}
 	return f, nil
@@ -72,7 +72,7 @@ func (ffs *FakeFileSystem) Read(path string) string {
 	if FileExists(file) {
 		content, err := os.ReadFile(file)
 		if err != nil {
-			Log('x', "Failed to read file '%s'.\nError: %s\n", path, err.Error())
+			LogError("Failed to read file '%s'.\nError: %s\n", path, err.Error())
 			return ""
 		}
 		return string(content)

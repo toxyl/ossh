@@ -22,7 +22,7 @@
         <div class="w3-display-container" style="height: 100%; overflow:hidden;">
             {{ template "tab_stats" dict "Scheme" .Scheme }}
             {{ template "tab_console" dict "Scheme" .Scheme }}
-            {{ template "tab_config" dict "Scheme" .Scheme }}
+            {{ template "tab_config" dict "Scheme" .Scheme "Config" .Config }}
         </div>
     </body>
 </html>

@@ -138,7 +138,7 @@ type WebinterfaceServer struct {
 }
 
 func (w *WebinterfaceServer) AddHTMLHandler(path string, handler func(w http.ResponseWriter, r *http.Request)) *WebinterfaceServer {
-	Log(' ', "[UI] Adding HTML handler for path '%s'...\n", path)
+	LogDefault("[UI] Adding HTML handler for path '%s'...\n", path)
 	if _, ok := w.Handlers[path]; ok {
 		return w
 	}
@@ -148,7 +148,7 @@ func (w *WebinterfaceServer) AddHTMLHandler(path string, handler func(w http.Res
 }
 
 func (w *WebinterfaceServer) AddSubscriptionHandler(path string, hub *Hub) *WebinterfaceServer {
-	Log(' ', "[UI] Adding Subscription handler for path '%s'...\n", path)
+	LogDefault("[UI] Adding Subscription handler for path '%s'...\n", path)
 	return w.AddHTMLHandler(
 		path,
 		func(w http.ResponseWriter, r *http.Request) {
@@ -158,7 +158,7 @@ func (w *WebinterfaceServer) AddSubscriptionHandler(path string, hub *Hub) *Webi
 			}
 			conn, err := upgrader.Upgrade(w, r, nil)
 			if err != nil {
-				Log(' ', "[UI] Connection connection upgrade failed: %s\n", err)
+				LogDefault("[UI] Connection connection upgrade failed: %s\n", err)
 				return
 			}
 			client := &Client{
@@ -173,7 +173,7 @@ func (w *WebinterfaceServer) AddSubscriptionHandler(path string, hub *Hub) *Webi
 }
 
 func (w *WebinterfaceServer) AddHandler(path string, messageHandler func(message []byte) []byte) *WebinterfaceServer {
-	Log(' ', "[UI] Adding handler for path '%s'...\n", path)
+	LogDefault("[UI] Adding handler for path '%s'...\n", path)
 	if _, ok := w.Handlers[path]; ok {
 		return w
 	}
@@ -181,7 +181,7 @@ func (w *WebinterfaceServer) AddHandler(path string, messageHandler func(message
 		// Upgrade our raw HTTP connection to a websocket based one
 		conn, err := upgrader.Upgrade(wc, r, nil)
 		if err != nil {
-			Log('x', "[UI] Error during connection upgrade: %s\n", err.Error())
+			LogError("[UI] Error during connection upgrade: %s\n", err.Error())
 			return
 		}
 		defer conn.Close()
@@ -191,7 +191,7 @@ func (w *WebinterfaceServer) AddHandler(path string, messageHandler func(message
 			messageType, message, err := conn.ReadMessage()
 			if err != nil {
 				if !strings.Contains(fmt.Sprintf("%s", err), "close 1000 (normal)") {
-					Log('x', "[UI] Error during message reading: %s\n", err.Error())
+					LogError("[UI] Error during message reading: %s\n", err.Error())
 				}
 				break
 			}
@@ -199,7 +199,7 @@ func (w *WebinterfaceServer) AddHandler(path string, messageHandler func(message
 			message = messageHandler(message)
 			err = conn.WriteMessage(messageType, message)
 			if err != nil {
-				Log('x', "[UI] Error during message writing: %s\n", err.Error())
+				LogError("[UI] Error during message writing: %s\n", err.Error())
 				break
 			}
 		}
@@ -213,7 +213,7 @@ func (w *WebinterfaceServer) MakeHTMLHandler(template string, data interface{}) 
 		var tpl bytes.Buffer
 		err := ParseTemplateHTML(template, &tpl, data)
 		if err != nil {
-			Log('x', "[UI] Failed to parse template: %s\n", err.Error())
+			LogError("[UI] Failed to parse template: %s\n", err.Error())
 			return
 		}
 
@@ -232,7 +232,7 @@ func (ws *WebinterfaceServer) PushLog(msg string) {
 
 func (ws *WebinterfaceServer) Start() {
 	srv := fmt.Sprintf("%s:%d", ws.Host, ws.Port)
-	Log(' ', "[UI] Preparing to start at %s...\n", srv)
+	LogDefault("[UI] Preparing to start at %s...\n", srv)
 	for k, v := range ws.Handlers {
 		http.HandleFunc(k, v)
 	}
@@ -253,16 +253,16 @@ func (ws *WebinterfaceServer) Start() {
 			},
 			TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
 		}
-		Log(' ', "[UI] Serving at %s...\n", srv)
+		LogDefault("[UI] Serving at %s...\n", srv)
 		log.Fatal(server.ListenAndServeTLS(ws.CertFile, ws.KeyFile))
 		return
 	}
-	Log(' ', "[UI] Serving at %s...\n", srv)
+	LogDefault("[UI] Serving at %s...\n", srv)
 	log.Fatal(http.ListenAndServe(srv, nil))
 }
 
 func NewWebinterfaceServer(host string, port int, certFile, keyFile string) *WebinterfaceServer {
-	Log(' ', "[UI] Creating server at %s:%d...\n", host, port)
+	LogDefault("[UI] Creating server at %s:%d...\n", host, port)
 
 	wsscheme := "ws"
 	if certFile != "" && keyFile != "" {
@@ -281,13 +281,16 @@ func NewWebinterfaceServer(host string, port int, certFile, keyFile string) *Web
 	wss.AddSubscriptionHandler("/stats", wss.Stats.Hub)
 	wss.AddSubscriptionHandler("/console", wss.Console.Hub)
 	wss.AddHandler("/config", func(message []byte) []byte {
-		return message
+		// TODO: implement saving config and restarting oSSH
+		return []byte("OK")
 	})
 	wss.AddHTMLHandler("/",
 		wss.MakeHTMLHandler("index", struct {
 			Scheme string
+			Config string
 		}{
 			Scheme: wsscheme,
+			Config: getConfig(),
 		}),
 	)
 

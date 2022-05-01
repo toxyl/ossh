@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/spf13/viper"
 )
@@ -82,6 +83,7 @@ func initConfig() {
 	if err != nil {
 		log.Panic(fmt.Errorf("[Config] Fatal error config file: %w", err))
 	}
+	cfgFile = viper.ConfigFileUsed()
 
 	err = viper.Unmarshal(&Conf)
 	if err != nil {
@@ -132,5 +134,16 @@ func initConfig() {
 
 	InitTemplaterFunctions()
 	InitTemplaterFunctionsHTML()
+}
 
+func getConfig() string {
+	cfg, err := os.ReadFile(cfgFile)
+	if err != nil {
+		LogError(
+			"Could not read config from '%s': %s\n",
+			colorWrap(cfgFile, colorCyan),
+			colorWrap(err.Error(), colorOrange),
+		)
+	}
+	return string(cfg)
 }

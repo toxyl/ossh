@@ -47,3 +47,31 @@ func Log(indicator rune, format string, a ...interface{}) {
 	}
 	fmt.Printf(prefix+" "+format, a...)
 }
+
+func LogDefault(format string, a ...interface{}) {
+	Log(' ', format, a...)
+}
+
+func LogInfo(format string, a ...interface{}) {
+	Log('i', format, a...)
+}
+
+func LogSuccess(format string, a ...interface{}) {
+	Log('✓', format, a...)
+}
+
+func LogOK(format string, a ...interface{}) {
+	Log('+', format, a...)
+}
+
+func LogNotOK(format string, a ...interface{}) {
+	Log('-', format, a...)
+}
+
+func LogError(format string, a ...interface{}) {
+	Log('x', format, a...)
+}
+
+func LogWarning(format string, a ...interface{}) {
+	Log('!', format, a...)
+}
