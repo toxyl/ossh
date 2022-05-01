@@ -56,7 +56,6 @@ type Config struct {
 
 var cfgFile string
 var Conf Config
-var FFS FakeFileSystem
 
 func isIPWhitelisted(ip string) bool {
 	for _, wip := range Conf.IPWhitelist {
@@ -120,12 +119,6 @@ func initConfig() {
 		Conf.PathUsers = fmt.Sprintf("%s/users.txt", Conf.PathData)
 	}
 
-	FFS = FakeFileSystem{
-		Root: Conf.PathFFS,
-		CWD:  "~",
-		User: "root",
-	}
-
 	templateFunctions = template.FuncMap{
 		"nl": func() string {
 			return "\n"
@@ -146,13 +139,6 @@ func initConfig() {
 		},
 		"mul": func(a, b float64) float64 {
 			return a * b
-		},
-		"file": func(path string) string {
-			return FFS.Read(path)
-		},
-		"list": func(path string) string {
-			files := FFS.List(path)
-			return strings.Join(files, " ")
 		},
 		"sha1": func(s string) string {
 			return StringToSha1(s)

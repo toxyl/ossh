@@ -26,6 +26,9 @@ type FakeShell struct {
 	created  time.Time
 	stats    *FakeShellStats
 	prompt   string
+
+	cwd       string
+	overlayFS *OverlayFS
 }
 
 func (fs *FakeShell) User() string {
@@ -56,6 +59,17 @@ func (fs *FakeShell) UpdatePrompt(path string) {
 func (fs *FakeShell) RecordExec(input, output string) {
 	fs.stats.recording.AddInputEvent(fs.prompt + input)
 	fs.writer.WriteLn(output)
+	fs.stats.recording.AddOutputEvent(output)
+}
+
+func (fs *FakeShell) RecordWriteLn(output string) {
+	fs.writer.WriteLn(output)
+	fs.stats.recording.AddOutputEvent(output)
+}
+
+func (fs *FakeShell) RecordWrite(output string) {
+	fs.writer.Write(output)
+	// TODO do we need to record this seperately?
 	fs.stats.recording.AddOutputEvent(output)
 }
 
@@ -230,6 +244,11 @@ func (fs *FakeShell) Exec(line string) bool {
 	dly := time.Duration(len(line) * int(Conf.InputDelay))
 	time.Sleep(dly * time.Millisecond)
 
+	// Ignore just pressing enter with whitespace
+	if strings.TrimSpace(line) == "" {
+		return false
+	}
+
 	// 3) check if command should exit immediately
 	for _, cmd := range Conf.Commands.Exit {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
@@ -286,7 +305,15 @@ func (fs *FakeShell) Exec(line string) bool {
 		}
 	}
 
-	// 10) check if we have a template for the command
+	instr := strings.TrimSpace(line)
+	instrCmd := strings.Split(instr, " ")[0]
+
+	// 10) check if there is a go-implemented command for this
+	if goCmd, found := CmdLookup[instrCmd]; found {
+		return goCmd(fs, instr)
+	}
+
+	// 11) check if we have a template for the command
 	fs.RecordExec(line, ParseTemplateToString(command, data))
 	return false
 }
@@ -352,7 +379,7 @@ func (fs *FakeShell) Process() *FakeShellStats {
 	return fs.stats
 }
 
-func NewFakeShell(s ssh.Session) *FakeShell {
+func NewFakeShell(s ssh.Session, overlay *OverlayFS) *FakeShell {
 	fs := &FakeShell{
 		session:  s,
 		terminal: nil,
@@ -366,10 +393,22 @@ func NewFakeShell(s ssh.Session) *FakeShell {
 			User:             s.User(),
 			recording:        NewASCIICastV2(fakeShellInitialWidth, fakeShellInitialHeight),
 		},
+		overlayFS: overlay,
 	}
+
 	fs.terminal = term.NewTerminal(s, "")
 	fs.writer = NewSlowWriter(fs.terminal)
 	fs.stats.Host = fs.Host()
+
+	if !overlay.DirExists("/home") {
+		overlay.Mkdir("/home", 700)
+	}
+
+	if !overlay.DirExists("/home/" + s.User()) {
+		overlay.Mkdir("/home/"+s.User(), 700)
+	}
+
+	fs.cwd = "/home/" + s.User()
 
 	fs.UpdatePrompt("~")
 	return fs
