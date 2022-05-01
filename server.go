@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -38,6 +39,8 @@ type OSSHServer struct {
 		Fingerprints map[string]uint
 		TimeWasted   int
 	}
+
+	fs *OverlayFSManager
 }
 
 func (ossh *OSSHServer) statsJSON() string {
@@ -390,7 +393,36 @@ func (ossh *OSSHServer) incCounter(stat map[string]uint, host string) map[string
 }
 
 func (ossh *OSSHServer) sessionHandler(s ssh.Session) {
-	fs := NewFakeShell(s)
+	remoteIP, _, err := net.SplitHostPort(s.RemoteAddr().String())
+	if err != nil {
+		Log('x', err.Error())
+		s.Close()
+		return
+	}
+
+	overlayFS, err := ossh.fs.NewSession(remoteIP)
+	if err != nil {
+		// TODO  graceful fallback?
+		Log('x', err.Error())
+		s.Close()
+		return
+	}
+
+	err = overlayFS.Mount()
+	if err != nil {
+		// TODO  graceful fallback?
+		Log('x', err.Error())
+		s.Close()
+		return
+	}
+	defer func() {
+		err := overlayFS.Close()
+		if err != nil {
+			Log('x', err.Error())
+		}
+	}()
+
+	fs := NewFakeShell(s, overlayFS)
 	host := fs.Host()
 	ossh.shells[host] = fs
 	stats := fs.Process()
@@ -549,6 +581,16 @@ func (ossh *OSSHServer) init() {
 		ConnectionFailedCallback:      ossh.connectionFailedCallback,
 		SessionRequestCallback:        ossh.sessionRequestCallback,
 		Version:                       ossh.Version,
+	}
+
+	ossh.fs = &OverlayFSManager{}
+	path := filepath.Join(Conf.PathData, "ffs")
+	if Conf.PathFFS != "" {
+		path = Conf.PathFFS
+	}
+	err := ossh.fs.Init(path)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
