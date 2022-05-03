@@ -31,6 +31,10 @@ func cmdCd(fs *FakeShell, line string) (exit bool) {
 	parts := strings.Split(line, " ")
 	var path string
 
+	if len(parts) == 1 {
+		parts = append(parts, "~")
+	}
+
 	if len(parts) < 2 {
 		path = filepath.Join("/home", fs.User())
 	} else {
@@ -141,7 +145,7 @@ func cmdCat(fs *FakeShell, line string) (exit bool) {
 func cmdTouch(fs *FakeShell, line string) (exit bool) {
 	parts := strings.Split(line, " ")
 	if len(parts) < 2 {
-		fs.RecordWriteLn("cat: specify file")
+		fs.RecordWriteLn("touch: specify file")
 		return
 	}
 
