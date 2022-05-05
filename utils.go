@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
+	"net/http"
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 // DirExists reports whether the dir exists as a boolean,
@@ -105,4 +108,30 @@ func StringToSha1(s string) string {
 	data := []byte(s)
 	hash := sha1.Sum(data)
 	return fmt.Sprintf("%x", hash[:])
+}
+
+// from https://stackoverflow.com/a/37897238/3337885
+func RealAddr(r *http.Request) string {
+	remoteIP := ""
+	// the default is the originating ip. but we try to find better options because this is almost
+	// never the right IP
+	if parts := strings.Split(r.RemoteAddr, ":"); len(parts) == 2 {
+		remoteIP = parts[0]
+	}
+	// If we have a forwarded-for header, take the address from there
+	if xff := strings.Trim(r.Header.Get("X-Forwarded-For"), ","); len(xff) > 0 {
+		addrs := strings.Split(xff, ",")
+		lastFwd := addrs[len(addrs)-1]
+		if ip := net.ParseIP(lastFwd); ip != nil {
+			remoteIP = ip.String()
+		}
+		// parse X-Real-Ip header
+	} else if xri := r.Header.Get("X-Real-Ip"); len(xri) > 0 {
+		if ip := net.ParseIP(xri); ip != nil {
+			remoteIP = ip.String()
+		}
+	}
+
+	return remoteIP
+
 }

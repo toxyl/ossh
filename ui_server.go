@@ -140,7 +140,6 @@ type UIServer struct {
 }
 
 func (w *UIServer) AddHTMLHandler(path string, handler func(w http.ResponseWriter, r *http.Request)) *UIServer {
-	LogDefault("[UI] Adding HTML handler for %s\n", colorWrap(path, colorBrightYellow))
 	if _, ok := w.Handlers[path]; ok {
 		return w
 	}
@@ -237,11 +236,11 @@ func (ws *UIServer) PushLog(msg string) {
 }
 
 func (ws *UIServer) Start() {
-	http.DefaultServeMux = &http.ServeMux{}
+	mux := http.NewServeMux()
 	ws.init()
 	srv := fmt.Sprintf("%s:%d", ws.Host, ws.Port)
 	for k, v := range ws.Handlers {
-		http.HandleFunc(k, v)
+		mux.HandleFunc(k, v)
 	}
 
 	if ws.CertFile != "" && ws.KeyFile != "" {
@@ -265,6 +264,16 @@ func (ws *UIServer) Start() {
 			Addr: srv,
 		}
 	}
+	ws.server.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		addr := RealAddr(req)
+
+		if !isIPWhitelisted(addr) {
+			http.Redirect(w, req, fmt.Sprintf("https://www.abuseipdb.com/check/%s", addr), 307)
+			return
+		}
+		mux.ServeHTTP(w, req)
+	})
+
 	LogDefault("Starting UI server on %s...\n", colorWrap(srv, colorBrightYellow))
 	err := ws.server.ListenAndServe()
 	if !strings.Contains(err.Error(), "Server closed") {
@@ -273,7 +282,6 @@ func (ws *UIServer) Start() {
 }
 
 func (ws *UIServer) Shutdown() {
-	LogDefault("[UI] Shutdown requested\n")
 	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		cancel()
@@ -289,7 +297,6 @@ func (ws *UIServer) Shutdown() {
 }
 
 func (ws *UIServer) Reload() {
-	LogDefault("[UI] Reload requested\n")
 	ws.Shutdown()
 	go func() {
 		ws.Start()
@@ -297,7 +304,6 @@ func (ws *UIServer) Reload() {
 }
 
 func (ws *UIServer) init() {
-	LogDefault("[UI] Initializing\n")
 	ws.Host = Conf.Webinterface.Host
 	ws.Port = int(Conf.Webinterface.Port)
 	ws.CertFile = Conf.Webinterface.CertFile
