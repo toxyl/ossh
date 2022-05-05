@@ -127,6 +127,8 @@ func initConfig() {
 
 	InitTemplaterFunctions()
 	InitTemplaterFunctionsHTML()
+
+	LogOK("Config file loaded: %s\n", colorWrap(cfgFile, colorOrange))
 }
 
 func getConfig() string {
@@ -139,4 +141,23 @@ func getConfig() string {
 		)
 	}
 	return string(cfg)
+}
+
+func updateConfig(config []byte) error {
+	pathSrc := viper.ConfigFileUsed()
+	pathBak := fmt.Sprintf("%s.bak", pathSrc)
+	err := CopyFile(pathSrc, pathBak)
+	if err != nil {
+		LogError("Failed to backup config from %s to %s!\n", pathSrc, pathBak)
+		return err
+	}
+	err = os.WriteFile(pathSrc, config, 0644)
+	if err != nil {
+		LogError("Failed to backup config from %s to %s!\n", pathSrc, pathBak)
+		return err
+	}
+	LogSuccess("Written new config to: %s\n", pathSrc)
+
+	initConfig()
+	return nil
 }

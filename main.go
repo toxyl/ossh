@@ -1,14 +1,14 @@
 package main
 
 var Server *OSSHServer
-var WebServer *WebinterfaceServer
+var WebServer *UIServer
 
 func main() {
 	initConfig()
-	WebServer = NewWebinterfaceServer(Conf.Webinterface.Host, int(Conf.Webinterface.Port), Conf.Webinterface.CertFile, Conf.Webinterface.KeyFile)
+	Server = NewOSSHServer()
+	WebServer = NewUIServer()
 	go func() {
 		WebServer.Start()
 	}()
-	Server = NewOSSHServer()
 	Server.Start()
 }

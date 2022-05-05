@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"log"
@@ -127,7 +128,7 @@ func NewWebsocketStream() *WebsocketStream {
 	return ws
 }
 
-type WebinterfaceServer struct {
+type UIServer struct {
 	Handlers map[string]func(w http.ResponseWriter, r *http.Request)
 	Host     string
 	Port     int
@@ -135,10 +136,11 @@ type WebinterfaceServer struct {
 	KeyFile  string
 	Stats    *WebsocketStream
 	Console  *WebsocketStream
+	server   *http.Server
 }
 
-func (w *WebinterfaceServer) AddHTMLHandler(path string, handler func(w http.ResponseWriter, r *http.Request)) *WebinterfaceServer {
-	LogDefault("[UI] Adding HTML handler for path '%s'...\n", path)
+func (w *UIServer) AddHTMLHandler(path string, handler func(w http.ResponseWriter, r *http.Request)) *UIServer {
+	LogDefault("[UI] Adding HTML handler for %s\n", colorWrap(path, colorBrightYellow))
 	if _, ok := w.Handlers[path]; ok {
 		return w
 	}
@@ -147,8 +149,7 @@ func (w *WebinterfaceServer) AddHTMLHandler(path string, handler func(w http.Res
 	return w
 }
 
-func (w *WebinterfaceServer) AddSubscriptionHandler(path string, hub *Hub) *WebinterfaceServer {
-	LogDefault("[UI] Adding Subscription handler for path '%s'...\n", path)
+func (w *UIServer) AddSubscriptionHandler(path string, hub *Hub) *UIServer {
 	return w.AddHTMLHandler(
 		path,
 		func(w http.ResponseWriter, r *http.Request) {
@@ -172,8 +173,7 @@ func (w *WebinterfaceServer) AddSubscriptionHandler(path string, hub *Hub) *Webi
 	)
 }
 
-func (w *WebinterfaceServer) AddHandler(path string, messageHandler func(message []byte) []byte) *WebinterfaceServer {
-	LogDefault("[UI] Adding handler for path '%s'...\n", path)
+func (w *UIServer) AddHandler(path string, messageHandler func(message []byte) []byte) *UIServer {
 	if _, ok := w.Handlers[path]; ok {
 		return w
 	}
@@ -208,7 +208,7 @@ func (w *WebinterfaceServer) AddHandler(path string, messageHandler func(message
 	return w
 }
 
-func (w *WebinterfaceServer) MakeHTMLHandler(template string, data interface{}) func(w http.ResponseWriter, r *http.Request) {
+func (w *UIServer) MakeHTMLHandler(template string, data interface{}) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var tpl bytes.Buffer
 		err := ParseTemplateHTML(template, &tpl, data)
@@ -222,23 +222,30 @@ func (w *WebinterfaceServer) MakeHTMLHandler(template string, data interface{}) 
 	}
 }
 
-func (ws *WebinterfaceServer) PushStats(msg string) {
+func (ws *UIServer) PushStats(msg string) {
+	if ws.Stats == nil {
+		return
+	}
 	ws.Stats.Hub.Broadcast(msg)
 }
 
-func (ws *WebinterfaceServer) PushLog(msg string) {
+func (ws *UIServer) PushLog(msg string) {
+	if ws.Console == nil {
+		return
+	}
 	ws.Console.Hub.Broadcast(msg)
 }
 
-func (ws *WebinterfaceServer) Start() {
+func (ws *UIServer) Start() {
+	http.DefaultServeMux = &http.ServeMux{}
+	ws.init()
 	srv := fmt.Sprintf("%s:%d", ws.Host, ws.Port)
-	LogDefault("[UI] Preparing to start at %s...\n", srv)
 	for k, v := range ws.Handlers {
 		http.HandleFunc(k, v)
 	}
 
 	if ws.CertFile != "" && ws.KeyFile != "" {
-		server := &http.Server{
+		ws.server = &http.Server{
 			Addr: srv,
 			TLSConfig: &tls.Config{
 				MinVersion:               tls.VersionTLS12,
@@ -253,39 +260,68 @@ func (ws *WebinterfaceServer) Start() {
 			},
 			TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
 		}
-		LogDefault("[UI] Serving at %s...\n", srv)
-		log.Fatal(server.ListenAndServeTLS(ws.CertFile, ws.KeyFile))
-		return
+	} else {
+		ws.server = &http.Server{
+			Addr: srv,
+		}
 	}
-	LogDefault("[UI] Serving at %s...\n", srv)
-	log.Fatal(http.ListenAndServe(srv, nil))
+	LogDefault("Starting UI server on %s...\n", colorWrap(srv, colorBrightYellow))
+	err := ws.server.ListenAndServe()
+	if !strings.Contains(err.Error(), "Server closed") {
+		log.Fatal(err)
+	}
 }
 
-func NewWebinterfaceServer(host string, port int, certFile, keyFile string) *WebinterfaceServer {
-	LogDefault("[UI] Creating server at %s:%d...\n", host, port)
+func (ws *UIServer) Shutdown() {
+	LogDefault("[UI] Shutdown requested\n")
+	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer func() {
+		cancel()
+	}()
 
+	if err := ws.server.Shutdown(ctxShutDown); err != nil {
+		LogError("[UI] Shutdown failed: %s\n", colorWrap(err.Error(), colorOrange))
+	}
+
+	ws.Handlers = nil
+
+	LogOK("[UI] Shutdown complete\n")
+}
+
+func (ws *UIServer) Reload() {
+	LogDefault("[UI] Reload requested\n")
+	ws.Shutdown()
+	go func() {
+		ws.Start()
+	}()
+}
+
+func (ws *UIServer) init() {
+	LogDefault("[UI] Initializing\n")
+	ws.Host = Conf.Webinterface.Host
+	ws.Port = int(Conf.Webinterface.Port)
+	ws.CertFile = Conf.Webinterface.CertFile
+	ws.KeyFile = Conf.Webinterface.KeyFile
 	wsscheme := "ws"
-	if certFile != "" && keyFile != "" {
+	if ws.CertFile != "" && ws.KeyFile != "" {
 		wsscheme = "wss"
 	}
+	ws.Handlers = map[string]func(w http.ResponseWriter, r *http.Request){}
+	ws.Stats = NewWebsocketStream()
+	ws.Console = NewWebsocketStream()
 
-	wss := &WebinterfaceServer{
-		Handlers: map[string]func(w http.ResponseWriter, r *http.Request){},
-		Host:     host,
-		Port:     port,
-		CertFile: certFile,
-		KeyFile:  keyFile,
-		Stats:    NewWebsocketStream(),
-		Console:  NewWebsocketStream(),
-	}
-	wss.AddSubscriptionHandler("/stats", wss.Stats.Hub)
-	wss.AddSubscriptionHandler("/console", wss.Console.Hub)
-	wss.AddHandler("/config", func(message []byte) []byte {
-		// TODO: implement saving config and restarting oSSH
-		return []byte("OK")
+	ws.AddSubscriptionHandler("/stats", ws.Stats.Hub)
+	ws.AddSubscriptionHandler("/console", ws.Console.Hub)
+	ws.AddHandler("/config", func(config []byte) []byte {
+		err := updateConfig(config)
+		if err != nil {
+			return nil
+		}
+		WebServer.Reload()
+		return nil
 	})
-	wss.AddHTMLHandler("/",
-		wss.MakeHTMLHandler("index", struct {
+	ws.AddHTMLHandler("/",
+		ws.MakeHTMLHandler("index", struct {
 			Scheme string
 			Config string
 		}{
@@ -293,6 +329,8 @@ func NewWebinterfaceServer(host string, port int, certFile, keyFile string) *Web
 			Config: getConfig(),
 		}),
 	)
+}
 
-	return wss
+func NewUIServer() *UIServer {
+	return &UIServer{}
 }

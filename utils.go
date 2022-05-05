@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"reflect"
@@ -34,6 +35,26 @@ func FileExists(name string) bool {
 	}
 	_, err = file.Stat()
 	return err == nil
+}
+
+func CopyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
 }
 
 var floatType = reflect.TypeOf(float64(0))
