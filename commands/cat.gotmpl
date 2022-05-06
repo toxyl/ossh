@@ -1,8 +1,0 @@
-{{ define "cat" }}
-{{ if not .Arguments }}
-end_request: I/O error
-{{ else }}
-{{ $a1 := (index .Arguments 0) }}
-{{ file $a1 }}
-{{ end }}
-{{ end }}

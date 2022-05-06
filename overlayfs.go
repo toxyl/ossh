@@ -179,6 +179,14 @@ type OverlayFS struct {
 }
 
 func (ofs *OverlayFS) Mount() error {
+	// let's try to unmount & remove everything first
+	_ = unix.Unmount(ofs.mergedDir, 0)
+	_ = os.RemoveAll(ofs.mergedDir)
+	_ = os.RemoveAll(ofs.workDir)
+	_ = os.RemoveAll(ofs.upperDir)
+
+	time.Sleep(1 * time.Second)
+
 	err := os.Mkdir(ofs.mergedDir, 700)
 	if err != nil {
 		return fmt.Errorf("mkdir merged: %w", err)

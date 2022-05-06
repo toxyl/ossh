@@ -21,7 +21,7 @@ func executeSSHCommand(host string, port int, usr, pwd, cmd string) string {
 		LogError("Executing SSH command '%s' on %s failed, dial error: %s\n",
 			colorWrap(cmd, colorBrightYellow),
 			colorWrap(fmt.Sprintf("%s:%d", host, port), colorBrightYellow),
-			colorWrap(err.Error(), colorCyan),
+			colorError(err),
 		)
 		return ""
 	}
@@ -30,7 +30,7 @@ func executeSSHCommand(host string, port int, usr, pwd, cmd string) string {
 		LogError("Executing SSH command '%s' on %s failed, session error: %s\n",
 			colorWrap(cmd, colorBrightYellow),
 			colorWrap(fmt.Sprintf("%s:%d", host, port), colorBrightYellow),
-			colorWrap(err.Error(), colorCyan),
+			colorError(err),
 		)
 		return ""
 	}
@@ -43,7 +43,7 @@ func executeSSHCommand(host string, port int, usr, pwd, cmd string) string {
 		LogError("Executing SSH command '%s' on %s failed, command error: %s\n",
 			colorWrap(cmd, colorBrightYellow),
 			colorWrap(fmt.Sprintf("%s:%d", host, port), colorBrightYellow),
-			colorWrap(err.Error(), colorCyan),
+			colorError(err),
 		)
 		return ""
 	}

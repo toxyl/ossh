@@ -159,31 +159,36 @@ func (ossh *OSSHServer) GracefulCloseOnError(err error, sess *ssh.Session) {
 func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 	s := ossh.Sessions.Create(sess.RemoteAddr().String()).SetSSHSession(&sess)
 	if s == nil {
-		ossh.GracefulCloseOnError(errors.New("[SSH] Failed to create oSSH session."), &sess)
+		ossh.GracefulCloseOnError(errors.New("Failed to create oSSH session."), &sess)
 		return
 	}
 
 	s.SSHSession = &sess
 
-	overlayFS, err := ossh.fs.NewSession(s.Host)
-	if err != nil {
-		ossh.GracefulCloseOnError(errors.New("[SSH] Failed to create FFS session."), s.SSHSession)
-		return
-	}
-
-	err = overlayFS.Mount()
-	if err != nil {
-		ossh.GracefulCloseOnError(errors.New("[SSH] Failed to mount FFS."), s.SSHSession)
-		return
-	}
-	defer func() {
-		err := overlayFS.Close()
+	if !ossh.KnownNodes.Has(s.Host) {
+		// only create for bots, sync nodes don't need it
+		overlayFS, err := ossh.fs.NewSession(s.Host)
 		if err != nil {
-			LogErrorLn(colorError(err))
+			ossh.GracefulCloseOnError(err, s.SSHSession)
+			return
 		}
-	}()
 
-	s.SetShell(NewFakeShell((*s.SSHSession), overlayFS))
+		err = overlayFS.Mount()
+		if err != nil {
+			ossh.GracefulCloseOnError(err, s.SSHSession)
+			return
+		}
+		defer func() {
+			err := overlayFS.Close()
+			if err != nil {
+				LogErrorLn(colorError(err))
+			}
+		}()
+
+		s.SetShell(NewFakeShell((*s.SSHSession), overlayFS))
+	} else {
+		s.SetShell(NewFakeShell((*s.SSHSession), nil))
+	}
 	stats := s.Shell.Process()
 
 	if !ossh.KnownNodes.Has(s.Host) && !s.Whitelisted {
@@ -194,7 +199,7 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 			colorDuration(stats.TimeSpent),
 			colorInt(int(stats.CommandsExecuted)),
 		)
-	} else {
+	} else if !ossh.KnownNodes.Has(s.Host) {
 		LogSuccessLn("%s: %s",
 			s.LogID(),
 			colorReason("Elvis has left the building."),
