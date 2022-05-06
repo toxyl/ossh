@@ -22,6 +22,7 @@ config.yaml.bak
 ossh
 captures/*
 ffs/defaultfs
+ffs/sandboxes
 hosts.txt
 fingerprints.txt
 users.txt

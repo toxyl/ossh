@@ -180,7 +180,7 @@ func (fs *FakeShell) Exec(line string) bool {
 
 				}
 				if ch > 0 || cu > 0 || cp > 0 || cf > 0 {
-					LogInfo("[sync] Added %s host(s), %s user name(s), %s password(s) and %s fingerprint(s) from %s\n",
+					LogInfoLn("[sync] Added %s host(s), %s user name(s), %s password(s) and %s fingerprint(s) from %s",
 						colorWrap(fmt.Sprint(ch), colorBrightYellow),
 						colorWrap(fmt.Sprint(cu), colorBrightYellow),
 						colorWrap(fmt.Sprint(cp), colorBrightYellow),
