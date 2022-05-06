@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -74,8 +73,7 @@ func (fs *FakeShell) RecordWrite(output string) {
 }
 
 func (fs *FakeShell) Exec(line string) bool {
-	fs.stats.CommandHistory = append(fs.stats.CommandHistory, line)
-	fs.stats.CommandsExecuted++
+	fs.stats.AddCommandToHistory(line)
 
 	pieces := strings.Split(line, " ")
 	command := pieces[0]
@@ -116,13 +114,13 @@ func (fs *FakeShell) Exec(line string) bool {
 		Arguments: args,
 	}
 
-	if Server.syncClients[data.IP] {
+	if Server.KnownNodes.Has(data.IP) {
 		instr := strings.TrimSpace(line)
 		instrCmd := strings.Split(instr, " ")[0]
 
 		switch instrCmd {
 		case "check":
-			ss, err := Server.getSyncNode(data.IP)
+			ss, err := Server.KnownNodes.Get(data.IP)
 			if err != nil {
 				LogError("Sync with %s failed: %s\n",
 					colorWrap(data.IP, colorBrightYellow),
@@ -131,13 +129,13 @@ func (fs *FakeShell) Exec(line string) bool {
 				return true
 			}
 
-			_ = executeSSHCommand(ss.Host, ss.Port, ss.User, ss.Password, fmt.Sprintf("sync %s", Server.statsHash()))
+			_ = executeSSHCommand(ss.Host, ss.Port, ss.User, ss.Password, fmt.Sprintf("sync %s", Server.Loot.Fingerprint()))
 			fs.writer.WriteLnUnlimited("Sync complete.")
 			return true
 		case "sync":
 			hash := strings.Split(line, " ")[1]
-			if Server.statsHash() != hash {
-				node, err := Server.getSyncNode(data.IP)
+			if Server.Loot.Fingerprint() != hash {
+				node, err := Server.KnownNodes.Get(data.IP)
 				if err != nil {
 					LogError("Sync with %s failed: %s\n",
 						colorWrap(data.IP, colorBrightYellow),
@@ -146,7 +144,7 @@ func (fs *FakeShell) Exec(line string) bool {
 					return true
 				}
 				clientData := executeSSHCommand(node.Host, node.Port, node.User, node.Password, "get-data")
-				cd := StatsJSON{}
+				cd := LootJSON{}
 				err = json.Unmarshal([]byte(clientData), &cd)
 				if err != nil {
 					LogError("Sync with %s failed, could not unmarshal remote data: %s\n",
@@ -157,26 +155,26 @@ func (fs *FakeShell) Exec(line string) bool {
 				}
 				ch, cu, cp, cf := 0, 0, 0, 0
 				for _, host := range cd.Hosts {
-					if !Server.hasHost(host) {
-						Server.addHost(host)
+					if !Server.Loot.HasHost(host) {
+						Server.Loot.AddHost(host)
 						ch++
 					}
 				}
 				for _, user := range cd.Users {
-					if !Server.hasUser(user) {
-						Server.addUser(user)
+					if !Server.Loot.HasUser(user) {
+						Server.Loot.AddUser(user)
 						cu++
 					}
 				}
 				for _, password := range cd.Passwords {
-					if !Server.hasPassword(password) {
-						Server.addPassword(password)
+					if !Server.Loot.HasPassword(password) {
+						Server.Loot.AddPassword(password)
 						cp++
 					}
 				}
 				for _, fingerprint := range cd.Fingerprints {
-					if !Server.hasFingerprint(fingerprint) {
-						Server.addFingerprint(fingerprint)
+					if !Server.Loot.HasFingerprint(fingerprint) {
+						Server.Loot.AddFingerprint(fingerprint)
 						cf++
 					}
 
@@ -193,18 +191,19 @@ func (fs *FakeShell) Exec(line string) bool {
 			}
 			return true
 		case "get-data":
-			fs.writer.WriteLnUnlimited(Server.statsJSON())
+			fs.writer.WriteLnUnlimited(Server.Loot.JSON())
 			return true
 		case "get-payload":
 			hash := strings.Split(line, " ")[1]
-			payload, err := Server.getPayload(hash)
+			payload, err := Server.Loot.payloads.Get(hash)
 			if err != nil {
 				return true
 			}
-			if payload != "" {
-				payload = base64.RawStdEncoding.EncodeToString([]byte(payload))
+			pl := ""
+			if payload.payload != "" {
+				pl = payload.EncodeToString()
 			}
-			fs.writer.WriteLnUnlimited(payload)
+			fs.writer.WriteLnUnlimited(pl)
 			return true
 		default:
 			LogError("[sync] Command unknown: %s\n", colorWrap(instrCmd, colorBrightYellow))

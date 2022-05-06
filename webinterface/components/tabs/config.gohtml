@@ -3,7 +3,7 @@
     function ws_conf_open(evt) { hide_overlay_connection(); }
     function ws_conf_close(evt) { show_overlay_connection(); }
     function ws_conf_preconnect(evt) { }
-    function ws_conf_receive(message) { }
+    function ws_conf_receive(message) { window.location.href = window.location.href; }
     function ws_conf_receive_complete() { }
 
     function ws_conf_send() {

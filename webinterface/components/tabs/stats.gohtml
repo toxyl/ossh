@@ -14,6 +14,8 @@
         $('#tsUsers').text(m.users);
         $('#tsPasswords').text(m.passwords);
         $('#tsFingerprints').text(m.fingerprints);
+        $('#tsSessions').text(m.sessions);
+        $('#tsLogins').text(`${m.logins_attempted} / ${m.logins_successful} / ${m.logins_failed}`);
         $('#tsTimeWasted').text(m.time_wasted);
     }
 
@@ -40,7 +42,15 @@
             <td id="tsFingerprints" class="w50 left"></td>
         </tr>
         <tr>
-            <td class="w50 right">TimeWasted</td>
+            <td class="w50 right">Active Sessions</td>
+            <td id="tsSessions" class="w50 left"></td>
+        </tr>
+        <tr>
+            <td class="w50 right">Logins (attempted / successful / failed)</td>
+            <td id="tsLogins" class="w50 left"></td>
+        </tr>
+        <tr>
+            <td class="w50 right">Time Wasted</td>
             <td id="tsTimeWasted" class="w50 left"></td>
         </tr>
     </table>

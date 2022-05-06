@@ -128,14 +128,14 @@ func initConfig() {
 	InitTemplaterFunctions()
 	InitTemplaterFunctionsHTML()
 
-	LogOK("Config file loaded: %s\n", colorWrap(cfgFile, colorOrange))
+	LogOKLn("Config loaded from %s", colorWrap(cfgFile, colorOrange))
 }
 
 func getConfig() string {
 	cfg, err := os.ReadFile(cfgFile)
 	if err != nil {
-		LogError(
-			"Could not read config from '%s': %s\n",
+		LogErrorLn(
+			"Could not read config from '%s': %s",
 			colorWrap(cfgFile, colorCyan),
 			colorWrap(err.Error(), colorOrange),
 		)
@@ -148,15 +148,15 @@ func updateConfig(config []byte) error {
 	pathBak := fmt.Sprintf("%s.bak", pathSrc)
 	err := CopyFile(pathSrc, pathBak)
 	if err != nil {
-		LogError("Failed to backup config from %s to %s!\n", pathSrc, pathBak)
+		LogErrorLn("Failed to backup config from %s to %s!", pathSrc, pathBak)
 		return err
 	}
 	err = os.WriteFile(pathSrc, config, 0644)
 	if err != nil {
-		LogError("Failed to backup config from %s to %s!\n", pathSrc, pathBak)
+		LogErrorLn("Failed to backup config from %s to %s!", pathSrc, pathBak)
 		return err
 	}
-	LogSuccess("Written new config to: %s\n", pathSrc)
+	LogSuccessLn("Written new config to: %s", pathSrc)
 
 	initConfig()
 	return nil

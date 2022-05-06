@@ -158,7 +158,7 @@ func (w *UIServer) AddSubscriptionHandler(path string, hub *Hub) *UIServer {
 			}
 			conn, err := upgrader.Upgrade(w, r, nil)
 			if err != nil {
-				LogDefault("[UI] Connection connection upgrade failed: %s\n", err)
+				LogDefaultLn("[UI] Connection connection upgrade failed: %s", err)
 				return
 			}
 			client := &Client{
@@ -180,7 +180,7 @@ func (w *UIServer) AddHandler(path string, messageHandler func(message []byte) [
 		// Upgrade our raw HTTP connection to a websocket based one
 		conn, err := upgrader.Upgrade(wc, r, nil)
 		if err != nil {
-			LogError("[UI] Error during connection upgrade: %s\n", err.Error())
+			LogErrorLn("[UI] Error during connection upgrade: %s", err.Error())
 			return
 		}
 		defer conn.Close()
@@ -190,7 +190,7 @@ func (w *UIServer) AddHandler(path string, messageHandler func(message []byte) [
 			messageType, message, err := conn.ReadMessage()
 			if err != nil {
 				if !strings.Contains(fmt.Sprintf("%s", err), "close 1000 (normal)") {
-					LogError("[UI] Error during message reading: %s\n", err.Error())
+					LogErrorLn("[UI] Error during message reading: %s", err.Error())
 				}
 				break
 			}
@@ -198,7 +198,7 @@ func (w *UIServer) AddHandler(path string, messageHandler func(message []byte) [
 			message = messageHandler(message)
 			err = conn.WriteMessage(messageType, message)
 			if err != nil {
-				LogError("[UI] Error during message writing: %s\n", err.Error())
+				LogErrorLn("[UI] Error during message writing: %s", err.Error())
 				break
 			}
 		}
@@ -212,7 +212,7 @@ func (w *UIServer) MakeHTMLHandler(template string, data interface{}) func(w htt
 		var tpl bytes.Buffer
 		err := ParseTemplateHTML(template, &tpl, data)
 		if err != nil {
-			LogError("[UI] Failed to parse template: %s\n", err.Error())
+			LogErrorLn("[UI] Failed to parse template: %s", err.Error())
 			return
 		}
 
@@ -267,14 +267,14 @@ func (ws *UIServer) Start() {
 	ws.server.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		addr := RealAddr(req)
 
-		if !isIPWhitelisted(addr) {
-			http.Redirect(w, req, fmt.Sprintf("https://www.abuseipdb.com/check/%s", addr), 307)
+		if !isIPWhitelisted(addr) && addr != Conf.Host {
+			http.Redirect(w, req, fmt.Sprintf("http://%s", addr), 307) // let's give them their request back
 			return
 		}
 		mux.ServeHTTP(w, req)
 	})
 
-	LogDefault("Starting UI server on %s...\n", colorWrap(srv, colorBrightYellow))
+	LogDefaultLn("Starting UI server on %s...", colorWrap(srv, colorBrightYellow))
 	err := ws.server.ListenAndServe()
 	if !strings.Contains(err.Error(), "Server closed") {
 		log.Fatal(err)
@@ -288,12 +288,12 @@ func (ws *UIServer) Shutdown() {
 	}()
 
 	if err := ws.server.Shutdown(ctxShutDown); err != nil {
-		LogError("[UI] Shutdown failed: %s\n", colorWrap(err.Error(), colorOrange))
+		LogErrorLn("[UI] Shutdown failed: %s", colorWrap(err.Error(), colorOrange))
 	}
 
 	ws.Handlers = nil
 
-	LogOK("[UI] Shutdown complete\n")
+	LogOKLn("[UI] Shutdown complete")
 }
 
 func (ws *UIServer) Reload() {

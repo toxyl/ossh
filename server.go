@@ -1,8 +1,8 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -12,583 +12,311 @@ import (
 	"time"
 
 	"github.com/gliderlabs/ssh"
-	"golang.org/x/exp/maps"
 )
 
-type StatsJSON struct {
-	Hosts        []string `json:"hosts"`
-	Users        []string `json:"users"`
-	Passwords    []string `json:"passwords"`
-	Fingerprints []string `json:"fingerprints"`
-}
-
 type OSSHServer struct {
-	Version     string
-	server      *ssh.Server
-	shells      map[string]*FakeShell
-	syncClients map[string]bool
-	Stats       struct {
-		Logins struct {
-			Attempts map[string]uint
-			Failed   map[string]uint
-			OK       map[string]uint
-		}
-		Users        map[string]uint
-		Passwords    map[string]uint
-		Hosts        map[string]uint
-		Fingerprints map[string]uint
-		TimeWasted   int
-	}
-
-	fs *OverlayFSManager
+	Loot       *Loot
+	Logins     *Logins
+	Sessions   *Sessions
+	KnownNodes *KnownNodes
+	TimeWasted int
+	server     *ssh.Server
+	fs         *OverlayFSManager
 }
 
 func (ossh *OSSHServer) statsJSONSimple() string {
 	data := struct {
-		CntHosts        int    `json:"hosts"`
-		CntPasswords    int    `json:"passwords"`
-		CntUsers        int    `json:"users"`
-		CntFingerprints int    `json:"fingerprints"`
-		TimeWasted      string `json:"time_wasted"`
+		Hosts            int    `json:"hosts"`
+		Passwords        int    `json:"passwords"`
+		Users            int    `json:"users"`
+		Fingerprints     int    `json:"fingerprints"`
+		Sessions         int    `json:"sessions"`
+		AttemptedLogins  uint   `json:"logins_attempted"`
+		SuccessfulLogins uint   `json:"logins_successful"`
+		FailedLogins     uint   `json:"logins_failed"`
+		TimeWasted       string `json:"time_wasted"`
 	}{
-		CntHosts:        len(Server.Stats.Hosts),
-		CntPasswords:    len(Server.Stats.Passwords),
-		CntUsers:        len(Server.Stats.Users),
-		CntFingerprints: len(Server.Stats.Fingerprints),
-		TimeWasted:      time.Duration(Server.Stats.TimeWasted * int(time.Second)).String(),
+		Hosts:            ossh.Loot.CountHosts(),
+		Passwords:        ossh.Loot.CountPasswords(),
+		Users:            ossh.Loot.CountUsers(),
+		Fingerprints:     ossh.Loot.CountFingerprints(),
+		Sessions:         ossh.Sessions.Count(),
+		AttemptedLogins:  ossh.Logins.GetAttempts(),
+		SuccessfulLogins: ossh.Logins.GetSuccesses(),
+		FailedLogins:     ossh.Logins.GetFailures(),
+		TimeWasted:       time.Duration(ossh.TimeWasted * int(time.Second)).String(),
 	}
 	json, err := json.Marshal(data)
 	if err != nil {
-		LogError("Could not marshal web interface stats data: %s\n", err.Error())
+		LogErrorLn("Could not marshal web interface stats data: %s", colorError(err))
 		return ""
 	}
 
 	return string(json)
 }
 
-func (ossh *OSSHServer) statsJSON() string {
-	data := StatsJSON{
-		Hosts:        maps.Keys(Server.Stats.Hosts),
-		Users:        maps.Keys(Server.Stats.Users),
-		Passwords:    maps.Keys(Server.Stats.Passwords),
-		Fingerprints: maps.Keys(Server.Stats.Fingerprints),
-	}
-	json, err := json.Marshal(data)
-	if err != nil {
-		LogError("Could not marshal sync data: %s\n", err.Error())
-		return ""
-	}
-
-	return string(json)
-}
-
-func (ossh *OSSHServer) statsHash() string {
-	return StringToSha256(ossh.statsJSON())
-}
-
-func (ossh *OSSHServer) loadFingerprints() {
-	if FileExists(Conf.PathFingerprints) {
-		content, err := os.ReadFile(Conf.PathFingerprints)
+func (ossh *OSSHServer) loadDataFile(path, contentType string, addFunction func(s string)) {
+	if FileExists(path) {
+		content, err := os.ReadFile(path)
 		if err != nil {
-			LogError("Failed to read fingerprints file: %s\n", err.Error())
+			LogErrorLn("Failed to read %s file: %s", colorHighlight(contentType), colorError(err))
 			return
 		}
-		fingerprints := strings.Split(string(content), "\n")
+		items := strings.Split(string(content), "\n")
 
-		LogOK("Loading %d fingerprints\n", len(fingerprints))
-		for _, fp := range fingerprints {
-			ossh.addFingerprint(fp)
+		LogOKLn("Loading %s %s", colorInt(len(items)), contentType)
+		for _, fp := range items {
+			addFunction(fp)
 		}
 	}
 }
 
-func (ossh *OSSHServer) loadUsers() {
-	if FileExists(Conf.PathUsers) {
-		content, err := os.ReadFile(Conf.PathUsers)
-		if err != nil {
-			LogError("Failed to read users file: %s\n", err.Error())
-			return
-		}
-		users := strings.Split(string(content), "\n")
-
-		LogOK("Loading %d users\n", len(users))
-		for _, eu := range users {
-			ossh.addUser(eu)
-		}
-	}
+func (ossh *OSSHServer) loadData() {
+	ossh.loadDataFile(Conf.PathHosts, "hosts", ossh.Loot.AddHost)
+	ossh.loadDataFile(Conf.PathUsers, "users", ossh.Loot.AddUser)
+	ossh.loadDataFile(Conf.PathPasswords, "passwords", ossh.Loot.AddPassword)
+	ossh.loadDataFile(Conf.PathFingerprints, "fingerprints", ossh.Loot.AddFingerprint)
 }
 
-func (ossh *OSSHServer) loadPasswords() {
-	if FileExists(Conf.PathPasswords) {
-		content, err := os.ReadFile(Conf.PathPasswords)
-		if err != nil {
-			LogError("Failed to read passwords file: %s\n", err.Error())
-			return
-		}
-		passwords := strings.Split(string(content), "\n")
-
-		LogOK("Loading %d passwords\n", len(passwords))
-		for _, ep := range passwords {
-			ossh.addPassword(ep)
-		}
-	}
-}
-
-func (ossh *OSSHServer) loadHosts() {
-	if FileExists(Conf.PathHosts) {
-		content, err := os.ReadFile(Conf.PathHosts)
-		if err != nil {
-			LogError("Failed to read hosts file: %s\n", err.Error())
-			return
-		}
-		hosts := strings.Split(string(content), "\n")
-
-		LogOK("Loading %d hosts\n", len(hosts))
-		for _, eh := range hosts {
-			ossh.addHost(eh)
-		}
-	}
-}
-
-func (ossh *OSSHServer) saveFingerprints() {
-	data := strings.Join(maps.Keys(ossh.Stats.Fingerprints), "\n") + "\n"
-	err := os.WriteFile(Conf.PathFingerprints, []byte(data), 0644)
+func (ossh *OSSHServer) saveDataFile(path, contentType string, lines []string) {
+	data := strings.Join(lines, "\n") + "\n"
+	err := os.WriteFile(path, []byte(data), 0644)
 	if err != nil {
-		LogError("Failed to write fingerprints file: %s\n", err.Error())
+		LogErrorLn("Failed to write %s file: %s", colorHighlight(contentType), colorError(err))
 	}
 }
 
-func (ossh *OSSHServer) saveUsers() {
-	data := strings.Join(maps.Keys(ossh.Stats.Users), "\n") + "\n"
-	err := os.WriteFile(Conf.PathUsers, []byte(data), 0644)
-	if err != nil {
-		LogError("Failed to write users file: %s\n", err.Error())
-	}
+func (ossh *OSSHServer) saveData() {
+	ossh.saveDataFile(Conf.PathHosts, "hosts", ossh.Loot.GetHosts())
+	ossh.saveDataFile(Conf.PathUsers, "users", ossh.Loot.GetUsers())
+	ossh.saveDataFile(Conf.PathPasswords, "passwords", ossh.Loot.GetPasswords())
+	ossh.saveDataFile(Conf.PathFingerprints, "fingerprints", ossh.Loot.GetFingerprints())
 }
 
-func (ossh *OSSHServer) savePasswords() {
-	data := strings.Join(maps.Keys(ossh.Stats.Passwords), "\n") + "\n"
-	err := os.WriteFile(Conf.PathPasswords, []byte(data), 0644)
-	if err != nil {
-		LogError("Failed to write passwords file: %s\n", err.Error())
-	}
-}
-
-func (ossh *OSSHServer) saveHosts() {
-	data := strings.Join(maps.Keys(ossh.Stats.Hosts), "\n") + "\n"
-	err := os.WriteFile(Conf.PathHosts, []byte(data), 0644)
-	if err != nil {
-		LogError("Failed to write hosts file: %s\n", err.Error())
-	}
-}
-
-func (ossh *OSSHServer) saveCapture(stats *FakeShellStats) {
-	resSha1 := StringToSha1(strings.Join(stats.CommandHistory, "\n"))
-	f := fmt.Sprintf("%s/ocap-%s-%s.cast", Conf.PathCaptures, stats.Host, resSha1)
-
-	if !FileExists(f) {
-		err := stats.recording.Save(f)
-		if err == nil {
-			LogSuccess("Capture saved: %s\n", colorWrap(f, colorOrange))
-		}
+func (ossh *OSSHServer) addLoginFailure(s *Session, reason string) {
+	if s.Password == "" {
+		s.Password = "(empty)"
 	}
 
-	ossh.savePayload(resSha1, stats.recording.String())
-	ossh.addFingerprint(resSha1)
-}
-
-func (ossh *OSSHServer) savePayload(sha1, payload string) {
-	f := fmt.Sprintf("%s/payload-%s.cast", Conf.PathCaptures, sha1)
-	if FileExists(f) {
-		return // no need to save, we already have this payload
-	}
-
-	err := os.WriteFile(f, []byte(payload), 0744)
-	if err == nil {
-		LogSuccess("Payload saved: %s\n", colorWrap(f, colorOrange))
-	}
-}
-
-func (ossh *OSSHServer) hasFingerprint(sha1 string) bool {
-	if _, ok := ossh.Stats.Fingerprints[sha1]; !ok {
-		return false
-	}
-	return true
-}
-
-func (ossh *OSSHServer) hasUser(usr string) bool {
-	if _, ok := ossh.Stats.Users[usr]; !ok {
-		return false
-	}
-	return true
-}
-
-func (ossh *OSSHServer) hasPassword(pwd string) bool {
-	if _, ok := ossh.Stats.Passwords[pwd]; !ok {
-		return false
-	}
-	return true
-}
-
-func (ossh *OSSHServer) hasHost(host string) bool {
-	if _, ok := ossh.Stats.Hosts[host]; !ok {
-		return false
-	}
-	return true
-}
-
-func (ossh *OSSHServer) hasPayload(sha1 string) bool {
-	return FileExists(fmt.Sprintf("%s/payload-%s.sh", Conf.PathCaptures, sha1))
-}
-
-func (ossh *OSSHServer) getPayload(sha1 string) (string, error) {
-	f := fmt.Sprintf("%s/payload-%s.sh", Conf.PathCaptures, sha1)
-	if !FileExists(f) {
-		return "", fmt.Errorf("Payload %s was not found.", sha1)
-	}
-
-	data, err := os.ReadFile(f)
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(data)), nil
-}
-
-func (ossh *OSSHServer) getSyncNode(host string) (SyncNode, error) {
-	for _, node := range Conf.Sync.Nodes {
-		if node.Host == host {
-			return node, nil
-		}
-	}
-	return SyncNode{}, fmt.Errorf("No sync secrets found for %s", host)
-}
-
-func (ossh *OSSHServer) addFingerprint(sha1 string) {
-	sha1 = strings.TrimSpace(sha1)
-	if sha1 == "" {
-		return
-	}
-
-	if !ossh.hasFingerprint(sha1) {
-		ossh.Stats.Fingerprints[sha1] = 0
-	}
-	ossh.Stats.Fingerprints[sha1]++
-
-	ossh.addPayload(sha1)
-}
-
-func (ossh *OSSHServer) addPayload(sha1 string) {
-	sha1 = strings.TrimSpace(sha1)
-	if sha1 == "" {
-		return
-	}
-
-	if !Server.hasPayload(sha1) {
-		// let's check if any of the nodes we know has a copy of the payload
-		for _, n := range Conf.Sync.Nodes {
-			payload := strings.TrimSpace(executeSSHCommand(n.Host, n.Port, n.User, n.Password, fmt.Sprintf("get-payload %s", sha1)))
-			if payload != "" {
-				p, err := base64.RawStdEncoding.DecodeString(payload)
-				if err == nil {
-					pdec := strings.TrimSpace(string(p))
-					Server.savePayload(sha1, pdec)
-				}
-				break
-			}
-		}
-	}
-}
-
-func (ossh *OSSHServer) addUser(usr string) {
-	usr = strings.TrimSpace(usr)
-	if usr == "" {
-		return
-	}
-
-	if !ossh.hasUser(usr) {
-		ossh.Stats.Users[usr] = 0
-	}
-	ossh.Stats.Users[usr]++
-}
-
-func (ossh *OSSHServer) addPassword(pwd string) {
-	pwd = strings.TrimSpace(pwd)
-	if pwd == "" {
-		return
-	}
-
-	if !ossh.hasPassword(pwd) {
-		ossh.Stats.Passwords[pwd] = 0
-	}
-	ossh.Stats.Passwords[pwd]++
-}
-
-func (ossh *OSSHServer) addHost(host string) {
-	host = strings.TrimSpace(host)
-	if host == "" {
-		return
-	}
-
-	if isIPWhitelisted(host) {
-		return // we don't want stats for whitelisted IPs
-	}
-
-	if !ossh.hasHost(host) {
-		ossh.Stats.Hosts[host] = 0
-		ossh.Stats.Logins.Attempts[host] = 0
-		ossh.Stats.Logins.Failed[host] = 0
-		ossh.Stats.Logins.OK[host] = 0
-	}
-	ossh.Stats.Hosts[host]++
-}
-
-func (ossh *OSSHServer) addLoginFailure(usr, pwd, host, reason string) {
-	if pwd == "" {
-		pwd = "(empty)"
-	}
-
-	if isIPWhitelisted(host) {
-		LogNotOK(
-			"%s@%s failed to login: %s.\n",
-			colorWrap(usr, colorGreen),
-			colorWrap(host, colorBrightYellow),
-			colorWrap(reason, colorOrange),
+	if isIPWhitelisted(s.Host) {
+		LogNotOKLn(
+			"%s failed to login: %s.",
+			s.LogID(),
+			colorReason(reason),
 		)
 		return // we don't want stats for whitelisted IPs
 	}
 
-	ossh.addUser(usr)
-	ossh.addPassword(pwd)
-	ossh.addHost(host)
-	ossh.Stats.Logins.Attempts = ossh.incCounter(ossh.Stats.Logins.Attempts, host)
-	ossh.Stats.Logins.Failed = ossh.incCounter(ossh.Stats.Logins.Failed, host)
-	LogNotOK(
-		"%s@%s failed to login with password %s: %s. (%d attempts; %d failed; %d success)\n",
-		colorWrap(usr, colorGreen),
-		colorWrap(host, colorBrightYellow),
-		colorWrap(pwd, colorGreen),
-		colorWrap(reason, colorOrange),
-		ossh.Stats.Logins.Attempts[host],
-		ossh.Stats.Logins.Failed[host],
-		ossh.Stats.Logins.OK[host],
+	ossh.Loot.AddUser(s.User)
+	ossh.Loot.AddPassword(s.Password)
+	ossh.Loot.AddHost(s.Host)
+	ossh.Logins.Get(s.Host).AddFailure()
+	LogNotOKLn(
+		"%s failed to login with password %s: %s. (%d attempts; %d failed; %d success)",
+		s.LogID(),
+		colorPassword(s.Password),
+		colorReason(reason),
+		ossh.Logins.Get(s.Host).GetAttempts(),
+		ossh.Logins.Get(s.Host).GetFailures(),
+		ossh.Logins.Get(s.Host).GetSuccesses(),
 	)
 }
 
-func (ossh *OSSHServer) addLoginSuccess(usr, pwd, host, reason string) {
-	if pwd == "" {
-		pwd = "(empty)"
+func (ossh *OSSHServer) addLoginSuccess(s *Session, reason string) {
+	if s.Password == "" {
+		s.Password = "(empty)"
 	}
 
-	if isIPWhitelisted(host) {
-		LogOK(
-			"%s@%s logged in.\n",
-			colorWrap(usr, colorGreen),
-			colorWrap(host, colorBrightYellow),
+	if isIPWhitelisted(s.Host) {
+		LogOKLn(
+			"%s logged in.",
+			s.LogID(),
 		)
 		return // we don't want stats for whitelisted IPs
 	}
 
-	ossh.addUser(usr)
-	ossh.addPassword(pwd)
-	ossh.addHost(host)
-	ossh.Stats.Logins.Attempts = ossh.incCounter(ossh.Stats.Logins.Attempts, host)
-	ossh.Stats.Logins.OK = ossh.incCounter(ossh.Stats.Logins.OK, host)
-	LogOK(
-		"%s@%s logged in with password %s: %s. (%d attempts; %d failed; %d success)\n",
-		colorWrap(usr, colorGreen),
-		colorWrap(host, colorBrightYellow),
-		colorWrap(pwd, colorGreen),
-		colorWrap(reason, colorOrange),
-		ossh.Stats.Logins.Attempts[host],
-		ossh.Stats.Logins.Failed[host],
-		ossh.Stats.Logins.OK[host],
+	ossh.Loot.AddUser(s.User)
+	ossh.Loot.AddPassword(s.Password)
+	ossh.Loot.AddHost(s.Host)
+	ossh.Logins.Get(s.Host).AddSuccess()
+	LogOKLn(
+		"%s logged in with password %s: %s. (%d attempts; %d failed; %d success)",
+		s.LogID(),
+		colorPassword(s.Password),
+		colorReason(reason),
+		ossh.Logins.Get(s.Host).GetAttempts(),
+		ossh.Logins.Get(s.Host).GetFailures(),
+		ossh.Logins.Get(s.Host).GetSuccesses(),
 	)
 }
 
-func (ossh *OSSHServer) incCounter(stat map[string]uint, host string) map[string]uint {
-	h := stat[host]
-	stat[host] = h + 1
-	return stat
+func (ossh *OSSHServer) GracefulCloseOnError(err error, sess *ssh.Session) {
+	// TODO  graceful fallback?
+	LogErrorLn("[SSH] Graceful close because %s.", colorError(err))
+	(*sess).Close()
 }
 
-func (ossh *OSSHServer) sessionHandler(s ssh.Session) {
-	remoteIP, _, err := net.SplitHostPort(s.RemoteAddr().String())
-	if err != nil {
-		Log('x', err.Error())
-		s.Close()
+func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
+	s := ossh.Sessions.Create(sess.RemoteAddr().String()).SetSSHSession(&sess)
+	if s == nil {
+		ossh.GracefulCloseOnError(errors.New("[SSH] Failed to create oSSH session."), &sess)
 		return
 	}
 
-	overlayFS, err := ossh.fs.NewSession(remoteIP)
+	s.SSHSession = &sess
+
+	overlayFS, err := ossh.fs.NewSession(s.Host)
 	if err != nil {
-		// TODO  graceful fallback?
-		Log('x', err.Error())
-		s.Close()
+		ossh.GracefulCloseOnError(errors.New("[SSH] Failed to create FFS session."), s.SSHSession)
 		return
 	}
 
 	err = overlayFS.Mount()
 	if err != nil {
-		// TODO  graceful fallback?
-		Log('x', err.Error())
-		s.Close()
+		ossh.GracefulCloseOnError(errors.New("[SSH] Failed to mount FFS."), s.SSHSession)
 		return
 	}
 	defer func() {
 		err := overlayFS.Close()
 		if err != nil {
-			Log('x', err.Error())
+			LogErrorLn(colorError(err))
 		}
 	}()
 
-	fs := NewFakeShell(s, overlayFS)
-	host := fs.Host()
-	ossh.shells[host] = fs
-	stats := fs.Process()
+	s.SetShell(NewFakeShell((*s.SSHSession), overlayFS))
+	stats := s.Shell.Process()
 
-	if !ossh.syncClients[host] && !isIPWhitelisted(host) {
-		ossh.Stats.TimeWasted += int(stats.TimeSpent)
+	if !ossh.KnownNodes.Has(s.Host) && !s.Whitelisted {
+		ossh.TimeWasted += int(stats.TimeSpent)
 
-		LogSuccess("%s@%s spent %s running %s command(s)\n",
-			colorWrap(fs.User(), colorGreen),
-			colorWrap(host, colorBrightYellow),
-			colorWrap(time.Duration(stats.TimeSpent*uint(time.Second)).String(), colorCyan),
-			colorWrap(fmt.Sprintf("%d", stats.CommandsExecuted), colorCyan),
+		LogSuccessLn("%s spent %s running %s command(s)",
+			s.LogID(),
+			colorDuration(stats.TimeSpent),
+			colorInt(int(stats.CommandsExecuted)),
+		)
+	} else {
+		LogSuccessLn("%s: %s",
+			s.LogID(),
+			colorReason("Elvis has left the building."),
 		)
 	}
 
-	ossh.saveUsers()
-	ossh.savePasswords()
-	ossh.saveHosts()
-	ossh.saveFingerprints()
+	ossh.saveData()
 
-	if !ossh.syncClients[host] && !isIPWhitelisted(host) {
-		ossh.saveCapture(stats)
+	if !ossh.KnownNodes.Has(s.Host) && !s.Whitelisted {
+		stats.SaveCapture()
 	}
 
-	delete(ossh.shells, host)
+	ossh.Sessions.Remove(s.ID)
 }
 
 func (ossh *OSSHServer) localPortForwardingCallback(ctx ssh.Context, bindHost string, bindPort uint32) bool {
-	LogWarning("%s@%s tried to locally forward port %s. Request denied!\n",
-		colorWrap(ctx.User(), colorGreen),
-		colorWrap(bindHost, colorBrightYellow),
-		colorWrap(fmt.Sprintf("%d", bindPort), colorCyan),
+	s := ossh.Sessions.Create(ctx.RemoteAddr().String())
+	LogWarningLn("%s tried to locally port forward to %s:%s. Request denied!",
+		s.LogID(),
+		colorHost(bindHost),
+		colorInt(int(bindPort)),
 	)
 
 	return false
 }
 
 func (ossh *OSSHServer) reversePortForwardingCallback(ctx ssh.Context, bindHost string, bindPort uint32) bool {
-	LogWarning("%s@%s tried to reverse forward port %s. Request denied!\n",
-		colorWrap(ctx.User(), colorGreen),
-		colorWrap(bindHost, colorBrightYellow),
-		colorWrap(fmt.Sprintf("%d", bindPort), colorCyan),
+	s := ossh.Sessions.Create(ctx.RemoteAddr().String())
+	LogWarningLn("%s tried to reverse port forward to %s:%s. Request denied!",
+		s.LogID(),
+		colorHost(bindHost),
+		colorInt(int(bindPort)),
 	)
 
 	return false
 }
 
 func (ossh *OSSHServer) ptyCallback(ctx ssh.Context, pty ssh.Pty) bool {
-	host := strings.Split(ctx.RemoteAddr().String(), ":")[0]
-	if ossh.syncClients[host] || isIPWhitelisted(host) {
+	s := ossh.Sessions.Create(ctx.RemoteAddr().String()).SetTerm(pty.Term)
+	if ossh.KnownNodes.Has(s.Host) || s.Whitelisted {
 		return true
 	}
-	LogOK("%s@%s started %s PTY session\n",
-		colorWrap(ctx.User(), colorGreen),
-		colorWrap(host, colorBrightYellow),
-		colorWrap(pty.Term, colorCyan),
+	LogOKLn("%s started %s PTY session",
+		s.LogID(),
+		colorHighlight(s.Term),
 	)
 	return true
 }
 
 func (ossh *OSSHServer) sessionRequestCallback(sess ssh.Session, requestType string) bool {
-	host := strings.Split(sess.RemoteAddr().String(), ":")[0]
-	if ossh.syncClients[host] || isIPWhitelisted(host) {
+	s := ossh.Sessions.Create(sess.RemoteAddr().String()).SetType(requestType)
+	if ossh.KnownNodes.Has(s.Host) || s.Whitelisted {
 		return true
 	}
-	LogOK("%s@%s requested %s session\n",
-		colorWrap(sess.User(), colorGreen),
-		colorWrap(host, colorBrightYellow),
-		colorWrap(requestType, colorCyan),
+	LogOKLn("%s requested %s session",
+		s.LogID(),
+		colorHighlight(s.Type),
 	)
 	return true
 }
 
 func (ossh *OSSHServer) connectionFailedCallback(conn net.Conn, err error) {
-	if err.Error() != "EOF" {
-		host := strings.Split(conn.RemoteAddr().String(), ":")[0]
-		if ossh.hasHost(host) {
-			if _, ok := ossh.shells[host]; ok {
-				LogWarning("%s@%s's connection failed: %s\n",
-					colorWrap(ossh.shells[host].stats.User, colorGreen),
-					colorWrap(host, colorBrightYellow),
-					colorWrap(err.Error(), colorOrange),
-				)
-				return
-			}
-		}
+	s := ossh.Sessions.Create(conn.RemoteAddr().String())
 
-		LogWarning("%s's connection failed: %s\n",
-			colorWrap(host, colorBrightYellow),
-			colorWrap(err.Error(), colorOrange),
+	if err.Error() != "EOF" {
+		ossh.Sessions.Remove(s.ID)
+		LogWarningLn("%s's connection failed: %s",
+			s.LogID(),
+			colorError(err),
 		)
 	}
 }
 
 func (ossh *OSSHServer) authHandler(ctx ssh.Context, pwd string) bool {
-	usr := ctx.User()
-	host := strings.Split(ctx.RemoteAddr().String(), ":")[0]
+	s := ossh.Sessions.Create(ctx.RemoteAddr().String())
+	s.SetUser(ctx.User()).SetPassword(pwd)
 
 	for _, node := range Conf.Sync.Nodes {
-		if usr == node.User && pwd == node.Password && node.Host == host {
+		if s.User == node.User && s.Password == node.Password && node.Host == s.Host {
 			// secret credentials hit, let's mark as a sync client
-			ossh.syncClients[host] = true
+			ossh.KnownNodes.Add(s.Host, &node)
 			return true
 		}
-		ossh.syncClients[host] = false
 	}
 
-	if isIPWhitelisted(host) {
-		ossh.addLoginSuccess(usr, pwd, host, "host is whitelisted")
+	if s.Whitelisted {
+		ossh.addLoginSuccess(s, "host is whitelisted")
 		return true // I know you, have fun
 	}
 
-	if ossh.hasHost(host) {
-		ossh.addLoginSuccess(usr, pwd, host, "host is back for more")
+	if ossh.Loot.HasHost(s.Host) {
+		ossh.addLoginSuccess(s, "host is back for more")
 		return true // let's see what it wants
 	}
 
-	if ossh.hasUser(usr) && ossh.hasPassword(pwd) {
-		ossh.addLoginFailure(usr, pwd, host, "host does not have new credentials")
+	if ossh.Loot.HasUser(s.User) && ossh.Loot.HasPassword(s.Password) {
+		ossh.addLoginFailure(s, "host does not have new credentials")
 		return false // come back when you have something we don't know yet!
 	}
 
-	if ossh.hasUser(usr) {
-		ossh.addLoginSuccess(usr, pwd, host, "host got the user name right")
+	if ossh.Loot.HasUser(s.User) {
+		ossh.addLoginSuccess(s, "host got the user name right")
 		return true // ok, we'll take it
 	}
 
-	if ossh.hasPassword(pwd) {
-		ossh.addLoginSuccess(usr, pwd, host, "host got the password right")
+	if ossh.Loot.HasPassword(s.Password) {
+		ossh.addLoginSuccess(s, "host got the password right")
 		return true // ok, we'll take it
 	}
 
 	// ok, the attacker has credentials we don't know yet, let's roll dice.
 	if time.Now().Unix()%3 != 0 {
-		ossh.addLoginFailure(usr, pwd, host, "host lost a game of dice")
+		ossh.addLoginFailure(s, "host lost a game of dice")
 		return false // no luck, big boy, try again
 	}
 
-	ossh.addLoginSuccess(usr, pwd, host, "host dodged all obstacles")
+	ossh.addLoginSuccess(s, "host dodged all obstacles")
 	return true
 }
 
 func (ossh *OSSHServer) init() {
-	ossh.loadHosts()
-	ossh.loadUsers()
-	ossh.loadPasswords()
-	ossh.loadFingerprints()
+	ossh.loadData()
 	ossh.server = &ssh.Server{
 		Addr:                          fmt.Sprintf("%s:%d", Conf.Host, Conf.Port),
 		Handler:                       ossh.sessionHandler,
@@ -599,7 +327,7 @@ func (ossh *OSSHServer) init() {
 		PtyCallback:                   ossh.ptyCallback,
 		ConnectionFailedCallback:      ossh.connectionFailedCallback,
 		SessionRequestCallback:        ossh.sessionRequestCallback,
-		Version:                       ossh.Version,
+		Version:                       Conf.Version,
 	}
 
 	ossh.fs = &OverlayFSManager{}
@@ -614,43 +342,18 @@ func (ossh *OSSHServer) init() {
 }
 
 func (ossh *OSSHServer) Start() {
-	LogDefault("Starting oSSH Server on %v\n", colorWrap(ossh.server.Addr, colorBrightYellow))
+	LogDefaultLn("Starting oSSH Server on %v", colorHost(ossh.server.Addr))
 	log.Fatal(ossh.server.ListenAndServe())
 }
 
 func NewOSSHServer() *OSSHServer {
 	ossh := &OSSHServer{
-		Version:     Conf.Version,
-		server:      nil,
-		shells:      map[string]*FakeShell{},
-		syncClients: map[string]bool{},
-		Stats: struct {
-			Logins struct {
-				Attempts map[string]uint
-				Failed   map[string]uint
-				OK       map[string]uint
-			}
-			Users        map[string]uint
-			Passwords    map[string]uint
-			Hosts        map[string]uint
-			Fingerprints map[string]uint
-			TimeWasted   int
-		}{
-			Logins: struct {
-				Attempts map[string]uint
-				Failed   map[string]uint
-				OK       map[string]uint
-			}{
-				Attempts: map[string]uint{},
-				Failed:   map[string]uint{},
-				OK:       map[string]uint{},
-			},
-			Users:        map[string]uint{},
-			Passwords:    map[string]uint{},
-			Hosts:        map[string]uint{},
-			Fingerprints: map[string]uint{},
-			TimeWasted:   0,
-		},
+		Loot:       NewLoot(),
+		Logins:     NewLogins(),
+		server:     nil,
+		Sessions:   NewActiveSessions(true),
+		KnownNodes: NewKnownNodes(),
+		TimeWasted: 0,
 	}
 	ossh.init()
 	go func() {
@@ -659,6 +362,11 @@ func NewOSSHServer() *OSSHServer {
 			for _, node := range Conf.Sync.Nodes {
 				_ = executeSSHCommand(node.Host, node.Port, node.User, node.Password, "check")
 			}
+		}
+	}()
+	go func() {
+		for {
+			time.Sleep(10 * time.Second)
 			WebServer.PushStats(Server.statsJSONSimple())
 		}
 	}()
