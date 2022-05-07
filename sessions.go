@@ -5,11 +5,13 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/gliderlabs/ssh"
 )
 
 type Session struct {
+	CreatedAt   time.Time
 	ID          string
 	Type        string
 	Shell       *FakeShell
@@ -113,8 +115,13 @@ func (s *Session) LogID() string {
 	)
 }
 
+func (s *Session) Uptime() time.Duration {
+	return time.Since(s.CreatedAt)
+}
+
 func NewSession() *Session {
 	s := &Session{
+		CreatedAt:  time.Now(),
 		ID:         "",
 		Shell:      nil,
 		SSHSession: nil,
@@ -167,6 +174,7 @@ func (ss *Sessions) Create(sessionID string) *Session {
 func (ss *Sessions) Remove(sessionID string) {
 	ss.lock.Lock()
 	defer ss.lock.Unlock()
+	Server.TimeWasted += int(ss.sessions[sessionID].Uptime().Seconds())
 	delete(ss.sessions, sessionID)
 }
 

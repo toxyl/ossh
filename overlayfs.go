@@ -124,8 +124,9 @@ func (ofsm *OverlayFSManager) NewSession(sandboxKey string) (*OverlayFS, error) 
 		}
 	}
 
-	if !DirExists(filepath.Join(sandboxPath, "layers")) {
-		err := os.Mkdir(filepath.Join(sandboxPath, "layers"), 0755)
+	sandboxLayersPath := filepath.Join(sandboxPath, "layers")
+	if !DirExists(sandboxLayersPath) {
+		err := os.Mkdir(sandboxLayersPath, 0755)
 		if err != nil {
 			return nil, fmt.Errorf("make sandbox dir: %w", err)
 		}
@@ -138,7 +139,7 @@ func (ofsm *OverlayFSManager) NewSession(sandboxKey string) (*OverlayFS, error) 
 	upperLayerPath := filepath.Join(sandboxPath, "layers", timeKey)
 	var lowerLayers []string
 
-	entries, err := os.ReadDir(filepath.Join(sandboxPath, "layers"))
+	entries, err := os.ReadDir(sandboxLayersPath)
 	if err != nil {
 		return nil, fmt.Errorf("read layers dir: %w", err)
 	}
@@ -178,36 +179,43 @@ type OverlayFS struct {
 	lowerDirs []string
 }
 
-func (ofs *OverlayFS) Mount() error {
-	// let's try to unmount & remove everything first
-	_ = unix.Unmount(ofs.mergedDir, 0)
-	_ = os.RemoveAll(ofs.mergedDir)
-	_ = os.RemoveAll(ofs.workDir)
-	_ = os.RemoveAll(ofs.upperDir)
+func (ofs *OverlayFS) Unmount() {
+	if DirExists(ofs.mergedDir) {
+		_ = unix.Unmount(ofs.mergedDir, 0)
+	}
+}
 
+func (ofs *OverlayFS) Mount() error {
+	ofs.Unmount()
 	time.Sleep(1 * time.Second)
 
-	err := os.Mkdir(ofs.mergedDir, 700)
-	if err != nil {
-		return fmt.Errorf("mkdir merged: %w", err)
+	if !DirExists(ofs.mergedDir) {
+		err := os.Mkdir(ofs.mergedDir, 700)
+		if err != nil {
+			return fmt.Errorf("mkdir merged (%s): %w", ofs.mergedDir, err)
+		}
 	}
 
-	err = os.Mkdir(ofs.workDir, 700)
-	if err != nil {
-		return fmt.Errorf("mkdir workdir: %w", err)
+	if !DirExists(ofs.workDir) {
+		err := os.Mkdir(ofs.workDir, 700)
+		if err != nil {
+			return fmt.Errorf("mkdir workdir (%s): %w", ofs.workDir, err)
+		}
 	}
 
-	err = os.Mkdir(ofs.upperDir, 700)
-	if err != nil {
-		return fmt.Errorf("mkdir upper: %w", err)
+	if !DirExists(ofs.upperDir) {
+		err := os.Mkdir(ofs.upperDir, 700)
+		if err != nil {
+			return fmt.Errorf("mkdir upper (%s): %w", ofs.upperDir, err)
+		}
 	}
 
 	lowedirs := strings.Join(ofs.lowerDirs, ":")
 	data := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", lowedirs, ofs.upperDir, ofs.workDir)
 
-	err = unix.Mount("overlay", ofs.mergedDir, "overlay", 0, data)
+	err := unix.Mount("overlay", ofs.mergedDir, "overlay", 0, data)
 	if err != nil {
-		return fmt.Errorf("mount: %w", err)
+		return fmt.Errorf("mount %s: %w", ofs.mergedDir, err)
 	}
 
 	return nil
@@ -216,17 +224,17 @@ func (ofs *OverlayFS) Mount() error {
 func (ofs *OverlayFS) Close() error {
 	err := unix.Unmount(ofs.mergedDir, 0)
 	if err != nil {
-		return fmt.Errorf("unmount: %w", err)
+		return fmt.Errorf("unmount %s: %w", ofs.mergedDir, err)
 	}
 
-	err = os.Remove(ofs.mergedDir)
+	err = os.RemoveAll(ofs.mergedDir)
 	if err != nil {
-		return fmt.Errorf("remove mergedDir: %w", err)
+		return fmt.Errorf("remove mergeddir (%s): %w", ofs.mergedDir, err)
 	}
 
 	err = os.RemoveAll(ofs.workDir)
 	if err != nil {
-		return fmt.Errorf("remove workdir: %w", err)
+		return fmt.Errorf("remove workdir (%s): %w", ofs.workDir, err)
 	}
 
 	return nil

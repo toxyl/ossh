@@ -57,6 +57,9 @@ commands:
     - [ "echo", "{{ .InputRaw }}" ]
     - [ "command", "What is your wish, {{ .User }}?" ]
     - [ "ifconfig", "ifconfig has been deprecated, use ip instead." ]
+    - [ "gcc", "Global Coal Conglomerate" ]
+    - [ "./bash", "/bin/bash^M: bad interpreter: No such file or directory" ]
+    
   permission_denied:
     - sudo
     - arch

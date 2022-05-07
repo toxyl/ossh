@@ -8,7 +8,6 @@ import (
 type FakeShellStats struct {
 	Host             string
 	User             string
-	TimeSpent        uint
 	CommandsExecuted uint
 	CommandHistory   []string
 	recording        *ASCIICastV2

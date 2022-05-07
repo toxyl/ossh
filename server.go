@@ -35,6 +35,7 @@ func (ossh *OSSHServer) statsJSONSimple() string {
 		SuccessfulLogins uint   `json:"logins_successful"`
 		FailedLogins     uint   `json:"logins_failed"`
 		TimeWasted       string `json:"time_wasted"`
+		Uptime           string `json:"uptime"`
 	}{
 		Hosts:            ossh.Loot.CountHosts(),
 		Passwords:        ossh.Loot.CountPasswords(),
@@ -45,6 +46,7 @@ func (ossh *OSSHServer) statsJSONSimple() string {
 		SuccessfulLogins: ossh.Logins.GetSuccesses(),
 		FailedLogins:     ossh.Logins.GetFailures(),
 		TimeWasted:       time.Duration(ossh.TimeWasted * int(time.Second)).String(),
+		Uptime:           uptime().Round(1 * time.Second).String(),
 	}
 	json, err := json.Marshal(data)
 	if err != nil {
@@ -150,32 +152,39 @@ func (ossh *OSSHServer) addLoginSuccess(s *Session, reason string) {
 	)
 }
 
-func (ossh *OSSHServer) GracefulCloseOnError(err error, sess *ssh.Session) {
+func (ossh *OSSHServer) GracefulCloseOnError(err error, s *Session, sess *ssh.Session, ofs *OverlayFS) {
 	// TODO  graceful fallback?
 	LogErrorLn("[SSH] Graceful close because %s.", colorError(err))
+	if ofs != nil {
+		err = ofs.Close()
+		if err != nil {
+			LogErrorLn(colorError(err))
+		}
+	}
 	(*sess).Close()
+	if s != nil {
+		ossh.Sessions.Remove(s.ID)
+	}
 }
 
 func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 	s := ossh.Sessions.Create(sess.RemoteAddr().String()).SetSSHSession(&sess)
 	if s == nil {
-		ossh.GracefulCloseOnError(errors.New("Failed to create oSSH session."), &sess)
+		ossh.GracefulCloseOnError(errors.New("Failed to create oSSH session."), nil, &sess, nil)
 		return
 	}
-
-	s.SSHSession = &sess
 
 	if !ossh.KnownNodes.Has(s.Host) {
 		// only create for bots, sync nodes don't need it
 		overlayFS, err := ossh.fs.NewSession(s.Host)
 		if err != nil {
-			ossh.GracefulCloseOnError(err, s.SSHSession)
+			ossh.GracefulCloseOnError(err, s, s.SSHSession, overlayFS)
 			return
 		}
 
 		err = overlayFS.Mount()
 		if err != nil {
-			ossh.GracefulCloseOnError(err, s.SSHSession)
+			ossh.GracefulCloseOnError(err, s, s.SSHSession, overlayFS)
 			return
 		}
 		defer func() {
@@ -192,11 +201,9 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 	stats := s.Shell.Process()
 
 	if !ossh.KnownNodes.Has(s.Host) && !s.Whitelisted {
-		ossh.TimeWasted += int(stats.TimeSpent)
-
 		LogSuccessLn("%s spent %s running %s command(s)",
 			s.LogID(),
-			colorDuration(stats.TimeSpent),
+			colorDuration(uint(s.Uptime().Seconds())),
 			colorInt(int(stats.CommandsExecuted)),
 		)
 	} else if !ossh.KnownNodes.Has(s.Host) {
@@ -222,7 +229,7 @@ func (ossh *OSSHServer) localPortForwardingCallback(ctx ssh.Context, bindHost st
 		colorHost(bindHost),
 		colorInt(int(bindPort)),
 	)
-
+	ossh.Sessions.Remove(s.ID)
 	return false
 }
 
@@ -233,7 +240,7 @@ func (ossh *OSSHServer) reversePortForwardingCallback(ctx ssh.Context, bindHost 
 		colorHost(bindHost),
 		colorInt(int(bindPort)),
 	)
-
+	ossh.Sessions.Remove(s.ID)
 	return false
 }
 
@@ -265,12 +272,12 @@ func (ossh *OSSHServer) connectionFailedCallback(conn net.Conn, err error) {
 	s := ossh.Sessions.Create(conn.RemoteAddr().String())
 
 	if err.Error() != "EOF" {
-		ossh.Sessions.Remove(s.ID)
 		LogWarningLn("%s's connection failed: %s",
 			s.LogID(),
 			colorError(err),
 		)
 	}
+	ossh.Sessions.Remove(s.ID)
 }
 
 func (ossh *OSSHServer) authHandler(ctx ssh.Context, pwd string) bool {
@@ -347,7 +354,7 @@ func (ossh *OSSHServer) init() {
 }
 
 func (ossh *OSSHServer) Start() {
-	LogDefaultLn("Starting oSSH Server on %v", colorHost(ossh.server.Addr))
+	LogDefaultLn("Starting oSSH server on %v", colorHost(ossh.server.Addr))
 	log.Fatal(ossh.server.ListenAndServe())
 }
 

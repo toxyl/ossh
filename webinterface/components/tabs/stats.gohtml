@@ -15,8 +15,9 @@
         $('#tsPasswords').text(m.passwords);
         $('#tsFingerprints').text(m.fingerprints);
         $('#tsSessions').text(m.sessions);
-        $('#tsLogins').text(`${m.logins_attempted} / ${m.logins_successful} / ${m.logins_failed}`);
+        $('#tsLogins').html(`${m.logins_attempted} attempts<br>${m.logins_successful} successful<br>${m.logins_failed} failed`);
         $('#tsTimeWasted').text(m.time_wasted);
+        $('#tsUptime').text(m.uptime);
     }
 
     function ws_st_receive_complete() { }
@@ -42,16 +43,20 @@
             <td id="tsFingerprints" class="w50 left"></td>
         </tr>
         <tr>
-            <td class="w50 right">Active Sessions</td>
+            <td class="w50 right">Sessions</td>
             <td id="tsSessions" class="w50 left"></td>
         </tr>
         <tr>
-            <td class="w50 right">Logins (attempted / successful / failed)</td>
+            <td class="w50 right">Logins</td>
             <td id="tsLogins" class="w50 left"></td>
         </tr>
         <tr>
             <td class="w50 right">Time Wasted</td>
             <td id="tsTimeWasted" class="w50 left"></td>
+        </tr>
+        <tr>
+            <td class="w50 right">Uptime</td>
+            <td id="tsUptime" class="w50 left"></td>
         </tr>
     </table>
 </div>

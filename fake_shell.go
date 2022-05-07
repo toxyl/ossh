@@ -348,7 +348,6 @@ func (fs *FakeShell) Process() *FakeShellStats {
 		fs.HandleInput()
 	}
 	fs.Close()
-	fs.stats.TimeSpent = uint(time.Now().Unix()) - uint(fs.created.Unix())
 	return fs.stats
 }
 
@@ -359,7 +358,6 @@ func NewFakeShell(s ssh.Session, overlay *OverlayFS) *FakeShell {
 		writer:   nil,
 		created:  time.Now(),
 		stats: &FakeShellStats{
-			TimeSpent:        0,
 			CommandsExecuted: 0,
 			CommandHistory:   []string{},
 			Host:             "",
