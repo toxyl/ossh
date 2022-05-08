@@ -55,6 +55,7 @@ type OverlayFSManager struct {
 var defaultFS embed.FS
 
 func (ofsm *OverlayFSManager) Init(baseDir string) error {
+	DebugOverlayFS("init %s", colorFile(baseDir))
 	if !DirExists(baseDir) {
 		err := os.Mkdir(baseDir, 0755)
 		if err != nil {
@@ -122,6 +123,7 @@ func (ofsm *OverlayFSManager) Init(baseDir string) error {
 }
 
 func (ofsm *OverlayFSManager) NewSession(sandboxKey string) (*OverlayFS, error) {
+	DebugOverlayFS("newsession %s", colorHighlight(sandboxKey))
 	sandboxPath := filepath.Join(ofsm.baseDir, "sandboxes", sandboxKey)
 	if !DirExists(sandboxPath) {
 		err := os.Mkdir(sandboxPath, 0755)
@@ -186,14 +188,14 @@ func (ofsm *OverlayFSManager) CleanupWorker() {
 
 		sandboxes, err := os.ReadDir(sandboxPath)
 		if err != nil {
-			Log('x', "cleanup worker: %s", err.Error())
+			LogErrorLn("cleanup worker: %s", err.Error())
 			continue
 		}
 
 		for _, sandbox := range sandboxes {
 			sandboxEntries, err := os.ReadDir(filepath.Join(sandboxPath, sandbox.Name()))
 			if err != nil {
-				Log('x', "cleanup worker, read sandbox dir: %s", err.Error())
+				LogErrorLn("cleanup worker, read sandbox dir: %s", err.Error())
 				continue
 			}
 
@@ -210,13 +212,14 @@ func (ofsm *OverlayFSManager) CleanupWorker() {
 				if !active {
 					timestamp := strings.Split(entry.Name(), "-")[1]
 
+					DebugOverlayFS("cleanup - unmount %s", colorHighlight(sandbox.Name()))
 					err = (&OverlayFS{
 						mergedDir: mergeDirPath,
 						workDir:   filepath.Join(sandboxPath, sandbox.Name(), fmt.Sprintf("work-%s", timestamp)),
 					}).Unmount()
 
 					if err != nil {
-						Log('x', "cleanup worker, close overlay '%s': %s", mergeDirPath, err.Error())
+						LogErrorLn("cleanup worker, close overlay '%s': %s", mergeDirPath, colorError(err))
 						continue
 					}
 				}
@@ -226,6 +229,7 @@ func (ofsm *OverlayFSManager) CleanupWorker() {
 }
 
 func (ofsm *OverlayFSManager) DeactivateOverlay(fs *OverlayFS) {
+	DebugOverlayFS("deactivate %s", colorFile(fs.mergedDir))
 	ofsm.mu.Lock()
 	defer ofsm.mu.Unlock()
 	delete(ofsm.activeOverlays, fs.mergedDir)
@@ -246,9 +250,7 @@ type OverlayFS struct {
 }
 
 func (ofs *OverlayFS) Mount() error {
-	ofs.Unmount()
-	time.Sleep(1 * time.Second)
-
+	DebugOverlayFS("mount %s", colorFile(ofs.mergedDir))
 	if !DirExists(ofs.mergedDir) {
 		err := os.Mkdir(ofs.mergedDir, 700)
 		if err != nil {
@@ -288,10 +290,12 @@ func (ofs *OverlayFS) Mount() error {
 }
 
 func (ofs *OverlayFS) Close() {
+	DebugOverlayFS("close %s", colorFile(ofs.mergedDir))
 	ofs.manager.DeactivateOverlay(ofs)
 }
 
 func (ofs *OverlayFS) Unmount() error {
+	DebugOverlayFS("unmount %s", colorFile(ofs.mergedDir))
 	err := unix.Unmount(ofs.mergedDir, 0)
 	if err != nil {
 		return fmt.Errorf("unmount: %w", err)
@@ -329,6 +333,8 @@ func (ofs *OverlayFS) insideMerged(path string) bool {
 }
 
 func (ofs *OverlayFS) OpenFile(path string, flag int, perm fs.FileMode) (*os.File, error) {
+	DebugOverlayFS("openfile %s", colorFile(path))
+
 	if !ofs.insideMerged(path) {
 		return nil, errors.New("path outside root")
 	}
@@ -337,6 +343,7 @@ func (ofs *OverlayFS) OpenFile(path string, flag int, perm fs.FileMode) (*os.Fil
 }
 
 func (ofs *OverlayFS) DirExists(path string) bool {
+	DebugOverlayFS("direxists %s", colorFile(path))
 	if !ofs.insideMerged(path) {
 		return false
 	}
@@ -345,6 +352,7 @@ func (ofs *OverlayFS) DirExists(path string) bool {
 }
 
 func (ofs *OverlayFS) Mkdir(path string, mode fs.FileMode) error {
+	DebugOverlayFS("mkdir %s", colorFile(path))
 	if !ofs.insideMerged(path) {
 		return errors.New("path outside root")
 	}
@@ -353,6 +361,7 @@ func (ofs *OverlayFS) Mkdir(path string, mode fs.FileMode) error {
 }
 
 func (ofs *OverlayFS) ReadDir(path string) ([]os.DirEntry, error) {
+	DebugOverlayFS("readdir %s", colorFile(path))
 	if !ofs.insideMerged(path) {
 		return nil, errors.New("path outside root")
 	}

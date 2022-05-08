@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,7 +12,6 @@ import (
 	"time"
 
 	"github.com/gliderlabs/ssh"
-	"golang.org/x/exp/maps"
 )
 
 type OSSHServer struct {
@@ -79,6 +77,7 @@ func (ossh *OSSHServer) loadData() {
 	ossh.loadDataFile(Conf.PathUsers, "users", ossh.Loot.AddUser)
 	ossh.loadDataFile(Conf.PathPasswords, "passwords", ossh.Loot.AddPassword)
 	ossh.loadDataFile(Conf.PathFingerprints, "fingerprints", ossh.Loot.AddFingerprint)
+	DebugOSSHServer("Loaded data files")
 }
 
 func (ossh *OSSHServer) saveDataFile(path, contentType string, lines []string) {
@@ -94,6 +93,7 @@ func (ossh *OSSHServer) SaveData() {
 	ossh.saveDataFile(Conf.PathUsers, "users", ossh.Loot.GetUsers())
 	ossh.saveDataFile(Conf.PathPasswords, "passwords", ossh.Loot.GetPasswords())
 	ossh.saveDataFile(Conf.PathFingerprints, "fingerprints", ossh.Loot.GetFingerprints())
+	DebugOSSHServer("Saved data files")
 }
 
 func (ossh *OSSHServer) addLoginFailure(s *Session, reason string) {
@@ -157,10 +157,7 @@ func (ossh *OSSHServer) GracefulCloseOnError(err error, s *Session, sess *ssh.Se
 	// TODO  graceful fallback?
 	LogErrorLn("[SSH] Graceful close because %s.", colorError(err))
 	if ofs != nil {
-		err = ofs.Close()
-		if err != nil {
-			LogErrorLn(colorError(err))
-		}
+		ofs.Close()
 	}
 	(*sess).Close()
 	if s != nil {
@@ -169,10 +166,10 @@ func (ossh *OSSHServer) GracefulCloseOnError(err error, s *Session, sess *ssh.Se
 }
 
 func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
-		// Catch panics, so a bug triggered in a SSH session doesn't crash the whole service
+	// Catch panics, so a bug triggered in a SSH session doesn't crash the whole service
 	defer func() {
 		if err := recover(); err != nil {
-			LogErrorLn("Fatal error: %s", colorError(err))
+			LogErrorLn("Fatal error: %s", colorReason(fmt.Sprint(err)))
 		}
 	}()
 	s := ossh.Sessions.Create(sess.RemoteAddr().String()).SetSSHSession(&sess)

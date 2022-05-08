@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"time"
-	"strings"
 )
 
 func colorWrap(str string, color uint) string {
@@ -82,6 +81,8 @@ func Log(indicator rune, format string, a ...interface{}) {
 		prefix = colorWrap("[x]", colorRed)
 	case '!':
 		prefix = colorWrap("[!]", colorOrange)
+	case 'd':
+		prefix = colorWrap("[DEBUG]", colorOrange)
 	case ' ':
 		prefix = colorWrap("[ ]", colorGray)
 	}
@@ -90,6 +91,40 @@ func Log(indicator rune, format string, a ...interface{}) {
 	fmt.Print(msg)
 	if SrvUI != nil {
 		SrvUI.PushLog(msg)
+	}
+}
+
+func debugLn(category string, color uint, format string, a ...interface{}) {
+	Log('d', fmt.Sprintf("[%s] %s\n", colorWrap(category, color), format), a...)
+}
+
+func DebugSyncServer(format string, a ...interface{}) {
+	if Conf.DebugSyncServer {
+		debugLn("Sync Server", colorCyan, format, a...)
+	}
+}
+
+func DebugSyncClient(format string, a ...interface{}) {
+	if Conf.DebugSyncClient {
+		debugLn("Sync Client", colorLightBlue, format, a...)
+	}
+}
+
+func DebugUIServer(format string, a ...interface{}) {
+	if Conf.DebugUIServer {
+		debugLn("UI Server", colorGreen, format, a...)
+	}
+}
+
+func DebugOSSHServer(format string, a ...interface{}) {
+	if Conf.DebugOSSHServer {
+		debugLn("oSSH Server", colorOliveGreen, format, a...)
+	}
+}
+
+func DebugOverlayFS(format string, a ...interface{}) {
+	if Conf.DebugOverlayFS {
+		debugLn("Overlay FS", colorBrightYellow, format, a...)
 	}
 }
 

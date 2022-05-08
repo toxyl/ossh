@@ -279,11 +279,11 @@ func NewFakeShell(s ssh.Session, overlay *OverlayFS) *FakeShell {
 
 	if overlay != nil {
 		if !overlay.DirExists("/home") {
-			overlay.Mkdir("/home", 700)
+			_ = overlay.Mkdir("/home", 700)
 		}
 
 		if !overlay.DirExists("/home/" + s.User()) {
-			overlay.Mkdir("/home/"+s.User(), 700)
+			_ = overlay.Mkdir("/home/"+s.User(), 700)
 		}
 	}
 	fs.cwd = "/home/" + s.User()

@@ -21,16 +21,22 @@ func (sc *SyncClient) connect() {
 		LogErrorLn("[Sync Client] Failed to connect: %s", colorError(err))
 		return
 	}
+	DebugSyncClient("%s: connect", colorHost(sc.ID()))
 	sc.conn = c
 }
 
 func (sc *SyncClient) write(msg string) {
 	if sc.conn != nil {
-		fmt.Fprintf(sc.conn, EncodeBase64String(msg)+"\n")
+		msg = strings.TrimSpace(msg)
+		DebugSyncClient("%s: write: %s", colorHost(sc.ID()), colorReason(msg))
+		msg = EncodeGzBase64String(msg)
+		DebugSyncClient("%s: write: %s", colorHost(sc.ID()), colorHighlight(msg))
+		fmt.Fprintf(sc.conn, msg+"\n")
 	}
 }
 
 func (sc *SyncClient) exit() {
+	DebugSyncClient("%s: exit", colorHost(sc.ID()))
 	sc.write("exit")
 }
 
@@ -50,7 +56,18 @@ func (sc *SyncClient) Exec(command string) (string, error) {
 		return "", err
 	}
 	resp = strings.TrimSpace(resp)
-	return DecodeBase64String(resp)
+	DebugSyncClient("%s: read: %s", colorHost(sc.ID()), colorReason(resp))
+	if resp == "" {
+		return "", nil
+	}
+	resp, err = DecodeGzBase64String(resp)
+	DebugSyncClient("%s: read: %s", colorHost(sc.ID()), colorHighlight(resp))
+	if err != nil {
+		DebugSyncClient("%s: Decoding %s failed: %s", colorHost(sc.ID()), colorHighlight(command), colorError(err))
+		DebugSyncClient("%s: Response was: %s", colorHost(sc.ID()), colorHighlight(resp))
+	}
+
+	return resp, nil
 }
 
 func (sc *SyncClient) ID() string {
@@ -74,6 +91,7 @@ func (sc *SyncClient) AddFingerprint(fingerprint string) {
 }
 
 func (sc *SyncClient) SyncData(cmd string, fnGet func() []string, fnAddRemote func(data string)) {
+	DebugSyncClient("%s: syncing %s", colorHost(sc.ID()), colorHighlight(cmd))
 	res, err := sc.Exec(cmd)
 	if err != nil {
 		LogErrorLn("Failed to get %s: %s", colorHighlight(cmd), colorError(err))

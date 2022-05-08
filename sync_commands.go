@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 )
 
@@ -21,7 +20,7 @@ var SyncCommands = map[string]SyncCommand{
 		if fp == fpsrv {
 			return "", nil
 		}
-		return fmt.Sprintf("%s", fpsrv), nil
+		return fpsrv, nil
 	},
 	"STATS": func(args []string) (string, error) {
 		return SrvOSSH.statsJSONSimple(), nil

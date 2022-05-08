@@ -14,6 +14,11 @@ type SyncNode struct {
 }
 
 type Config struct {
+	DebugSyncServer  bool     `mapstructure:"debug_sync_server"`
+	DebugSyncClient  bool     `mapstructure:"debug_sync_client"`
+	DebugOSSHServer  bool     `mapstructure:"debug_ossh_server"`
+	DebugUIServer    bool     `mapstructure:"debug_ui_server"`
+	DebugOverlayFS   bool     `mapstructure:"debug_overlay_fs"`
 	PathData         string   `mapstructure:"path_data"`
 	PathFingerprints string   `mapstructure:"path_fingerprints"`
 	PathPasswords    string   `mapstructure:"path_passwords"`
