@@ -212,7 +212,6 @@ func (ofsm *OverlayFSManager) CleanupWorker() {
 				if !active {
 					timestamp := strings.Split(entry.Name(), "-")[1]
 
-					DebugOverlayFS("cleanup - unmount %s", colorHighlight(sandbox.Name()))
 					err = (&OverlayFS{
 						mergedDir: mergeDirPath,
 						workDir:   filepath.Join(sandboxPath, sandbox.Name(), fmt.Sprintf("work-%s", timestamp)),
@@ -229,7 +228,6 @@ func (ofsm *OverlayFSManager) CleanupWorker() {
 }
 
 func (ofsm *OverlayFSManager) DeactivateOverlay(fs *OverlayFS) {
-	DebugOverlayFS("deactivate %s", colorFile(fs.mergedDir))
 	ofsm.mu.Lock()
 	defer ofsm.mu.Unlock()
 	delete(ofsm.activeOverlays, fs.mergedDir)
@@ -290,7 +288,6 @@ func (ofs *OverlayFS) Mount() error {
 }
 
 func (ofs *OverlayFS) Close() {
-	DebugOverlayFS("close %s", colorFile(ofs.mergedDir))
 	ofs.manager.DeactivateOverlay(ofs)
 }
 
@@ -343,7 +340,6 @@ func (ofs *OverlayFS) OpenFile(path string, flag int, perm fs.FileMode) (*os.Fil
 }
 
 func (ofs *OverlayFS) DirExists(path string) bool {
-	DebugOverlayFS("direxists %s", colorFile(path))
 	if !ofs.insideMerged(path) {
 		return false
 	}
