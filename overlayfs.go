@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -45,6 +46,9 @@ import (
 // however, each session always has a unique upper-dir.
 type OverlayFSManager struct {
 	baseDir string
+
+	mu             sync.Mutex
+	activeOverlays map[string]bool
 }
 
 //go:embed ffs
@@ -111,6 +115,8 @@ func (ofsm *OverlayFSManager) Init(baseDir string) error {
 	}
 
 	ofsm.baseDir = baseDir
+	ofsm.activeOverlays = make(map[string]bool)
+	go ofsm.CleanupWorker()
 
 	return nil
 }
@@ -159,7 +165,12 @@ func (ofsm *OverlayFSManager) NewSession(sandboxKey string) (*OverlayFS, error) 
 
 	lowerLayers = append(lowerLayers, filepath.Join(ofsm.baseDir, "defaultfs"))
 
+	ofsm.mu.Lock()
+	ofsm.activeOverlays[mergeLayerPath] = true
+	ofsm.mu.Unlock()
+
 	return &OverlayFS{
+		manager:   ofsm,
 		mergedDir: mergeLayerPath,
 		upperDir:  upperLayerPath,
 		workDir:   workLayerPath,
@@ -167,8 +178,63 @@ func (ofsm *OverlayFSManager) NewSession(sandboxKey string) (*OverlayFS, error) 
 	}, nil
 }
 
+func (ofsm *OverlayFSManager) CleanupWorker() {
+	sandboxPath := filepath.Join(ofsm.baseDir, "sandboxes")
+
+	for {
+		time.Sleep(5 * time.Second)
+
+		sandboxes, err := os.ReadDir(sandboxPath)
+		if err != nil {
+			Log('x', "cleanup worker: %s", err.Error())
+			continue
+		}
+
+		for _, sandbox := range sandboxes {
+			sandboxEntries, err := os.ReadDir(filepath.Join(sandboxPath, sandbox.Name()))
+			if err != nil {
+				Log('x', "cleanup worker, read sandbox dir: %s", err.Error())
+				continue
+			}
+
+			for _, entry := range sandboxEntries {
+				if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "merge-") {
+					continue
+				}
+
+				mergeDirPath := filepath.Join(sandboxPath, sandbox.Name(), entry.Name())
+				ofsm.mu.Lock()
+				active := ofsm.activeOverlays[mergeDirPath]
+				ofsm.mu.Unlock()
+
+				if !active {
+					timestamp := strings.Split(entry.Name(), "-")[1]
+
+					err = (&OverlayFS{
+						mergedDir: mergeDirPath,
+						workDir:   filepath.Join(sandboxPath, sandbox.Name(), fmt.Sprintf("work-%s", timestamp)),
+					}).Unmount()
+
+					if err != nil {
+						Log('x', "cleanup worker, close overlay '%s': %s", mergeDirPath, err.Error())
+						continue
+					}
+				}
+			}
+		}
+	}
+}
+
+func (ofsm *OverlayFSManager) DeactivateOverlay(fs *OverlayFS) {
+	ofsm.mu.Lock()
+	defer ofsm.mu.Unlock()
+	delete(ofsm.activeOverlays, fs.mergedDir)
+}
+
 // https://windsock.io/the-overlay-filesystem/
 type OverlayFS struct {
+	manager *OverlayFSManager
+
 	// The dir containing the merged layers
 	mergedDir string
 	// The upper most layer, containing all changed made if any
@@ -177,12 +243,6 @@ type OverlayFS struct {
 	workDir string
 	// The lower layers, ordered by time
 	lowerDirs []string
-}
-
-func (ofs *OverlayFS) Unmount() {
-	if DirExists(ofs.mergedDir) {
-		_ = unix.Unmount(ofs.mergedDir, 0)
-	}
 }
 
 func (ofs *OverlayFS) Mount() error {
@@ -227,23 +287,27 @@ func (ofs *OverlayFS) Mount() error {
 	return fmt.Errorf("mount (%s): %s", ofs.mergedDir, "the directory does not exist")
 }
 
-func (ofs *OverlayFS) Close() error {
-	if DirExists(ofs.mergedDir) {
-		err := unix.Unmount(ofs.mergedDir, 0)
-		if err != nil {
-			return fmt.Errorf("unmount (%s): %w", ofs.mergedDir, err)
-		}
+func (ofs *OverlayFS) Close() {
+	ofs.manager.DeactivateOverlay(ofs)
+}
 
-		err = os.RemoveAll(ofs.mergedDir)
-		if err != nil {
-			return fmt.Errorf("remove mergeddir (%s): %w", ofs.mergedDir, err)
+func (ofs *OverlayFS) Unmount() error {
+	err := unix.Unmount(ofs.mergedDir, 0)
+	if err != nil {
+		return fmt.Errorf("unmount: %w", err)
+	}
+
+	err = os.Remove(ofs.mergedDir)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove mergedDir: %w", err)
 		}
 	}
 
-	if DirExists(ofs.workDir) {
-		err := os.RemoveAll(ofs.workDir)
-		if err != nil {
-			return fmt.Errorf("remove workdir (%s): %w", ofs.workDir, err)
+	err = os.RemoveAll(ofs.workDir)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove workdir: %w", err)
 		}
 	}
 

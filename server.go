@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gliderlabs/ssh"
+	"golang.org/x/exp/maps"
 )
 
 type OSSHServer struct {
@@ -167,6 +169,12 @@ func (ossh *OSSHServer) GracefulCloseOnError(err error, s *Session, sess *ssh.Se
 }
 
 func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
+		// Catch panics, so a bug triggered in a SSH session doesn't crash the whole service
+	defer func() {
+		if err := recover(); err != nil {
+			LogErrorLn("Fatal error: %s", colorError(err))
+		}
+	}()
 	s := ossh.Sessions.Create(sess.RemoteAddr().String()).SetSSHSession(&sess)
 	if s == nil {
 		ossh.GracefulCloseOnError(errors.New("Failed to create oSSH session."), nil, &sess, nil)
@@ -186,10 +194,7 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 		return
 	}
 	defer func() {
-		err := overlayFS.Close()
-		if err != nil {
-			LogErrorLn(colorError(err))
-		}
+		overlayFS.Close()
 	}()
 
 	s.SetShell(NewFakeShell((*s.SSHSession), overlayFS))
