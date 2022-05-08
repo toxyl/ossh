@@ -1,20 +1,32 @@
 package main
 
-import "time"
+import (
+	"os"
+	"time"
+)
 
-var Server *OSSHServer
-var WebServer *UIServer
+var SrvOSSH *OSSHServer
+var SrvUI *UIServer
+var SrvSync *SyncServer
+
 var startTime time.Time
 
 func main() {
+	args := os.Args
+
+	if len(args) == 2 {
+		cfgFile = args[1]
+	}
+
 	startTime = time.Now()
 	initConfig()
-	Server = NewOSSHServer()
-	WebServer = NewUIServer()
-	go func() {
-		WebServer.Start()
-	}()
-	Server.Start()
+	SrvOSSH = NewOSSHServer()
+	SrvUI = NewUIServer()
+	SrvSync = NewSyncServer()
+	go SrvUI.Start()
+	go SrvSync.Start()
+	go SrvSync.SyncToNodes()
+	SrvOSSH.Start()
 }
 
 func uptime() time.Duration {

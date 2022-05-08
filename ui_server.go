@@ -243,26 +243,24 @@ func (ws *UIServer) Start() {
 		mux.HandleFunc(k, v)
 	}
 
-	if ws.CertFile != "" && ws.KeyFile != "" {
-		ws.server = &http.Server{
-			Addr: srv,
-			TLSConfig: &tls.Config{
-				MinVersion:               tls.VersionTLS12,
-				CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
-				PreferServerCipherSuites: true,
-				CipherSuites: []uint16{
-					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-					tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-				},
+	if !FileExists(ws.CertFile) || !FileExists(ws.KeyFile) {
+		GenerateSelfSignedCertificate("local.ossh", "oSSH", ws.KeyFile, ws.CertFile)
+	}
+
+	ws.server = &http.Server{
+		Addr: srv,
+		TLSConfig: &tls.Config{
+			MinVersion:               tls.VersionTLS12,
+			CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+			PreferServerCipherSuites: true,
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
 			},
-			TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
-		}
-	} else {
-		ws.server = &http.Server{
-			Addr: srv,
-		}
+		},
+		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
 	}
 	ws.server.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		addr := RealAddr(req)
@@ -274,8 +272,8 @@ func (ws *UIServer) Start() {
 		mux.ServeHTTP(w, req)
 	})
 
-	LogDefaultLn("Starting UI server on %s...", colorWrap(srv, colorBrightYellow))
-	err := ws.server.ListenAndServe()
+	LogDefaultLn("Starting UI server on %s...", colorWrap("https://"+srv, colorBrightYellow))
+	err := ws.server.ListenAndServeTLS(ws.CertFile, ws.KeyFile)
 	if !strings.Contains(err.Error(), "Server closed") {
 		log.Fatal(err)
 	}
@@ -288,7 +286,7 @@ func (ws *UIServer) Shutdown() {
 	}()
 
 	if err := ws.server.Shutdown(ctxShutDown); err != nil {
-		LogErrorLn("[UI] Shutdown failed: %s", colorWrap(err.Error(), colorOrange))
+		LogErrorLn("[UI] Shutdown failed: %s", colorError(err))
 	}
 
 	ws.Handlers = nil
@@ -323,7 +321,7 @@ func (ws *UIServer) init() {
 		if err != nil {
 			return nil
 		}
-		WebServer.Reload()
+		SrvUI.Reload()
 		return nil
 	})
 	ws.AddHTMLHandler("/",

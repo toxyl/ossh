@@ -194,6 +194,7 @@ func (ofs *OverlayFS) Mount() error {
 		if err != nil {
 			return fmt.Errorf("mkdir merged (%s): %w", ofs.mergedDir, err)
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 
 	if !DirExists(ofs.workDir) {
@@ -201,6 +202,7 @@ func (ofs *OverlayFS) Mount() error {
 		if err != nil {
 			return fmt.Errorf("mkdir workdir (%s): %w", ofs.workDir, err)
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 
 	if !DirExists(ofs.upperDir) {
@@ -208,33 +210,41 @@ func (ofs *OverlayFS) Mount() error {
 		if err != nil {
 			return fmt.Errorf("mkdir upper (%s): %w", ofs.upperDir, err)
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 
-	lowedirs := strings.Join(ofs.lowerDirs, ":")
-	data := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", lowedirs, ofs.upperDir, ofs.workDir)
+	lowerdirs := strings.Join(ofs.lowerDirs, ":")
+	data := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", lowerdirs, ofs.upperDir, ofs.workDir)
 
-	err := unix.Mount("overlay", ofs.mergedDir, "overlay", 0, data)
-	if err != nil {
-		return fmt.Errorf("mount %s: %w", ofs.mergedDir, err)
+	if DirExists(ofs.mergedDir) {
+		err := unix.Mount("overlay", ofs.mergedDir, "overlay", 0, data)
+		if err != nil {
+			return fmt.Errorf("mount (%s): %w", ofs.mergedDir, err)
+		}
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("mount (%s): %s", ofs.mergedDir, "the directory does not exist")
 }
 
 func (ofs *OverlayFS) Close() error {
-	err := unix.Unmount(ofs.mergedDir, 0)
-	if err != nil {
-		return fmt.Errorf("unmount %s: %w", ofs.mergedDir, err)
+	if DirExists(ofs.mergedDir) {
+		err := unix.Unmount(ofs.mergedDir, 0)
+		if err != nil {
+			return fmt.Errorf("unmount (%s): %w", ofs.mergedDir, err)
+		}
+
+		err = os.RemoveAll(ofs.mergedDir)
+		if err != nil {
+			return fmt.Errorf("remove mergeddir (%s): %w", ofs.mergedDir, err)
+		}
 	}
 
-	err = os.RemoveAll(ofs.mergedDir)
-	if err != nil {
-		return fmt.Errorf("remove mergeddir (%s): %w", ofs.mergedDir, err)
-	}
-
-	err = os.RemoveAll(ofs.workDir)
-	if err != nil {
-		return fmt.Errorf("remove workdir (%s): %w", ofs.workDir, err)
+	if DirExists(ofs.workDir) {
+		err := os.RemoveAll(ofs.workDir)
+		if err != nil {
+			return fmt.Errorf("remove workdir (%s): %w", ofs.workDir, err)
+		}
 	}
 
 	return nil

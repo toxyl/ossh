@@ -32,7 +32,7 @@ func (p *Payload) Save() {
 
 func (p *Payload) Read() (string, error) {
 	if !p.Exists() {
-		return "", fmt.Errorf("Payload %s was not found.", p.hash)
+		return "", fmt.Errorf("%s was not found.", p.hash)
 	}
 
 	data, err := os.ReadFile(p.file)
@@ -54,13 +54,13 @@ func (p *Payload) DecodeFromString(encodedPayload string) bool {
 	return true
 }
 
-func (p *Payload) EncodeToString() string {
-	return base64.RawStdEncoding.EncodeToString([]byte(p.payload))
-}
-
 func (p *Payload) Download(hash string) bool {
-	for _, n := range Conf.Sync.Nodes {
-		if p.DecodeFromString(executeSSHCommand(n.Host, n.Port, n.User, n.Password, fmt.Sprintf("get-payload %s", hash))) {
+	if SrvSync == nil {
+		return false
+	}
+	res := SrvSync.GetPayload(hash)
+	if res != "" {
+		if p.DecodeFromString(res) {
 			p.Save()
 			return true
 		}
@@ -68,10 +68,14 @@ func (p *Payload) Download(hash string) bool {
 	return false
 }
 
-func (p *Payload) Set(payload string) {
-	hash := StringToSha1(payload)
+func (p *Payload) SetHash(hash string) {
 	p.hash = hash
 	p.file = fmt.Sprintf("%s/payload-%s.cast", Conf.PathCaptures, hash)
+}
+
+func (p *Payload) Set(payload string) {
+	hash := StringToSha1(payload)
+	p.SetHash(hash)
 	p.payload = payload
 }
 
@@ -108,7 +112,7 @@ func (ps *Payloads) Add(payload *Payload) {
 
 func (ps *Payloads) Get(sha1 string) (*Payload, error) {
 	if !ps.Has(sha1) {
-		return nil, errors.New("Payload not found")
+		return nil, errors.New("not found")
 	}
 	ps.lock.Lock()
 	defer ps.lock.Unlock()

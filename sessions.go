@@ -172,10 +172,12 @@ func (ss *Sessions) Create(sessionID string) *Session {
 }
 
 func (ss *Sessions) Remove(sessionID string) {
-	ss.lock.Lock()
-	defer ss.lock.Unlock()
-	Server.TimeWasted += int(ss.sessions[sessionID].Uptime().Seconds())
-	delete(ss.sessions, sessionID)
+	if ss.Has(sessionID) {
+		ss.lock.Lock()
+		defer ss.lock.Unlock()
+		SrvOSSH.TimeWasted += int(ss.sessions[sessionID].Uptime().Seconds())
+		delete(ss.sessions, sessionID)
+	}
 }
 
 func (ss *Sessions) Count() int {

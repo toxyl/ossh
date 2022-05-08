@@ -87,8 +87,8 @@ func Log(indicator rune, format string, a ...interface{}) {
 	msg := fmt.Sprintf(prefix+" "+format, a...)
 
 	fmt.Print(msg)
-	if WebServer != nil {
-		WebServer.PushLog(msg)
+	if SrvUI != nil {
+		SrvUI.PushLog(msg)
 	}
 }
 

@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"math"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -98,6 +100,30 @@ func GetFloat(val interface{}) (float64, error) {
 	}
 }
 
+func StringToInt64(s string, defaultValue int64) int64 {
+	i, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		i = defaultValue
+	}
+	return i
+}
+
+func StringToInt32(s string, defaultValue int32) int32 {
+	i, err := strconv.ParseInt(s, 10, 32)
+	if err != nil {
+		i = int64(defaultValue)
+	}
+	return int32(i)
+}
+
+func StringToInt(s string, defaultValue int) int {
+	i, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		i = int64(defaultValue)
+	}
+	return int(i)
+}
+
 func StringToSha256(s string) string {
 	data := []byte(s)
 	hash := sha256.Sum256(data)
@@ -108,6 +134,35 @@ func StringToSha1(s string) string {
 	data := []byte(s)
 	hash := sha1.Sum(data)
 	return fmt.Sprintf("%x", hash[:])
+}
+
+func StringSliceToSha256(s []string) string {
+	sort.Strings(s)
+	return StringToSha256(strings.Join(s, ","))
+}
+
+func ImplodeLines(lines []string) string {
+	return strings.Join(lines, "\n")
+}
+
+func ExplodeLines(lines string) []string {
+	return strings.Split(lines, "\n")
+}
+
+// StringSliceDifference returns the elements in `a` that aren't in `b`.
+// from https://stackoverflow.com/a/45428032/3337885
+func StringSliceDifference(a, b []string) []string {
+	mb := make(map[string]struct{}, len(b))
+	for _, x := range b {
+		mb[x] = struct{}{}
+	}
+	var diff []string
+	for _, x := range a {
+		if _, found := mb[x]; !found {
+			diff = append(diff, x)
+		}
+	}
+	return diff
 }
 
 // from https://stackoverflow.com/a/37897238/3337885
@@ -133,5 +188,18 @@ func RealAddr(r *http.Request) string {
 	}
 
 	return remoteIP
+}
 
+func EncodeBase64String(src string) string {
+	res := base64.StdEncoding.EncodeToString([]byte(strings.TrimSpace(src)))
+	return res
+}
+
+func DecodeBase64String(src string) (string, error) {
+	srcdec, err := base64.StdEncoding.DecodeString(src)
+	if err != nil {
+		return "", err
+	}
+	res := strings.TrimSpace(string(srcdec))
+	return res, nil
 }

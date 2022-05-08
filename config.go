@@ -9,10 +9,8 @@ import (
 )
 
 type SyncNode struct {
-	Host     string `mapstructure:"host"`
-	Port     int    `mapstructure:"port"`
-	User     string `mapstructure:"user"`
-	Password string `mapstructure:"password"`
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
 }
 
 type Config struct {
@@ -39,6 +37,10 @@ type Config struct {
 		CertFile string `mapstructure:"cert_file"`
 		KeyFile  string `mapstructure:"key_file"`
 	} `mapstructure:"webinterface"`
+	SyncServer struct {
+		Host string `mapstructure:"host"`
+		Port uint   `mapstructure:"port"`
+	} `mapstructure:"sync_server"`
 	Sync struct {
 		Interval int        `mapstructure:"interval"`
 		Nodes    []SyncNode `mapstructure:"nodes"`
@@ -55,7 +57,7 @@ type Config struct {
 	} `mapstructure:"commands"`
 }
 
-var cfgFile string
+var cfgFile string = ""
 var Conf Config
 
 func isIPWhitelisted(ip string) bool {
@@ -123,6 +125,14 @@ func initConfig() {
 
 	if Conf.PathUsers == "" {
 		Conf.PathUsers = fmt.Sprintf("%s/users.txt", Conf.PathData)
+	}
+
+	if Conf.Webinterface.CertFile == "" {
+		Conf.Webinterface.CertFile = fmt.Sprintf("%s/ossh.crt", Conf.PathData)
+	}
+
+	if Conf.Webinterface.KeyFile == "" {
+		Conf.Webinterface.KeyFile = fmt.Sprintf("%s/ossh.key", Conf.PathData)
 	}
 
 	InitTemplaterFunctions()

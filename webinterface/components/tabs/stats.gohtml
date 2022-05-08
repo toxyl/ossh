@@ -16,8 +16,8 @@
         $('#tsFingerprints').text(m.fingerprints);
         $('#tsSessions').text(m.sessions);
         $('#tsLogins').html(`${m.logins_attempted} attempts<br>${m.logins_successful} successful<br>${m.logins_failed} failed`);
-        $('#tsTimeWasted').text(m.time_wasted);
-        $('#tsUptime').text(m.uptime);
+        $('#tsTimeWasted').text(humanTimeInterval(m.time_wasted));
+        $('#tsUptime').text(humanTimeInterval(m.uptime));
     }
 
     function ws_st_receive_complete() { }

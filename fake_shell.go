@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"regexp"
@@ -114,102 +113,9 @@ func (fs *FakeShell) Exec(line string) bool {
 		Arguments: args,
 	}
 
-	if Server.KnownNodes.Has(data.IP) {
-		instr := strings.TrimSpace(line)
-		instrCmd := strings.Split(instr, " ")[0]
-
-		switch instrCmd {
-		case "check":
-			ss, err := Server.KnownNodes.Get(data.IP)
-			if err != nil {
-				LogError("Sync with %s failed: %s\n",
-					colorWrap(data.IP, colorBrightYellow),
-					colorWrap(err.Error(), colorCyan),
-				)
-				return true
-			}
-
-			_ = executeSSHCommand(ss.Host, ss.Port, ss.User, ss.Password, fmt.Sprintf("sync %s", Server.Loot.Fingerprint()))
-			fs.writer.WriteLnUnlimited("Sync complete.")
-			return true
-		case "sync":
-			hash := strings.Split(line, " ")[1]
-			if Server.Loot.Fingerprint() != hash {
-				node, err := Server.KnownNodes.Get(data.IP)
-				if err != nil {
-					LogError("Sync with %s failed: %s\n",
-						colorWrap(data.IP, colorBrightYellow),
-						colorWrap(err.Error(), colorCyan),
-					)
-					return true
-				}
-				clientData := executeSSHCommand(node.Host, node.Port, node.User, node.Password, "get-data")
-				cd := LootJSON{}
-				err = json.Unmarshal([]byte(clientData), &cd)
-				if err != nil {
-					LogError("Sync with %s failed, could not unmarshal remote data: %s\n",
-						colorWrap(data.IP, colorBrightYellow),
-						colorWrap(err.Error(), colorCyan),
-					)
-					return true
-				}
-				ch, cu, cp, cf := 0, 0, 0, 0
-				for _, host := range cd.Hosts {
-					if !Server.Loot.HasHost(host) {
-						Server.Loot.AddHost(host)
-						ch++
-					}
-				}
-				for _, user := range cd.Users {
-					if !Server.Loot.HasUser(user) {
-						Server.Loot.AddUser(user)
-						cu++
-					}
-				}
-				for _, password := range cd.Passwords {
-					if !Server.Loot.HasPassword(password) {
-						Server.Loot.AddPassword(password)
-						cp++
-					}
-				}
-				for _, fingerprint := range cd.Fingerprints {
-					if !Server.Loot.HasFingerprint(fingerprint) {
-						Server.Loot.AddFingerprint(fingerprint)
-						cf++
-					}
-
-				}
-				if ch > 0 || cu > 0 || cp > 0 || cf > 0 {
-					LogInfoLn("[sync] Added %s host(s), %s user name(s), %s password(s) and %s fingerprint(s) from %s",
-						colorWrap(fmt.Sprint(ch), colorBrightYellow),
-						colorWrap(fmt.Sprint(cu), colorBrightYellow),
-						colorWrap(fmt.Sprint(cp), colorBrightYellow),
-						colorWrap(fmt.Sprint(cf), colorBrightYellow),
-						colorWrap(data.IP, colorBrightYellow),
-					)
-				}
-			}
-			return true
-		case "get-data":
-			fs.writer.WriteLnUnlimited(Server.Loot.JSON())
-			return true
-		case "get-payload":
-			hash := strings.Split(line, " ")[1]
-			payload, err := Server.Loot.payloads.Get(hash)
-			if err != nil {
-				return true
-			}
-			pl := ""
-			if payload.payload != "" {
-				pl = payload.EncodeToString()
-			}
-			fs.writer.WriteLnUnlimited(pl)
-			return true
-		default:
-			LogError("[sync] Command unknown: %s\n", colorWrap(instrCmd, colorBrightYellow))
-			fs.writer.WriteLnUnlimited("Illegal sync command")
-			return true
-		}
+	if SrvSync.HasNode(data.IP) {
+		LogWarningLn("%s, what are you doing here? Go home!", colorHost(data.IP))
+		return true
 	}
 
 	// 1) make sure the client waits some time at least,

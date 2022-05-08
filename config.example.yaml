@@ -6,19 +6,18 @@ host: 0.0.0.0
 port: 2200
 webinterface: 
   host: 0.0.0.0
-  port: 80
-  cert_file: 
-  key_file: 
+  port: 443
 max_idle: 3600 # seconds before idling bots are kicked
 ratelimit: 125 # in chars/second
 input_delay: 25 # in ms/char
+sync_server:
+  host: 127.0.0.1
+  port: 1337
 sync:
   interval: 1 # in minutes
   nodes:
     # - host: 127.0.0.1
-    #   port: 22
-    #   user: 8fe36196f2c4bb5a63f390c3e2e1152a3ababcd3f41c1295b86f773c9c53c632
-    #   password: 3061559b1baa386f6b5a3d1c73caa75617fbf78e3a49c23f272ac6d855f315b9
+    #   port: 1337
 commands:
   rewriters:
     - [ ";\\s*", "\n" ]

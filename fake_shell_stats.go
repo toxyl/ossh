@@ -42,6 +42,6 @@ func (fss *FakeShellStats) SaveCapture() {
 		}
 	}
 	pl.Save()
-	Server.Loot.payloads.Add(pl)
-	Server.Loot.AddFingerprint(pl.hash)
+	SrvOSSH.Loot.payloads.Add(pl)
+	SrvOSSH.Loot.AddFingerprint(pl.hash)
 }
