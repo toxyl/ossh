@@ -393,6 +393,13 @@ func (ossh *OSSHServer) incCounter(stat map[string]uint, host string) map[string
 }
 
 func (ossh *OSSHServer) sessionHandler(s ssh.Session) {
+	// Catch panics, so a bug triggered in a SSH session doesn't crash the whole service
+	defer func() {
+		if err := recover(); err != nil {
+			Log('x', "Fatal error: %v", err)
+		}
+	}()
+
 	remoteIP, _, err := net.SplitHostPort(s.RemoteAddr().String())
 	if err != nil {
 		Log('x', err.Error())
