@@ -17,6 +17,8 @@ func DirExists(name string) bool {
 	if err != nil {
 		return false
 	}
+	defer fileOrDir.Close()
+
 	info, err := fileOrDir.Stat()
 	if err != nil {
 		return false
@@ -32,6 +34,8 @@ func FileExists(name string) bool {
 	if err != nil {
 		return false
 	}
+	defer file.Close()
+
 	_, err = file.Stat()
 	return err == nil
 }
