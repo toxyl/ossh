@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 func colorWrap(str string, color uint) string {
 	return fmt.Sprintf("\033[38;5;%dm%s\033[0m", color, str)
@@ -45,5 +48,10 @@ func Log(indicator rune, format string, a ...interface{}) {
 	case ' ':
 		prefix = colorWrap("[ ]", colorGray)
 	}
-	fmt.Printf(prefix+" "+format, a...)
+
+	line := fmt.Sprintf(prefix+" "+format, a...)
+	fmt.Print(line)
+	if !strings.HasSuffix(line, "\n") {
+		fmt.Print("\n")
+	}
 }
