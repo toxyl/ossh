@@ -423,10 +423,7 @@ func (ossh *OSSHServer) sessionHandler(s ssh.Session) {
 		return
 	}
 	defer func() {
-		err := overlayFS.Close()
-		if err != nil {
-			Log('x', err.Error())
-		}
+		overlayFS.Close()
 	}()
 
 	fs := NewFakeShell(s, overlayFS)
