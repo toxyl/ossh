@@ -330,7 +330,7 @@ func (ofs *OverlayFS) insideMerged(path string) bool {
 }
 
 func (ofs *OverlayFS) OpenFile(path string, flag int, perm fs.FileMode) (*os.File, error) {
-	DebugOverlayFS("openfile %s", colorFile(path))
+	LogInfoLn("[Overlay FS] Open %s%s", colorFile(ofs.mergedDir), colorReason(path))
 
 	if !ofs.insideMerged(path) {
 		return nil, errors.New("path outside root")

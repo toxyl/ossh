@@ -266,7 +266,7 @@ func (ws *UIServer) Start() {
 		addr := RealAddr(req)
 
 		if !isIPWhitelisted(addr) && addr != Conf.Host {
-			http.Redirect(w, req, fmt.Sprintf("http://%s", addr), 307) // let's give them their request back
+			http.Redirect(w, req, fmt.Sprintf("%s://%s/%s", req.Proto, addr, req.URL.Path), 307) // let's give them their request back
 			return
 		}
 		mux.ServeHTTP(w, req)

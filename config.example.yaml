@@ -56,8 +56,12 @@ commands:
     - [ "echo", "{{ .InputRaw }}" ]
     - [ "command", "What is your wish, {{ .User }}?" ]
     - [ "ifconfig", "ifconfig has been deprecated, use ip instead." ]
+    - [ "ifconfigcloud", "ifconfigcloud has been deprecated, use ip instead." ]
     - [ "gcc", "Global Coal Conglomerate" ]
+    - [ "./sh", "/bin/sh^M: bad interpreter: No such file or directory" ]
     - [ "./bash", "/bin/bash^M: bad interpreter: No such file or directory" ]
+    - [ "./x86_64", "/bin/bash^M: bad interpreter: No such file or directory" ]
+    - [ "./.senpai.loader", "/bin/bash^M: bad interpreter: No such file or directory" ]
     
   permission_denied:
     - sudo
