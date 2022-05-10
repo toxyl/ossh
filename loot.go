@@ -204,7 +204,7 @@ func (l *Loot) JSON() string {
 	}
 	json, err := json.Marshal(data)
 	if err != nil {
-		LogErrorLn("Could not marshal sync data: %s", colorError(err))
+		LogOSSHServer.Error("Could not marshal sync data: %s", colorError(err))
 		return ""
 	}
 

@@ -26,7 +26,7 @@ func (p *Payload) Save() {
 
 	err := os.WriteFile(p.file, []byte(p.payload), 0744)
 	if err == nil {
-		LogSuccessLn("Payload saved: %s", colorFile(p.file))
+		LogPayloads.Success("Payload saved: %s", colorFile(p.file))
 	}
 }
 

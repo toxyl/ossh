@@ -1,23 +1,7 @@
 {{ define "utils" }} 
 <script type="text/javascript">
     function log_to_class(category) {
-        category = category.toUpperCase();
-        var map = {
-            "INFO": "color-1",
-            "WARNING": "color-2",
-            "ERROR": "color-3",
-            "NOT OK": "color-4",
-            "OK": "color-5",
-            "SUCCESS": "color-6",
-            "OTHER": "color-7",
-            "DEBUG": "color-8",
-        }
-
-        if (map[category] == undefined) {
-            return "color-9";
-        }
-
-        return map[category];
+        return category.toLowerCase().replace(" ", "-");
     }
 
     function humanTimeInterval(seconds) {

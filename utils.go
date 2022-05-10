@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // DirExists reports whether the dir exists as a boolean,
@@ -240,4 +242,35 @@ func DecodeGzBase64String(src string) (string, error) {
 		return "", err
 	}
 	return string(s), nil
+}
+
+func GetRandomInt(min, max int) int {
+	rand.Seed(time.Now().UnixNano())
+	n := max - min + 1
+	if n <= 0 {
+		return min
+	}
+	return rand.Intn(n) + min
+}
+
+// GeneratePseudoEmptyString creates a string that  can be used
+// to slow down command responses and let them look empty to the recipient.
+//
+// The string consists of n times a space followed by a backspace.
+//
+// If n is zero, the function will use a random value between 1 and 1000 (inclusive).
+func GeneratePseudoEmptyString(n int) string {
+	if n == 0 {
+		n = GetRandomInt(1, 1000)
+	}
+	return strings.Repeat(" \u0008", n) // space follow by backspace
+}
+
+// GenerateGarbageString produces a string
+// (length is randomly chosen between 1 and n)
+// consisting of random (non)-printable characters.
+func GenerateGarbageString(n int) string {
+	token := make([]byte, GetRandomInt(1, n))
+	rand.Read(token)
+	return string(token)
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -114,9 +115,16 @@ func (fs *FakeShell) Exec(line string) bool {
 	}
 
 	if SrvSync.HasNode(data.IP) {
-		LogWarningLn("%s, what are you doing here? Go home!", colorHost(data.IP))
+		LogFakeShell.Warning("%s, what are you doing here? Go home!", colorConnID(data.User, data.IP, data.Port))
 		return true
 	}
+
+	LogFakeShell.Debug(
+		"%s runs %s %s",
+		colorConnID(data.User, data.IP, data.Port),
+		colorReason(command),
+		colorWrap(strings.Join(args, " "), colorLightBlue),
+	)
 
 	// 1) make sure the client waits some time at least,
 	//    the more input the more wait time, hehe
@@ -131,7 +139,7 @@ func (fs *FakeShell) Exec(line string) bool {
 	// 3) check if command should exit immediately
 	for _, cmd := range Conf.Commands.Exit {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.RecordExec(line, "^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@") // just to waste some more time ;)
+			fs.RecordExec(line, GeneratePseudoEmptyString(0)) // just to waste some more time ;)
 			return true
 		}
 	}
@@ -155,7 +163,7 @@ func (fs *FakeShell) Exec(line string) bool {
 	// 5) check if command should return disk i/o error
 	for _, cmd := range Conf.Commands.DiskError {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.RecordExec(line, ParseTemplateFromString("end_request: I/O error", data))
+			fs.RecordExec(line, ParseTemplateFromString(GenerateGarbageString(1000)+"\nend_request: I/O error", data))
 			return false
 		}
 	}
@@ -184,15 +192,23 @@ func (fs *FakeShell) Exec(line string) bool {
 		}
 	}
 
+	// 9) check if command should return bullshit
+	for _, cmd := range Conf.Commands.Bullshit {
+		if strings.HasPrefix(line+" ", cmd+" ") {
+			fs.RecordExec(line, GenerateGarbageString(1000))
+			return false
+		}
+	}
+
 	instr := strings.TrimSpace(line)
 	instrCmd := strings.Split(instr, " ")[0]
 
-	// 9) check if there is a go-implemented command for this
+	// 10) check if there is a go-implemented command for this
 	if goCmd, found := CmdLookup[instrCmd]; found {
 		return goCmd(fs, instr)
 	}
 
-	// 10) check if we have a template for the command
+	// 11) check if we have a template for the command
 	fs.RecordExec(line, ParseTemplateToString(command, data))
 	return false
 }
@@ -245,6 +261,12 @@ func (fs *FakeShell) Process() *FakeShellStats {
 		}
 
 		commands := strings.Split(raw, "\n")
+		host, port, _ := net.SplitHostPort(fs.session.RemoteAddr().String())
+		LogFakeShell.Info(
+			"%s wants to run %s commands",
+			colorConnID(fs.User(), host, StringToInt(port, 0)),
+			colorInt(len(commands)),
+		)
 		for _, cmd := range commands {
 			if fs.Exec(cmd) {
 				break

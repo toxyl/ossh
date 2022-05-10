@@ -67,8 +67,7 @@ Commands are evaluated in the following order:
 These are pairs of regular expressions and replacements and will be executed in the given order on any user/bot input. Be aware that captures are made after rewriters have been applied.
 
 #### `exit` (config)
-If a command matches this list the connection will be terminated with a time-wasting response: 
-`^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@`
+If a command matches this list the connection will be terminated with a time-wasting response that consists of a repeated sequence of a space followed by a backspace which makes it look empty but potentially take a long time to process. How often that sequence is repeated is random, at least one will be send, at most one thousand.
 
 #### `simple` (config)
 These are pairs with a command to match and a response. Responses can use some template variables so one can, e.g., simulate the `whoami` command. Available variables are:  

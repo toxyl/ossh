@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -158,7 +157,7 @@ func (w *UIServer) AddSubscriptionHandler(path string, hub *Hub) *UIServer {
 			}
 			conn, err := upgrader.Upgrade(w, r, nil)
 			if err != nil {
-				LogDefaultLn("[UI] Connection connection upgrade failed: %s", err)
+				LogUIServer.Default("Connection connection upgrade failed: %s", err)
 				return
 			}
 			client := &Client{
@@ -180,7 +179,7 @@ func (w *UIServer) AddHandler(path string, messageHandler func(message []byte) [
 		// Upgrade our raw HTTP connection to a websocket based one
 		conn, err := upgrader.Upgrade(wc, r, nil)
 		if err != nil {
-			LogErrorLn("[UI] Error during connection upgrade: %s", err.Error())
+			LogUIServer.Error("Error during connection upgrade: %s", err.Error())
 			return
 		}
 		defer conn.Close()
@@ -189,8 +188,9 @@ func (w *UIServer) AddHandler(path string, messageHandler func(message []byte) [
 		for {
 			messageType, message, err := conn.ReadMessage()
 			if err != nil {
-				if !strings.Contains(fmt.Sprintf("%s", err), "close 1000 (normal)") {
-					LogErrorLn("[UI] Error during message reading: %s", err.Error())
+				if !strings.Contains(err.Error(), "close 1000 (normal)") &&
+					!strings.Contains(err.Error(), "close 1001 (going away)") {
+					LogUIServer.Error("Error during message reading: %s", err.Error())
 				}
 				break
 			}
@@ -198,7 +198,7 @@ func (w *UIServer) AddHandler(path string, messageHandler func(message []byte) [
 			message = messageHandler(message)
 			err = conn.WriteMessage(messageType, message)
 			if err != nil {
-				LogErrorLn("[UI] Error during message writing: %s", err.Error())
+				LogUIServer.Error("Error during message writing: %s", err.Error())
 				break
 			}
 		}
@@ -212,7 +212,7 @@ func (w *UIServer) MakeHTMLHandler(template string, data interface{}) func(w htt
 		var tpl bytes.Buffer
 		err := ParseTemplateHTML(template, &tpl, data)
 		if err != nil {
-			LogErrorLn("[UI] Failed to parse template: %s", err.Error())
+			LogUIServer.Error("Failed to parse template: %s", err.Error())
 			return
 		}
 
@@ -272,10 +272,10 @@ func (ws *UIServer) Start() {
 		mux.ServeHTTP(w, req)
 	})
 
-	LogDefaultLn("Starting UI server on %s...", colorWrap("https://"+srv, colorBrightYellow))
+	LogUIServer.Default("Starting UI server on %s...", colorWrap("https://"+srv, colorBrightYellow))
 	err := ws.server.ListenAndServeTLS(ws.CertFile, ws.KeyFile)
 	if !strings.Contains(err.Error(), "Server closed") {
-		log.Fatal(err)
+		LogUIServer.Error("Server stopped: %s", colorError(err))
 	}
 }
 
@@ -286,12 +286,12 @@ func (ws *UIServer) Shutdown() {
 	}()
 
 	if err := ws.server.Shutdown(ctxShutDown); err != nil {
-		LogErrorLn("[UI] Shutdown failed: %s", colorError(err))
+		LogUIServer.Error("Shutdown failed: %s", colorError(err))
 	}
 
 	ws.Handlers = nil
 
-	LogOKLn("[UI] Shutdown complete")
+	LogUIServer.OK("Shutdown complete")
 }
 
 func (ws *UIServer) Reload() {

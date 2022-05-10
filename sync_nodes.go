@@ -104,7 +104,7 @@ func (sn *SyncNodes) Exec(command string) string {
 			return r
 		}
 		if err != nil {
-			LogErrorLn("Failed to exec command %s on node %s: %s", colorHighlight(command), colorHost(c.ID()), colorError(err))
+			LogSyncServer.Error("Failed to exec command %s on node %s: %s", colorHighlight(command), colorHost(c.ID()), colorError(err))
 		}
 	}
 	return ""

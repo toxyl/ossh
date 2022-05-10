@@ -30,7 +30,7 @@ func (s *Session) SetID(id string) *Session {
 	defer s.lock.Unlock()
 	ip, port, err := net.SplitHostPort(id)
 	if err != nil {
-		LogErrorLn("Invalid session ID %s: %s\nNote: format must be 'host:port'!", colorReason(id), colorError(err))
+		LogOSSHServer.Error("Invalid session ID %s: %s\nNote: format must be 'host:port'!", colorReason(id), colorError(err))
 		return nil
 	}
 	p, err := strconv.Atoi(port)
@@ -107,12 +107,7 @@ func (s *Session) SetPort(port int) *Session {
 }
 
 func (s *Session) LogID() string {
-	return fmt.Sprintf(
-		"%s@%s:%s",
-		colorUser(s.User),
-		colorHost(s.Host),
-		colorInt(s.Port),
-	)
+	return colorConnID(s.User, s.Host, s.Port)
 }
 
 func (s *Session) Uptime() time.Duration {

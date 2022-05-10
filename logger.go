@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+func colorConnID(user, host string, port int) string {
+	return fmt.Sprintf("%s@%s:%s", colorUser(user), colorHost(host), colorInt(port))
+}
+
 func colorWrap(str string, color uint) string {
 	return fmt.Sprintf("\033[38;5;%dm%s\033[0m", color, str)
 }
@@ -46,27 +50,35 @@ func colorInt(n int) string {
 }
 
 const (
-	// #005fff
-	colorLightBlue = 27
-	// #00af00
-	colorOliveGreen = 34
-	// #00ff00
-	colorGreen = 46
-	// #00ffff
-	colorCyan = 51
-	// #d70000
-	colorDarkRed = 160
-	// #ff0000
-	colorRed = 196
-	// #ff8700
-	colorOrange = 208
-	// #ffffaf
+	colorDarkBlue     = 17
+	colorBlue         = 21
+	colorDarkGreen    = 22
+	colorLightBlue    = 27
+	colorOliveGreen   = 34
+	colorGreen        = 46
+	colorCyan         = 51
+	colorPurple       = 53
+	colorDarkOrange   = 130
+	colorDarkYellow   = 142
+	colorLime         = 154
+	colorDarkRed      = 160
+	colorRed          = 196
+	colorPink         = 201
+	colorOrange       = 208
+	colorYellow       = 220
 	colorBrightYellow = 229
-	// #bcbcbc
-	colorGray = 250
+	colorDarkGray     = 234
+	colorMediumGray   = 240
+	colorGray         = 250
 )
 
-func Log(indicator rune, format string, a ...interface{}) {
+type Logger struct {
+	ID    string
+	color uint
+	debug bool
+}
+
+func (ssl *Logger) write(indicator rune, format string, a ...interface{}) {
 	prefix := "[ ]"
 	switch indicator {
 	case 'i':
@@ -82,11 +94,11 @@ func Log(indicator rune, format string, a ...interface{}) {
 	case '!':
 		prefix = colorWrap("[!]", colorOrange)
 	case 'd':
-		prefix = colorWrap("[DEBUG]", colorOrange)
+		prefix = colorWrap("[D]", colorOrange)
 	case ' ':
 		prefix = colorWrap("[ ]", colorGray)
 	}
-	msg := fmt.Sprintf(prefix+" "+format, a...)
+	msg := fmt.Sprintf(prefix+" "+format+"\n", a...)
 
 	fmt.Print(msg)
 	if SrvUI != nil {
@@ -94,92 +106,68 @@ func Log(indicator rune, format string, a ...interface{}) {
 	}
 }
 
-func debugLn(category string, color uint, format string, a ...interface{}) {
-	Log('d', fmt.Sprintf("[%s] %s\n", colorWrap(category, color), format), a...)
+func (ssl *Logger) prependFormat(format string) string {
+	return fmt.Sprintf("%s: %s\n", colorWrap(fmt.Sprintf("%-16s", ssl.ID), ssl.color), format)
 }
 
-func DebugSyncServer(format string, a ...interface{}) {
-	if Conf.DebugSyncServer {
-		debugLn("Sync Server", colorCyan, format, a...)
+func (ssl *Logger) Default(format string, a ...interface{}) {
+	ssl.write(' ', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) Info(format string, a ...interface{}) {
+	ssl.write('i', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) Success(format string, a ...interface{}) {
+	ssl.write('✓', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) OK(format string, a ...interface{}) {
+	ssl.write('+', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) NotOK(format string, a ...interface{}) {
+	ssl.write('-', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) Error(format string, a ...interface{}) {
+	ssl.write('x', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) Warning(format string, a ...interface{}) {
+	ssl.write('!', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) Debug(format string, a ...interface{}) {
+	if !ssl.debug {
+		return
+	}
+	ssl.write('d', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) EnableDebug() {
+	ssl.debug = true
+}
+
+func NewLogger(id string, color uint) *Logger {
+	return &Logger{
+		ID:    id,
+		color: color,
+		debug: false,
 	}
 }
 
-func DebugSyncClient(format string, a ...interface{}) {
-	if Conf.DebugSyncClient {
-		debugLn("Sync Client", colorLightBlue, format, a...)
-	}
-}
-
-func DebugUIServer(format string, a ...interface{}) {
-	if Conf.DebugUIServer {
-		debugLn("UI Server", colorGreen, format, a...)
-	}
-}
-
-func DebugOSSHServer(format string, a ...interface{}) {
-	if Conf.DebugOSSHServer {
-		debugLn("oSSH Server", colorOliveGreen, format, a...)
-	}
-}
-
-func DebugOverlayFS(format string, a ...interface{}) {
-	if Conf.DebugOverlayFS {
-		debugLn("Overlay FS", colorBrightYellow, format, a...)
-	}
-}
-
-func LogDefault(format string, a ...interface{}) {
-	Log(' ', format, a...)
-}
-
-func LogDefaultLn(format string, a ...interface{}) {
-	LogDefault(fmt.Sprintf("%s\n", format), a...)
-}
-
-func LogInfo(format string, a ...interface{}) {
-	Log('i', format, a...)
-}
-
-func LogInfoLn(format string, a ...interface{}) {
-	LogInfo(fmt.Sprintf("%s\n", format), a...)
-}
-
-func LogSuccess(format string, a ...interface{}) {
-	Log('✓', format, a...)
-}
-
-func LogSuccessLn(format string, a ...interface{}) {
-	LogSuccess(fmt.Sprintf("%s\n", format), a...)
-}
-
-func LogOK(format string, a ...interface{}) {
-	Log('+', format, a...)
-}
-
-func LogOKLn(format string, a ...interface{}) {
-	LogOK(fmt.Sprintf("%s\n", format), a...)
-}
-
-func LogNotOK(format string, a ...interface{}) {
-	Log('-', format, a...)
-}
-
-func LogNotOKLn(format string, a ...interface{}) {
-	LogNotOK(fmt.Sprintf("%s\n", format), a...)
-}
-
-func LogError(format string, a ...interface{}) {
-	Log('x', format, a...)
-}
-
-func LogErrorLn(format string, a ...interface{}) {
-	LogError(fmt.Sprintf("%s\n", format), a...)
-}
-
-func LogWarning(format string, a ...interface{}) {
-	Log('!', format, a...)
-}
-
-func LogWarningLn(format string, a ...interface{}) {
-	LogWarning(fmt.Sprintf("%s\n", format), a...)
-}
+var (
+	LogGlobal        = NewLogger("Global", colorGray)
+	LogASCIICastV2   = NewLogger("ASCIICast v2", colorBrightYellow)
+	LogFakeShell     = NewLogger("Fake Shell", colorOliveGreen)
+	LogOverlayFS     = NewLogger("Overlay FS", colorLightBlue)
+	LogPayloads      = NewLogger("Payloads", colorDarkYellow)
+	LogOSSHServer    = NewLogger("oSSH Server", colorLime)
+	LogSyncClient    = NewLogger("Sync Client", colorBlue)
+	LogSyncCommands  = NewLogger("Sync Commands", colorDarkGreen)
+	LogSyncServer    = NewLogger("Sync Server", colorDarkRed)
+	LogHTMLTemplater = NewLogger("HTML Templater", colorMediumGray)
+	LogTextTemplater = NewLogger("Text Templater", colorMediumGray)
+	LogUIServer      = NewLogger("UI Server", colorCyan)
+)

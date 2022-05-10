@@ -38,7 +38,7 @@ func (fss *FakeShellStats) SaveCapture() {
 	if !FileExists(f) {
 		err := fss.recording.Save(f)
 		if err == nil {
-			LogSuccessLn("Capture saved: %s", colorFile(f))
+			LogFakeShell.Success("Capture saved: %s", colorFile(f))
 		}
 	}
 	pl.Save()

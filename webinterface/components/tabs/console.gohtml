@@ -3,9 +3,9 @@
     var current_log_filter = "*";
 
     function filter_log(category) {
-        current_log_filter = category.toUpperCase();
+        current_log_filter = category;
         $('.log').each(function(index) {
-            if (current_log_filter == "*" || $(this).hasClass(`log${current_log_filter.replace(/[^a-zA-Z0-9]+/g, '')}`)) {
+            if (current_log_filter == "*" || $(this).hasClass(`log-${current_log_filter}`)) {
                 $(this).show();
                 return;
             }
@@ -18,42 +18,56 @@
             return;
 
         var cs = $("#tConsole");
-        var re = /.*?m\[(.*?)\].*?\s+(.*)\s*/;    
-        var ct = str.replace(re, '$1');
+        var re = /(.*?m\[)(.*?)(\].*?)\s+(.*?)\s*:\s+(.*)\s*/;    
+        var msgtype = str.replace(re, '$1$2$3');
+        var subsystem = str.replace(re, '$4');
+        var msg = str.replace(re, '$5');
+        var ct = str.replace(re, '$2');
         switch (ct) {
             case 'i':
-                ct = "INFO";
+                ct = "info";
                 break;
             case '!':
-                ct = "WARNING";
+                ct = "warning";
                 break;
             case 'x':
-                ct = "ERROR";
+                ct = "error";
                 break;
             case '-':
-                ct = "NOT OK";
+                ct = "not ok";
                 break;
             case '+':
-                ct = "OK";
+                ct = "ok";
                 break;
             case '✓':
-                ct = "SUCCESS";
+                ct = "success";
                 break;
-            case 'DEBUG':
-                ct = "DEBUG";
+            case 'D':
+                ct = "debug";
                 break;
-        
             default:
-                ct = "OTHER";
+                ct = "other";
                 break;
         }
-        var msg = str.replace(re, '$2');
+
         var ansi_up = new AnsiUp;
         msg = ansi_up.ansi_to_html(msg);
+        subsystem = ansi_up.ansi_to_html(subsystem);
+        msgtype = ansi_up.ansi_to_html(msgtype);
 
-        cs.prepend(`<tr class='log log${ct.replace(/[^a-zA-Z0-9]+/g, '')}'><td class="w5 left"><tag class='bg-${log_to_class(ct)}'>${ct}</tag></td><td  class="w15 left monospace">${(new Date()).toISOString()}</td><td class="w80 left monospace">${msg}</td></tr>`);
-        if (current_log_filter != "*" && current_log_filter != ct) {
-            $(`.log.log${ct.replace(/[^a-zA-Z0-9]+/g, '')}`).hide();
+        txttype = ct.trim().toLowerCase().replace(" ", "-").replace(/[^a-zA-Z0-9\-\*]+/g, '');
+        txtsubsys = $(subsystem).text().trim().toLowerCase().replace(" ", "-").replace(/[^a-zA-Z0-9\-\*]+/g, '');
+
+        cs.prepend(`
+        <tr class='log log-${txttype} log-${txtsubsys}'>
+            <td class="w15 left monospace">${(new Date()).toISOString()}</td>
+            <td class="w5 left"><tag class='w3-button w3-text-black bg-color-${txtsubsys}' onclick="filter_log('${txtsubsys}')">${txtsubsys}</tag></td>
+            <td class="w5 left"><tag class='w3-button w3-text-black bg-color-${txttype}' onclick="filter_log('${txttype}')">${ct}</tag></td>
+            <td class="w75 left monospace">${msg}</td>
+        </tr>`);
+        if (current_log_filter != "*" && current_log_filter != txttype && current_log_filter != txtsubsys) {
+            $(`.log-${txttype}`).hide();
+            $(`.log-${txtsubsys}`).hide();
         }
         if (cs.children().length > 500) {
             cs.children().slice(500).remove();

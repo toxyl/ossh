@@ -1,11 +1,21 @@
 {{ define "tags_logs" }}
-<tag class="w3-button w3-text-black bg-color-1" onclick="filter_log('INFO')">INFO</tag>
-<tag class="w3-button w3-text-black bg-color-2" onclick="filter_log('WARNING')">WARNING</tag>
-<tag class="w3-button w3-text-black bg-color-3" onclick="filter_log('ERROR')">ERROR</tag>
-<tag class="w3-button w3-text-black bg-color-4" onclick="filter_log('NOT OK')">NOT OK</tag>
-<tag class="w3-button w3-text-black bg-color-5" onclick="filter_log('OK')">OK</tag>
-<tag class="w3-button w3-text-black bg-color-6" onclick="filter_log('SUCCESS')">SUCCESS</tag>
-<tag class="w3-button w3-text-black bg-color-7" onclick="filter_log('OTHER')">OTHER</tag>
-<tag class="w3-button w3-text-black bg-color-8" onclick="filter_log('DEBUG')">DEBUG</tag>
-<tag class="w3-button w3-text-black bg-color-9" onclick="filter_log('*')">All</tag>
+<tag class="w3-button w3-text-black bg-color-info" onclick="filter_log('info')">info</tag>
+<tag class="w3-button w3-text-black bg-color-warning" onclick="filter_log('warning')">warning</tag>
+<tag class="w3-button w3-text-black bg-color-error" onclick="filter_log('error')">error</tag>
+<tag class="w3-button w3-text-black bg-color-not-ok" onclick="filter_log('not ok')">not ok</tag>
+<tag class="w3-button w3-text-black bg-color-ok" onclick="filter_log('ok')">ok</tag>
+<tag class="w3-button w3-text-black bg-color-success" onclick="filter_log('success')">success</tag>
+<tag class="w3-button w3-text-black bg-color-debug" onclick="filter_log('debug')">debug</tag>
+<br>
+<tag class="w3-button w3-text-black bg-color-ossh-server" onclick="filter_log('ossh-server')">ossh-server</tag>
+<tag class="w3-button w3-text-black bg-color-ui-server" onclick="filter_log('ui-server')">ui-server</tag>
+<tag class="w3-button w3-text-black bg-color-sync-server" onclick="filter_log('sync-server')">sync-server</tag>
+<tag class="w3-button w3-text-black bg-color-sync-client" onclick="filter_log('sync-client')">sync-client</tag>
+<tag class="w3-button w3-text-black bg-color-sync-commands" onclick="filter_log('sync-commands')">sync-commands</tag>
+<tag class="w3-button w3-text-black bg-color-overlay-fs" onclick="filter_log('overlay-fs')">overlay-fs</tag>
+<tag class="w3-button w3-text-black bg-color-payloads" onclick="filter_log('payloads')">payloads</tag>
+<tag class="w3-button w3-text-black bg-color-fake-shell" onclick="filter_log('fake-shell')">fake-shell</tag>
+<tag class="w3-button w3-text-black bg-color-text-templater" onclick="filter_log('text-templater')">text-templater</tag>
+<tag class="w3-button w3-text-black bg-color-html-templater" onclick="filter_log('html-templater')">html-templater</tag>
+<tag class="w3-button w3-text-black bg-color-other" onclick="filter_log('*')">Reset Filter</tag>
 {{ end }}

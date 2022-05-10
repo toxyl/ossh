@@ -14,11 +14,16 @@ type SyncNode struct {
 }
 
 type Config struct {
-	DebugSyncServer  bool     `mapstructure:"debug_sync_server"`
-	DebugSyncClient  bool     `mapstructure:"debug_sync_client"`
-	DebugOSSHServer  bool     `mapstructure:"debug_ossh_server"`
-	DebugUIServer    bool     `mapstructure:"debug_ui_server"`
-	DebugOverlayFS   bool     `mapstructure:"debug_overlay_fs"`
+	Debug struct {
+		ASCIICastV2  bool `mapstructure:"asciicast_v2"`
+		FakeShell    bool `mapstructure:"fake_shell"`
+		SyncCommands bool `mapstructure:"sync_commands"`
+		SyncServer   bool `mapstructure:"sync_server"`
+		SyncClient   bool `mapstructure:"sync_client"`
+		OSSHServer   bool `mapstructure:"ossh_server"`
+		UIServer     bool `mapstructure:"ui_server"`
+		OverlayFS    bool `mapstructure:"overlay_fs"`
+	} `mapstructure:"debug"`
 	PathData         string   `mapstructure:"path_data"`
 	PathFingerprints string   `mapstructure:"path_fingerprints"`
 	PathPasswords    string   `mapstructure:"path_passwords"`
@@ -59,6 +64,7 @@ type Config struct {
 		CommandNotFound  []string   `mapstructure:"command_not_found"`
 		FileNotFound     []string   `mapstructure:"file_not_found"`
 		NotImplemented   []string   `mapstructure:"not_implemented"`
+		Bullshit         []string   `mapstructure:"bullshit"`
 	} `mapstructure:"commands"`
 }
 
@@ -74,27 +80,7 @@ func isIPWhitelisted(ip string) bool {
 	return false
 }
 
-func initConfig() {
-	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
-	} else {
-		viper.SetConfigName("config")
-		viper.SetConfigType("yaml")
-		viper.AddConfigPath("/etc/ossh/")
-		viper.AddConfigPath("$HOME/.ossh")
-		viper.AddConfigPath(".")
-	}
-
-	err := viper.ReadInConfig()
-	if err != nil {
-		log.Panic(fmt.Errorf("[Config] Fatal error config file: %w", err))
-	}
-	cfgFile = viper.ConfigFileUsed()
-
-	err = viper.Unmarshal(&Conf)
-	if err != nil {
-		log.Printf("[Config] Unable to decode into Config struct, %v", err)
-	}
+func InitPaths() {
 
 	if Conf.PathData == "" {
 		Conf.PathData = "/etc/ossh"
@@ -139,20 +125,79 @@ func initConfig() {
 	if Conf.Webinterface.KeyFile == "" {
 		Conf.Webinterface.KeyFile = fmt.Sprintf("%s/ossh.key", Conf.PathData)
 	}
+}
 
+func InitDebug() {
+	if Conf.Debug.ASCIICastV2 {
+		LogASCIICastV2.EnableDebug()
+	}
+
+	if Conf.Debug.SyncCommands {
+		LogSyncCommands.EnableDebug()
+	}
+
+	if Conf.Debug.SyncClient {
+		LogSyncClient.EnableDebug()
+	}
+
+	if Conf.Debug.SyncServer {
+		LogSyncServer.EnableDebug()
+	}
+
+	if Conf.Debug.OSSHServer {
+		LogOSSHServer.EnableDebug()
+	}
+
+	if Conf.Debug.UIServer {
+		LogUIServer.EnableDebug()
+	}
+
+	if Conf.Debug.OverlayFS {
+		LogOverlayFS.EnableDebug()
+	}
+
+	if Conf.Debug.FakeShell {
+		LogFakeShell.EnableDebug()
+	}
+}
+
+func initConfig() {
+	if cfgFile != "" {
+		viper.SetConfigFile(cfgFile)
+	} else {
+		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath("/etc/ossh/")
+		viper.AddConfigPath("$HOME/.ossh")
+		viper.AddConfigPath(".")
+	}
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		log.Panic(fmt.Errorf("[Config] Fatal error config file: %w", err))
+	}
+	cfgFile = viper.ConfigFileUsed()
+
+	err = viper.Unmarshal(&Conf)
+	if err != nil {
+		log.Panicf("[Config] Unable to decode into Config struct, %v", err)
+	}
+
+	InitPaths()
+	InitDebug()
 	InitTemplaterFunctions()
 	InitTemplaterFunctionsHTML()
 
-	LogOKLn("Config loaded from %s", colorWrap(cfgFile, colorOrange))
+	LogGlobal.OK("Config loaded from %s", colorWrap(cfgFile, colorOrange))
 }
 
 func getConfig() string {
 	cfg, err := os.ReadFile(cfgFile)
 	if err != nil {
-		LogErrorLn(
+		LogGlobal.Error(
 			"Could not read config from '%s': %s",
-			colorWrap(cfgFile, colorCyan),
-			colorWrap(err.Error(), colorOrange),
+			colorFile(cfgFile),
+			colorError(err),
 		)
 	}
 	return string(cfg)
@@ -163,15 +208,15 @@ func updateConfig(config []byte) error {
 	pathBak := fmt.Sprintf("%s.bak", pathSrc)
 	err := CopyFile(pathSrc, pathBak)
 	if err != nil {
-		LogErrorLn("Failed to backup config from %s to %s!", pathSrc, pathBak)
+		LogGlobal.Error("Failed to backup config from %s to %s!", pathSrc, pathBak)
 		return err
 	}
 	err = os.WriteFile(pathSrc, config, 0644)
 	if err != nil {
-		LogErrorLn("Failed to backup config from %s to %s!", pathSrc, pathBak)
+		LogGlobal.Error("Failed to backup config from %s to %s!", pathSrc, pathBak)
 		return err
 	}
-	LogSuccessLn("Written new config to: %s", pathSrc)
+	LogGlobal.Success("Written new config to: %s", pathSrc)
 
 	initConfig()
 	return nil

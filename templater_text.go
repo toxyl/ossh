@@ -38,9 +38,9 @@ func parseTemplateString(templateString string, wr io.Writer, data interface{}) 
 	t, err := template.New("tpl").Funcs(templateFunctions).Parse(templateString)
 	if err != nil {
 		if strings.Contains(err.Error(), "no template") {
-			LogError("Template '%s' not found\n", templateString)
+			LogTextTemplater.Error("Template '%s' not found", templateString)
 		} else {
-			LogError("Failed to parse template string %s: %s\n", templateString, err.Error())
+			LogTextTemplater.Error("Failed to parse template string %s: %s", templateString, err.Error())
 		}
 		return err
 	}
@@ -77,9 +77,9 @@ func ParseTemplateToString(name string, data interface{}) string {
 	err := ParseTemplate(name, &tpl, data)
 	if err != nil {
 		if strings.Contains(err.Error(), "no template") {
-			LogError("Template '%s' not found\n", name)
+			LogTextTemplater.Error("Template '%s' not found", name)
 		} else {
-			LogError("Failed to parse template string %s: %s\n", name, err.Error())
+			LogTextTemplater.Error("Failed to parse template string %s: %s", name, err.Error())
 		}
 		return fmt.Sprintf("%s: command not found", name)
 	}

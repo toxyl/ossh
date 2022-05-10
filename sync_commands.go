@@ -48,7 +48,7 @@ var SyncCommands = map[string]SyncCommand{
 			}
 		}
 		if added > 0 {
-			LogOKLn("[sync] Added %s host(s)", colorInt(added))
+			LogSyncCommands.OK("Added %s host(s)", colorInt(added))
 			SrvOSSH.SaveData()
 		}
 		return "", nil
@@ -64,7 +64,7 @@ var SyncCommands = map[string]SyncCommand{
 			}
 		}
 		if added > 0 {
-			LogOKLn("[sync] Added %s user(s)", colorInt(added))
+			LogSyncCommands.OK("Added %s user(s)", colorInt(added))
 			SrvOSSH.SaveData()
 		}
 		return "", nil
@@ -80,7 +80,7 @@ var SyncCommands = map[string]SyncCommand{
 			}
 		}
 		if added > 0 {
-			LogOKLn("[sync] Added %s password(s)", colorInt(added))
+			LogSyncCommands.OK("Added %s password(s)", colorInt(added))
 			SrvOSSH.SaveData()
 		}
 		return "", nil
@@ -96,7 +96,7 @@ var SyncCommands = map[string]SyncCommand{
 			}
 		}
 		if added > 0 {
-			LogOKLn("[sync] Added %s fingerprint(s)", colorInt(added))
+			LogSyncCommands.OK("Added %s fingerprint(s)", colorInt(added))
 			SrvOSSH.SaveData()
 		}
 		return "", nil

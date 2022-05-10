@@ -1,3 +1,13 @@
+debug:
+  asciicast_v2: false
+  fake_shell: false
+  sync_commands: false
+  sync_server: false
+  sync_client: false
+  ossh_server: false
+  ui_server: false
+  overlay_fs: false
+  
 host_name: nasty-pot
 version: OpenSSH_8.4p1 Ubuntu-6ubuntu2.1
 ip_whitelist:
@@ -62,6 +72,10 @@ commands:
     - [ "./bash", "/bin/bash^M: bad interpreter: No such file or directory" ]
     - [ "./x86_64", "/bin/bash^M: bad interpreter: No such file or directory" ]
     - [ "./.senpai.loader", "/bin/bash^M: bad interpreter: No such file or directory" ]
+    - [ "#!/bin/sh", "/bin/sh^M: bad interpreter: No such file or directory" ]
+    - [ "./23", "ELF load command address/offset not properly aligned" ]
+    - [ "./23s", "ELF load command address/offset not properly aligned" ]
+    - [ "./23.sh", "/bin/bash^M: bad interpreter: No such file or directory" ]
     
   permission_denied:
     - sudo
@@ -85,7 +99,6 @@ commands:
     - du
     - readlink
     - realpath
-    - rm
     - rmdir
     - scp
     - history
@@ -169,3 +182,5 @@ commands:
     - who
     - xxd
     - yes
+  bullshit:
+    - bullshit
