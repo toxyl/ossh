@@ -1,0 +1,73 @@
+{{ define "stats" }}
+{{ template "ws_conn" dict "Scheme" .Scheme "Name" "stats" "OpenFn" "ws_st_open" "CloseFn" "ws_st_close" "PreConnectFn" "ws_st_preconnect" "ReceiveFn" "ws_st_receive" "ReceiveCompleteFn" "ws_st_receive_complete" "SendFn" "ws_st_send" }}
+<script type="text/javascript">
+    function ws_st_open(evt) { hide_overlay_connection(); }
+    function ws_st_close(evt) { show_overlay_connection(); }
+    function ws_st_preconnect(evt) { }
+
+    function ws_st_receive(message) {
+        if (message.trim() == "")
+            return;
+
+        m = JSON.parse(message);
+        
+        $('#tsHosts').text(m.hosts);
+        $('#tsUsers').text(m.users);
+        $('#tsPasswords').text(m.passwords);
+        $('#tsFingerprints').text(m.fingerprints);
+        $('#tsSessions').text(m.sessions);
+        $('#tsLoginsAttempted').text(m.logins_attempted);
+        $('#tsLoginsSuccessful').text(m.logins_successful);
+        $('#tsLoginsFailed').text(m.logins_failed);
+        $('#tsTimeWasted').text(humanTimeInterval(m.time_wasted));
+        $('#tsUptime').text(humanTimeInterval(m.uptime));
+    }
+
+    function ws_st_receive_complete() { }
+    function ws_st_send() { }
+</script>
+<div class="w3-bar w3-black w3-bottom">
+    <div class="w3-bar-item">
+        <span id="tsUptime"></span>&nbsp;&nbsp;<b>uptime</b>
+    </div>
+    
+    <div class="w3-bar-item">
+        <span id="tsSessions"></span>&nbsp;&nbsp;<b>sessions</b>
+    </div>
+
+    <div class="w3-bar-item">
+        <span id="tsTimeWasted"></span>&nbsp;&nbsp;<b>wasted</b>
+    </div>
+
+    <div class="w3-bar-item">
+        <span id="tsLoginsAttempted"></span>&nbsp;&nbsp;<b>attempted logins</b>
+    </div>
+
+    <div class="w3-bar-item">
+        <span id="tsLoginsSuccessful"></span>&nbsp;&nbsp;<b>successful logins</b>
+    </div>
+
+    <div class="w3-bar-item">
+        <span id="tsLoginsFailed"></span>&nbsp;&nbsp;<b>failed logins</b>
+    </div>
+
+    <div class="w3-bar-item">
+        <span id="tsHosts"></span>&nbsp;&nbsp;<b>known hosts</b>
+    </div>
+
+    <div class="w3-bar-item">
+        <span id="tsUsers"></span>&nbsp;&nbsp;<b>known users</b>
+    </div>
+
+    <div class="w3-bar-item">
+        <span id="tsPasswords"></span>&nbsp;&nbsp;<b>known passwords</b>
+    </div>
+    
+    <div class="w3-bar-item">
+        <span id="tsFingerprints"></span>&nbsp;&nbsp;<b>known payloads</b>
+    </div>
+</div>
+<script>
+    ws_stats_connect();
+</script>
+{{ end }}

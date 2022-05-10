@@ -9,12 +9,8 @@
 </script>
 <div class="w3-bar w3-black">
     <button class="w3-bar-item w3-btn bold tablink w3-green" onclick="openTab(event, 'Console')"><i class="fa fa-bars fa-lg"></i>&nbsp;&nbsp;<span class="w3-hide-small">Console</span></button>
-    <button class="w3-bar-item w3-btn bold tablink w3-hover-green" onclick="openTab(event, 'Stats')"><i class="fa fa-area-chart fa-lg"></i>&nbsp;&nbsp;<span class="w3-hide-small">Stats</span></button>
     <button class="w3-bar-item w3-btn bold tablink w3-hover-green" onclick="openTab(event, 'Config')"><i class="fa fa-cog fa-lg"></i>&nbsp;&nbsp;<span class="w3-hide-small">Config</span></button>
-    <div class="w3-bar-item w3-right" style="height:100%"><span class="bolder">oSSH</span></div>
-</div>
-
-<div class="w3-bar w3-black w3-bottom">
-    <button class="w3-bar-item w3-btn tablink w3-hover-red" onclick="ws_config_send()"><i class="fa fa-refresh fa-lg"></i>&nbsp;&nbsp;<span class="w3-hide-small">Update Config</span></button>
+    <button class="w3-bar-item w3-btn bold tablink w3-hover-green" onclick="openTab(event, 'Payloads')"><i class="fa fa-fire fa-lg"></i>&nbsp;&nbsp;<span class="w3-hide-small">Payloads</span></button>
+    <div class="w3-bar-item w3-right" style="height:100%"><span class="bolder">{{ .HostName }}'s oSSH</span></div>
 </div>
 {{ end }}

@@ -324,13 +324,35 @@ func (ws *UIServer) init() {
 		SrvUI.Reload()
 		return nil
 	})
+	ws.AddHandler("/payloads", func(msg []byte) []byte {
+		if string(msg) == "list" {
+			return []byte(fmt.Sprintf("list:%s", strings.Join(SrvOSSH.Loot.GetFingerprints(), ",")))
+		}
+		p, err := SrvOSSH.Loot.payloads.Get(string(msg))
+		if err != nil {
+			LogUIServer.Error("Could not retrieve payload %s: %s", colorHighlight(string(msg)), colorError(err))
+			return nil
+		}
+		pl, err := p.Read()
+		if err != nil {
+			LogUIServer.Error("Could not read payload %s: %s", colorHighlight(string(msg)), colorError(err))
+			return nil
+		}
+		return []byte(EncodeBase64String(pl))
+	})
 	ws.AddHTMLHandler("/",
 		ws.MakeHTMLHandler("index", struct {
-			Scheme string
-			Config string
+			Scheme         string
+			Config         string
+			HostName       string
+			TerminalWidth  int
+			TerminalHeight int
 		}{
-			Scheme: wsscheme,
-			Config: getConfig(),
+			Scheme:         wsscheme,
+			Config:         getConfig(),
+			HostName:       Conf.HostName,
+			TerminalWidth:  fakeShellInitialWidth,
+			TerminalHeight: fakeShellInitialHeight,
 		}),
 	)
 }

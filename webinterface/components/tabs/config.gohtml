@@ -13,8 +13,11 @@
 </script>
 {{ template "ws_conn" dict "Scheme" .Scheme "Name" "config" "OpenFn" "ws_conf_open" "CloseFn" "ws_conf_close" "PreConnectFn" "ws_conf_preconnect" "ReceiveFn" "ws_conf_receive" "ReceiveCompleteFn" "ws_conf_receive_complete" "SendFn" "ws_conf_send" }}
 <div id="tabConfig" class="w3-display-container w3-dark-gray tab" style="display:none">
-    <div class="w3-left w100" style="height: 100%; overflow: auto;">
-        <div id="editor" class="w100" style="height: 100%">{{ .Config }}</div>
+    <div class="w3-left w100 h5">
+        <button class="w3-bar-item w3-btn tablink w3-hover-red h100" onclick="ws_config_send()"><i class="fa fa-refresh fa-lg"></i>&nbsp;&nbsp;<span class="w3-hide-small">Update Config</span></button>
+    </div>
+    <div class="w3-left w100 h95" style="overflow: auto;">
+        <div id="editor" class="w100 h100">{{ .Config }}</div>
     </div>
 </div>
 <script>

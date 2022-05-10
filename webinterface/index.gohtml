@@ -6,8 +6,9 @@
         <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
         <link href="https://fonts.googleapis.com/css2?family=Rajdhani" rel="stylesheet">
-        <title>oSSH</title>
+        <title>{{ .HostName }}'s oSSH</title>
         {{ template "jquery" }} 
+        {{ template "asciinema" }} 
         {{ template "ansi2html" }} 
         {{ template "utils" }} 
         {{ template "ace" }}
@@ -17,14 +18,15 @@
         {{ template "overlay" dict "Name" "connection" "Reason" "connecting to server" }}
         <div class="w3-top">
             <div class="w3-bar">
-                {{ template "tabs" }}
+                {{ template "tabs" dict "HostName" .HostName }}
             </div>
         </div>
         <div class="w3-display-container" style="height: 100%; overflow:hidden;">
-            {{ template "tab_stats" dict "Scheme" .Scheme }}
             {{ template "tab_console" dict "Scheme" .Scheme }}
             {{ template "tab_config" dict "Scheme" .Scheme "Config" .Config }}
+            {{ template "tab_payloads" dict "Scheme" .Scheme }}
         </div>
+        {{ template "stats" dict "Scheme" .Scheme }}
     </body>
 </html>
 {{ end }}

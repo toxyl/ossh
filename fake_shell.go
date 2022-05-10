@@ -15,7 +15,7 @@ import (
 
 const (
 	fakeShellInitialWidth  = 80
-	fakeShellInitialHeight = 40
+	fakeShellInitialHeight = 24
 )
 
 type FakeShell struct {
