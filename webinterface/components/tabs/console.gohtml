@@ -60,10 +60,10 @@
 
         cs.prepend(`
         <tr class='log log-${txttype} log-${txtsubsys}'>
-            <td class="w15 left monospace">${(new Date()).toISOString()}</td>
-            <td class="w5 left"><tag class='w3-button w3-text-black bg-color-${txtsubsys}' onclick="filter_log('${txtsubsys}')">${txtsubsys}</tag></td>
-            <td class="w5 left"><tag class='w3-button w3-text-black bg-color-${txttype}' onclick="filter_log('${txttype}')">${ct}</tag></td>
-            <td class="w75 left monospace">${msg}</td>
+            <td class="w10 left monospace">${(new Date()).toLocaleString()}</td>
+            <td class="w5 left"><tag class='w3-button w3-text-black bg-color-${txtsubsys} w100' onclick="filter_log('${txtsubsys}')">${txtsubsys}</tag></td>
+            <td class="w5 left"><tag class='w3-button w3-text-black bg-color-${txttype} w100' onclick="filter_log('${txttype}')">${ct}</tag></td>
+            <td class="w80 left monospace">${msg}</td>
         </tr>`);
         if (current_log_filter != "*" && current_log_filter != txttype && current_log_filter != txtsubsys) {
             $(`.log-${txttype}`).hide();
