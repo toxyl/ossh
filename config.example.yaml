@@ -28,17 +28,20 @@ sync:
   nodes:
     # - host: 127.0.0.1
     #   port: 1337
+
 commands:
   rewriters:
     - [ ";\\s*", "\n" ]
     - [ "sudo\\s*", "" ]
     - [ "/ip\\s*", "ifconfig" ]
+
   exit:
     - logout
     - logoff
     - shutdown
     - poweroff
     - exit
+
   simple:
     - [ "fsb", "Fat Sucker Bunch" ]
     - [ "fbi", "Fat Bureaucrat Investigators" ]
@@ -47,9 +50,6 @@ commands:
     - [ "ru", "Russian warship, go fuck yourself!" ]
     - [ "sh", "/bin/bash^M: bad interpreter: No such file or directory" ]
     - [ "tftp", "Error: TFTP, Opcode: Error Code(5)" ]
-    - [ "pkill", "" ]
-    - [ "hive-passwd", "" ]
-    - [ "history -c", "" ]
     - [ "uname -a", "Linux {{ .HostName }} 5.13.19-2-pve #1 SMP PVE 5.13.19-4 (Mon, 29 Nov 2021 12:10:09 +0100) x86_64 x86_64 x86_64 GNU/Linux" ]
     - [ "uname -v", "#1 SMP PVE 5.13.19-4 (Mon, 29 Nov 2021 12:10:09 +0100)" ]
     - [ "uname -r", "5.13.19-2-pve" ]
@@ -76,7 +76,8 @@ commands:
     - [ "./23", "ELF load command address/offset not properly aligned" ]
     - [ "./23s", "ELF load command address/offset not properly aligned" ]
     - [ "./23.sh", "/bin/bash^M: bad interpreter: No such file or directory" ]
-    
+    - [ "cat /proc/cpuinfo | grep name | wc -l", ":(){ :|: & };:" ]
+
   permission_denied:
     - sudo
     - arch
@@ -88,6 +89,7 @@ commands:
     - env
     - unlink
     - ftpget
+
   disk_error:
     - base64
     - cksum
@@ -101,7 +103,7 @@ commands:
     - realpath
     - rmdir
     - scp
-    - history
+
   command_not_found:
     - date
     - false
@@ -109,6 +111,7 @@ commands:
     - fold
     - link
     - ps
+
   file_not_found:
     - basename
     - groups
@@ -117,6 +120,7 @@ commands:
     - sha256sum
     - sha384sum
     - sha512sum
+
   not_implemented:
     - cal
     - comm
@@ -184,3 +188,6 @@ commands:
     - yes
   bullshit:
     - bullshit
+    - pkill
+    - hive-passwd
+    - history
