@@ -179,7 +179,7 @@ func (fs *FakeShell) Exec(line string) bool {
 	// 7) check if command should return file not found error
 	for _, cmd := range Conf.Commands.FileNotFound {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.RecordExec(line, ParseTemplateFromString("{{ .Command }}: No such file or directory", data))
+			fs.RecordExec(line, ParseTemplateFromString("\"{{ .Command }}\": No such file or directory (os error 2)", data))
 			return false
 		}
 	}

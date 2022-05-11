@@ -97,7 +97,7 @@ If a command matches this list oSSH will respond with:
 
 #### `file_not_found` (config)
 If a command matches this list oSSH will respond with:  
-`{{ .Command }}: No such file or directory`
+`"{{ .Command }}": No such file or directory (os error 2)`
 
 #### `not_implemented` (config)
 If a command matches this list oSSH will respond with:  
