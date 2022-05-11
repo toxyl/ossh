@@ -2,8 +2,27 @@
 <script type="text/javascript">
     function load_asciicast(data) {
         $('#player').text("");
+        if (data == undefined || data == null || data == "") {
+            data = {
+                data: [
+                    {
+                        version: 2, 
+                        width: 80, 
+                        height: 24
+                    },
+                    [ 0.0, "o", "\033[38;5;208m" ]
+                ]
+            };
+
+            msg = "Payload not found, maybe it was not synced yet. Please try again later.";
+            for (i = 0; i < msg.length; i++) {
+                data.data.push([ i*(0.05+0.05*Math.random()), "o", msg[i] ]);
+            }            
+        } else {
+            data = `data:text/plain;base64,${data}`;
+        }
         AsciinemaPlayer.create(
-            `data:text/plain;base64,${data}`,
+            data,
             document.getElementById("player"),
             {
                 fit: "both",
@@ -22,7 +41,9 @@
     function ws_pl_preconnect(evt) { }
     function ws_pl_receive(message) { 
         if (message.substring(0,4) == "list") {
+            $('#payloads').text("");
             payloads = message.split(":")[1].split(",");
+            payloads.sort();
             for (i = 0; i < payloads.length; i++) {
                 $('#payloads').append(`<div class="w3-btn w3-hover-green w100" onclick="ws_payloads_send('${payloads[i]}')">${payloads[i]}</div>`);
             }
@@ -33,14 +54,23 @@
     function ws_pl_receive_complete() { }
 
     function ws_pl_send(msg) {
+        if (msg != "list") {
+            $('#title-asciicast').text(msg);
+        }
         return msg;
     }
 </script>
 {{ template "ws_conn" dict "Scheme" .Scheme "Name" "payloads" "OpenFn" "ws_pl_open" "CloseFn" "ws_pl_close" "PreConnectFn" "ws_pl_preconnect" "ReceiveFn" "ws_pl_receive" "ReceiveCompleteFn" "ws_pl_receive_complete" "SendFn" "ws_pl_send" }}
-<div id="tabPayloads" class="w3-display-container w3-dark-gray tab" style="display:none">
-    <div class="w3-left w100 h100" style="overflow: hidden;">
-        <div id="payloads" class="w20 h100" style="float:left;overflow: scroll;overflow-x: hidden;"></div>
-        <div id="player" class="w80 h100"></div>
+<div id="tabPayloads" class="w3-display-container w3-dark-gray tab hidden">
+    <div class="w3-left w100 h100 overflow-hidden">
+        <div class="w20 h100 float-left overflow-hidden">
+            <button class="w3-bar-item w3-btn tablink w3-hover-red h5 w100" onclick="ws_payloads_send('list')"><i class="fa fa-refresh fa-lg"></i>&nbsp;&nbsp;<span class="w3-hide-small">Refresh Payloads</span></button>
+            <div id="payloads" class="w100 h95 overflow-y-scroll overflow-x-hidden"></div>
+        </div>
+        <div class="w80 h100 float-left overflow-hidden">
+            <div id="title-asciicast" class="w100 h5 center bold" style="padding-top:10px;font-size: 14px"></div>
+            <div id="player" class="w100 h95"></div>
+        </div>
     </div>
 </div>
 <script>
