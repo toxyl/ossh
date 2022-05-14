@@ -152,6 +152,12 @@ func (ss *SyncServer) SyncToNodes() {
 				continue
 			}
 
+			if len(fpLocal) != 4 || len(fpRemote) != 4 {
+				// probably something went wrong with the transmission,
+				// let's ignore it for now
+				continue
+			}
+
 			if fpLocal[0] != fpRemote[0] {
 				LogSyncServer.Debug("%s are outdated", colorHighlight("hosts"))
 				client.SyncData("HOSTS", SrvOSSH.Loot.GetHosts, client.AddHost)

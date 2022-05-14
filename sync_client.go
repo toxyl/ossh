@@ -97,7 +97,8 @@ func (sc *SyncClient) SyncData(cmd string, fnGet func() []string, fnAddRemote fu
 	LogSyncClient.Debug("%s: syncing %s", colorHost(sc.ID()), colorHighlight(cmd))
 	res, err := sc.Exec(cmd)
 	if err != nil {
-		LogSyncClient.Error("Failed to get %s: %s", colorHighlight(cmd), colorError(err))
+		// chances are that the node refused the connection because it's busy with syncing itself
+		LogSyncClient.Debug("Failed to get %s: %s", colorHighlight(cmd), colorError(err))
 		return
 	}
 
