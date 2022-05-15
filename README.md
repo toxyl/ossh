@@ -52,6 +52,8 @@ You can monitor oSSHs operation using `journalctl`:
 journalctl -u ossh -f --output cat
 ```
 
+Or control it via its web interface, which will be started on `0.0.0.0:443` (default) or according to the config (`webinterface`).
+
 ## Configuration
 ### Sluggishness
 oSSH slows down responses to simulate a slow machine and to waste the bots time. This ratelimit can be defined in the config (`ratelimit`). Sometimes bots run commands with little output, so oSSH will add some penalty for every input character to slow things down a bit more for them. This can be defined in the config as well (`input_delay`).
