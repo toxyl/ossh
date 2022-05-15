@@ -1,0 +1,127 @@
+{{ define "tab_console" }}
+<script type="text/javascript">
+    var current_log_filter = "*";
+
+    function filter_log(category) {
+        current_log_filter = category;
+        $('.log').each(function(index) {
+            if (current_log_filter == "*" || $(this).hasClass(`log-${current_log_filter}`)) {
+                $(this).show();
+                return;
+            }
+            $(this).hide();
+        });
+    }
+
+    function log_console(str) {
+        if (str.trim() == "")
+            return;
+
+        var cs = $("#tConsole");
+        var re = /(.*?m\[)(.*?)(\].*?)\s+(.*?)\s*:\s+(.*)\s*/;    
+        var msgtype = str.replace(re, '$1$2$3');
+        var subsystem = str.replace(re, '$4');
+        var msg = str.replace(re, '$5');
+        var ct = str.replace(re, '$2');
+        switch (ct) {
+            case 'i':
+                ct = "info";
+                break;
+            case '!':
+                ct = "warning";
+                break;
+            case 'x':
+                ct = "error";
+                break;
+            case '-':
+                ct = "not ok";
+                break;
+            case '+':
+                ct = "ok";
+                break;
+            case '✓':
+                ct = "success";
+                break;
+            case 'D':
+                ct = "debug";
+                break;
+            default:
+                ct = "other";
+                break;
+        }
+
+        var ansi_up = new AnsiUp;
+        msg = ansi_up.ansi_to_html(msg);
+        subsystem = ansi_up.ansi_to_html(subsystem);
+        msgtype = ansi_up.ansi_to_html(msgtype);
+
+        txttype = ct.trim().toLowerCase().replace(" ", "-").replace(/[^a-zA-Z0-9\-\*]+/g, '');
+        txtsubsys = $(subsystem).text().trim().toLowerCase().replace(" ", "-").replace(/[^a-zA-Z0-9\-\*]+/g, '');
+
+        cs.prepend(`
+        <tr class='log log-${txttype} log-${txtsubsys}'>
+            <td class="w10 left monospace">${(new Date()).toLocaleString()}</td>
+            <td class="w5 left"><tag class='w3-button w3-text-black bg-color-${txtsubsys} w100' onclick="filter_log('${txtsubsys}')">${txtsubsys}</tag></td>
+            <td class="w5 left"><tag class='w3-button w3-text-black bg-color-${txttype} w100' onclick="filter_log('${txttype}')">${ct}</tag></td>
+            <td class="w80 left monospace">${msg}</td>
+        </tr>`);
+        if (current_log_filter != "*" && current_log_filter != txttype && current_log_filter != txtsubsys) {
+            $(`.log-${txttype}`).hide();
+            $(`.log-${txtsubsys}`).hide();
+        }
+        if (cs.children().length > 500) {
+            cs.children().slice(500).remove();
+        }
+    }
+
+    function ws_con_open(evt) { hide_overlay_connection(); }
+    function ws_con_close(evt) { show_overlay_connection(); }
+    function ws_con_preconnect(evt) { }
+    function ws_con_receive(message) { log_console(message); }
+    function ws_con_receive_complete() { }
+    function ws_con_send() { }
+</script>
+{{ template "ws_conn" dict "Scheme" .Scheme "Name" "console" "OpenFn" "ws_con_open" "CloseFn" "ws_con_close" "PreConnectFn" "ws_con_preconnect" "ReceiveFn" "ws_con_receive" "ReceiveCompleteFn" "ws_con_receive_complete" "SendFn" "ws_con_send" }}
+<div id="tabConsole" class="w3-display-container w3-dark-gray tab">
+    <div style="padding-top: 7px;">
+        <table class="w100 no-margin">
+            <tr>
+                <td><b>Message types</b></td>
+                <td><tag class="w3-button w3-text-black bg-color-info w100" onclick="filter_log('info')">info</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-warning w100" onclick="filter_log('warning')">warning</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-error w100" onclick="filter_log('error')">error</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-not-ok w100" onclick="filter_log('not ok')">not ok</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-ok w100" onclick="filter_log('ok')">ok</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-success w100" onclick="filter_log('success')">success</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-debug w100" onclick="filter_log('debug')">debug</tag></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><b>Sub systems</b></td>
+                <td><tag class="w3-button w3-text-black bg-color-ossh-server w100" onclick="filter_log('ossh-server')">ossh-server</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-ui-server w100" onclick="filter_log('ui-server')">ui-server</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-sync-server w100" onclick="filter_log('sync-server')">sync-server</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-sync-client w100" onclick="filter_log('sync-client')">sync-client</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-sync-commands w100" onclick="filter_log('sync-commands')">sync-commands</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-overlay-fs w100" onclick="filter_log('overlay-fs')">overlay-fs</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-payloads w100" onclick="filter_log('payloads')">payloads</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-fake-shell w100" onclick="filter_log('fake-shell')">fake-shell</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-text-templater w100" onclick="filter_log('text-templater')">text-templater</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-html-templater w100" onclick="filter_log('html-templater')">html-templater</tag></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td class="center"><tag class="w3-button w3-text-black bg-color-other w100" onclick="filter_log('*')">Reset</tag></td>
+                <td colspan="9"></td>
+            </tr>
+        </table>
+    </div>
+    <table id="tConsole"></table>
+    <br><br><br><br>
+</div>
+<script>
+    ws_console_connect();
+</script>
+{{ end }}

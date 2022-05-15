@@ -1,0 +1,80 @@
+{{ define "tab_config" }}
+<script type="text/javascript">
+    function ws_conf_open(evt) { hide_overlay_connection(); }
+    function ws_conf_close(evt) { show_overlay_connection(); }
+    function ws_conf_preconnect(evt) { }
+    function ws_conf_receive(message) { window.location.href = window.location.href; }
+    function ws_conf_receive_complete() { }
+
+    function ws_conf_send() {
+        var editor = ace.edit("editor");
+        return editor.getValue();
+    }
+</script>
+{{ template "ws_conn" dict "Scheme" .Scheme "Name" "config" "OpenFn" "ws_conf_open" "CloseFn" "ws_conf_close" "PreConnectFn" "ws_conf_preconnect" "ReceiveFn" "ws_conf_receive" "ReceiveCompleteFn" "ws_conf_receive_complete" "SendFn" "ws_conf_send" }}
+<div id="tabConfig" class="w3-display-container w3-dark-gray tab" style="display:none">
+    <div class="w3-left w100 h5">
+        <button class="w3-bar-item w3-btn tablink w3-hover-red h100" onclick="ws_config_send()"><i class="fa fa-refresh fa-lg"></i>&nbsp;&nbsp;<span class="w3-hide-small">Update Config</span></button>
+    </div>
+    <div class="w3-left w100 h95" style="overflow: auto;">
+        <div id="editor" class="w100 h100">{{ .Config }}</div>
+    </div>
+</div>
+<script>
+    var editor = ace.edit("editor");
+    editor.setTheme("ace/theme/tomorrow_night_eighties");
+    editor.setOptions({
+        selectionStyle: "line", //"line"|"text"
+        highlightActiveLine: true, //true|false
+        highlightSelectedWord: true, //true|false
+        readOnly: false, //true|false
+        cursorStyle: "smooth", //"ace"|"slim"|"smooth"|"wide"
+        mergeUndoDeltas: true, //false|true|"always"
+        // behavioursEnabled: boolean
+        // wrapBehavioursEnabled: boolean
+        // this is needed if editor is inside scrollable page
+        // autoScrollEditorIntoView: boolean (defaults to false)
+        // copy/cut the full line if selection is empty, defaults to false
+        // copyWithEmptySelection: boolean 
+        // useSoftTabs: boolean (defaults to false)
+        // navigateWithinSoftTabs: boolean (defaults to false)
+        // enableMultiselect: boolean   # on by default
+        // hScrollBarAlwaysVisible: boolean
+        // vScrollBarAlwaysVisible: boolean
+        highlightGutterLine: true,
+        animatedScroll: true,
+        showInvisibles: false,
+        showPrintMargin: false,
+        // printMarginColumn: number (defaults to 80)
+        // shortcut for showPrintMargin and printMarginColumn
+        // printMargin: false|number 
+        // fadeFoldWidgets: boolean
+        // showFoldWidgets: boolean (defaults to true)
+        // showLineNumbers: boolean (defaults to true)
+        // showGutter: boolean (defaults to true)
+        // displayIndentGuides: boolean (defaults to true)
+        // fontSize: number or css font-size string
+        // fontFamily: css font-family value
+        // resize editor based on the contents of the editor until the number of lines reaches maxLines
+        autoScrollEditorIntoView: true,
+        maxLines: Infinity,
+        minLines: 10,
+        // number of page sizes to scroll after document end (typical values are 0, 0.5, and 1)
+        // scrollPastEnd: number|boolean
+        // fixedWidthGutter: boolean (defaults to false)
+        // theme: path to a theme e.g "ace/theme/textmate"
+        // firstLineNumber: number defaults to 1
+        // overwrite: boolean
+        newLineMode: "unix", //"auto" | "unix" | "windows"
+        useWorker: true,
+        // useSoftTabs: boolean
+        tabSize: 4,
+        wrap: true, //boolean|number
+        foldStyle: "markbeginend", //"markbegin"|"markbeginend"|"manual"
+        mode: "ace/mode/yaml", //path to a mode e.g "ace/mode/text"
+    });
+    editor.focus();
+
+    ws_config_connect();
+</script>
+{{ end }}

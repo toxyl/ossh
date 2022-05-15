@@ -2,35 +2,83 @@ package main
 
 import (
 	"fmt"
-	"strings"
+	"time"
 )
+
+func colorConnID(user, host string, port int) string {
+	return fmt.Sprintf("%s@%s:%s", colorUser(user), colorHost(host), colorInt(port))
+}
 
 func colorWrap(str string, color uint) string {
 	return fmt.Sprintf("\033[38;5;%dm%s\033[0m", color, str)
 }
 
+func colorUser(user string) string {
+	return colorWrap(user, colorGreen)
+}
+
+func colorHost(host string) string {
+	return colorWrap(host, colorBrightYellow)
+}
+
+func colorPassword(password string) string {
+	return colorWrap(password, colorGreen)
+}
+
+func colorError(err error) string {
+	return colorWrap(err.Error(), colorOrange)
+}
+
+func colorReason(reason string) string {
+	return colorWrap(reason, colorOrange)
+}
+
+func colorFile(file string) string {
+	return colorWrap(file, colorLightBlue)
+}
+
+func colorHighlight(message string) string {
+	return colorWrap(message, colorCyan)
+}
+
+func colorDuration(seconds uint) string {
+	return colorWrap(time.Duration(seconds*uint(time.Second)).String(), colorCyan)
+}
+
+func colorInt(n int) string {
+	return colorWrap(fmt.Sprintf("%d", n), colorCyan)
+}
+
 const (
-	// #005fff
-	colorLightBlue = 27
-	// #00af00
-	colorOliveGreen = 34
-	// #00ff00
-	colorGreen = 46
-	// #00ffff
-	colorCyan = 51
-	// #d70000
-	colorDarkRed = 160
-	// #ff0000
-	colorRed = 196
-	// #ff8700
-	colorOrange = 208
-	// #ffffaf
+	colorDarkBlue     = 17
+	colorBlue         = 21
+	colorDarkGreen    = 22
+	colorLightBlue    = 27
+	colorOliveGreen   = 34
+	colorGreen        = 46
+	colorCyan         = 51
+	colorPurple       = 53
+	colorDarkOrange   = 130
+	colorDarkYellow   = 142
+	colorLime         = 154
+	colorDarkRed      = 160
+	colorRed          = 196
+	colorPink         = 201
+	colorOrange       = 208
+	colorYellow       = 220
 	colorBrightYellow = 229
-	// #bcbcbc
-	colorGray = 250
+	colorDarkGray     = 234
+	colorMediumGray   = 240
+	colorGray         = 250
 )
 
-func Log(indicator rune, format string, a ...interface{}) {
+type Logger struct {
+	ID    string
+	color uint
+	debug bool
+}
+
+func (ssl *Logger) write(indicator rune, format string, a ...interface{}) {
 	prefix := "[ ]"
 	switch indicator {
 	case 'i':
@@ -45,13 +93,81 @@ func Log(indicator rune, format string, a ...interface{}) {
 		prefix = colorWrap("[x]", colorRed)
 	case '!':
 		prefix = colorWrap("[!]", colorOrange)
+	case 'd':
+		prefix = colorWrap("[D]", colorOrange)
 	case ' ':
 		prefix = colorWrap("[ ]", colorGray)
 	}
+	msg := fmt.Sprintf(prefix+" "+format+"\n", a...)
 
-	line := fmt.Sprintf(prefix+" "+format, a...)
-	fmt.Print(line)
-	if !strings.HasSuffix(line, "\n") {
-		fmt.Print("\n")
+	fmt.Print(msg)
+	if SrvUI != nil {
+		SrvUI.PushLog(msg)
 	}
 }
+
+func (ssl *Logger) prependFormat(format string) string {
+	return fmt.Sprintf("%s: %s\n", colorWrap(fmt.Sprintf("%-16s", ssl.ID), ssl.color), format)
+}
+
+func (ssl *Logger) Default(format string, a ...interface{}) {
+	ssl.write(' ', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) Info(format string, a ...interface{}) {
+	ssl.write('i', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) Success(format string, a ...interface{}) {
+	ssl.write('✓', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) OK(format string, a ...interface{}) {
+	ssl.write('+', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) NotOK(format string, a ...interface{}) {
+	ssl.write('-', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) Error(format string, a ...interface{}) {
+	ssl.write('x', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) Warning(format string, a ...interface{}) {
+	ssl.write('!', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) Debug(format string, a ...interface{}) {
+	if !ssl.debug {
+		return
+	}
+	ssl.write('d', ssl.prependFormat(format), a...)
+}
+
+func (ssl *Logger) EnableDebug() {
+	ssl.debug = true
+}
+
+func NewLogger(id string, color uint) *Logger {
+	return &Logger{
+		ID:    id,
+		color: color,
+		debug: false,
+	}
+}
+
+var (
+	LogGlobal        = NewLogger("Global", colorGray)
+	LogASCIICastV2   = NewLogger("ASCIICast v2", colorBrightYellow)
+	LogFakeShell     = NewLogger("Fake Shell", colorOliveGreen)
+	LogOverlayFS     = NewLogger("Overlay FS", colorLightBlue)
+	LogPayloads      = NewLogger("Payloads", colorDarkYellow)
+	LogOSSHServer    = NewLogger("oSSH Server", colorLime)
+	LogSyncClient    = NewLogger("Sync Client", colorBlue)
+	LogSyncCommands  = NewLogger("Sync Commands", colorDarkGreen)
+	LogSyncServer    = NewLogger("Sync Server", colorDarkRed)
+	LogHTMLTemplater = NewLogger("HTML Templater", colorMediumGray)
+	LogTextTemplater = NewLogger("Text Templater", colorMediumGray)
+	LogUIServer      = NewLogger("UI Server", colorCyan)
+)

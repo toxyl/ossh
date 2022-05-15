@@ -1,10 +1,9 @@
 package main
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -16,7 +15,7 @@ import (
 
 const (
 	fakeShellInitialWidth  = 80
-	fakeShellInitialHeight = 40
+	fakeShellInitialHeight = 24
 )
 
 type FakeShell struct {
@@ -74,8 +73,7 @@ func (fs *FakeShell) RecordWrite(output string) {
 }
 
 func (fs *FakeShell) Exec(line string) bool {
-	fs.stats.CommandHistory = append(fs.stats.CommandHistory, line)
-	fs.stats.CommandsExecuted++
+	fs.stats.AddCommandToHistory(line)
 
 	pieces := strings.Split(line, " ")
 	command := pieces[0]
@@ -116,130 +114,19 @@ func (fs *FakeShell) Exec(line string) bool {
 		Arguments: args,
 	}
 
-	if Server.syncClients[data.IP] {
-		instr := strings.TrimSpace(line)
-		instrCmd := strings.Split(instr, " ")[0]
-
-		switch instrCmd {
-		case "check":
-			ss, err := Server.getSyncNode(data.IP)
-			if err != nil {
-				Log('x', "Sync with %s failed: %s\n",
-					colorWrap(data.IP, colorBrightYellow),
-					colorWrap(err.Error(), colorCyan),
-				)
-				return true
-			}
-
-			_ = executeSSHCommand(ss.Host, ss.Port, ss.User, ss.Password, fmt.Sprintf("sync %s", Server.statsHash()))
-			fs.writer.WriteLnUnlimited("Sync complete.")
-			return true
-		case "sync":
-			hash := strings.Split(line, " ")[1]
-			if Server.statsHash() != hash {
-				node, err := Server.getSyncNode(data.IP)
-				if err != nil {
-					Log('x', "Sync with %s failed: %s\n",
-						colorWrap(data.IP, colorBrightYellow),
-						colorWrap(err.Error(), colorCyan),
-					)
-					return true
-				}
-				clientData := executeSSHCommand(node.Host, node.Port, node.User, node.Password, "get-data")
-				cd := StatsJSON{}
-				err = json.Unmarshal([]byte(clientData), &cd)
-				if err != nil {
-					Log('x', "Sync with %s failed, could not unmarshal remote data: %s\n",
-						colorWrap(data.IP, colorBrightYellow),
-						colorWrap(err.Error(), colorCyan),
-					)
-					return true
-				}
-				ch, cu, cp, cf := 0, 0, 0, 0
-				for _, host := range cd.Hosts {
-					if !Server.hasHost(host) {
-						Server.addHost(host)
-						ch++
-					}
-				}
-				for _, user := range cd.Users {
-					if !Server.hasUser(user) {
-						Server.addUser(user)
-						cu++
-					}
-				}
-				for _, password := range cd.Passwords {
-					if !Server.hasPassword(password) {
-						Server.addPassword(password)
-						cp++
-					}
-				}
-				for _, fingerprint := range cd.Fingerprints {
-					if !Server.hasFingerprint(fingerprint) {
-						Server.addFingerprint(fingerprint)
-						cf++
-					}
-
-				}
-				if ch > 0 || cu > 0 || cp > 0 || cf > 0 {
-					Log('i', "[sync] Added %s host(s), %s user name(s), %s password(s) and %s fingerprint(s) from %s\n",
-						colorWrap(fmt.Sprint(ch), colorBrightYellow),
-						colorWrap(fmt.Sprint(cu), colorBrightYellow),
-						colorWrap(fmt.Sprint(cp), colorBrightYellow),
-						colorWrap(fmt.Sprint(cf), colorBrightYellow),
-						colorWrap(data.IP, colorBrightYellow),
-					)
-				}
-			}
-			return true
-		case "get-data":
-			fs.writer.WriteLnUnlimited(Server.statsJSON())
-			return true
-		case "get-payload":
-			hash := strings.Split(line, " ")[1]
-			payload, err := Server.getPayload(hash)
-			if err != nil {
-				return true
-			}
-			if payload != "" {
-				payload = base64.RawStdEncoding.EncodeToString([]byte(payload))
-			}
-			fs.writer.WriteLnUnlimited(payload)
-			return true
-		default:
-			Log('x', "[sync] Command unknown: %s\n", colorWrap(instrCmd, colorBrightYellow))
-			fs.writer.WriteLnUnlimited("Illegal sync command")
-			return true
-		}
+	if SrvSync.HasNode(data.IP) {
+		LogFakeShell.Warning("%s, what are you doing here? Go home!", colorConnID(data.User, data.IP, data.Port))
+		return true
 	}
 
-	if isIPWhitelisted(rmtH) {
-		// 1) check if it's an admin command
-		if strings.TrimSpace(line) == "my-little-pony" { // = stats
-			fs.writer.WriteLnUnlimited(ParseTemplateFromString(`
-	Hosts:        {{ .CntHosts }}
-	Users:        {{ .CntUsers }}
-	Passwords:    {{ .CntPasswords }}
-	Fingerprints: {{ .CntFingerprints }}
-	Time wasted:  {{ .TimeWasted }}
-	`, struct {
-				CntHosts        int
-				CntPasswords    int
-				CntUsers        int
-				CntFingerprints int
-				TimeWasted      string
-			}{
-				CntHosts:        len(Server.Stats.Hosts),
-				CntPasswords:    len(Server.Stats.Passwords),
-				CntUsers:        len(Server.Stats.Users),
-				CntFingerprints: len(Server.Stats.Fingerprints),
-				TimeWasted:      time.Duration(Server.Stats.TimeWasted * int(time.Second)).String(),
-			}))
-			return true
-		}
-	}
+	LogFakeShell.Debug(
+		"%s runs %s %s",
+		colorConnID(data.User, data.IP, data.Port),
+		colorReason(command),
+		colorWrap(strings.Join(args, " "), colorLightBlue),
+	)
 
-	// 2) make sure the client waits some time at least,
+	// 1) make sure the client waits some time at least,
 	//    the more input the more wait time, hehe
 	dly := time.Duration(len(line) * int(Conf.InputDelay))
 	time.Sleep(dly * time.Millisecond)
@@ -252,12 +139,12 @@ func (fs *FakeShell) Exec(line string) bool {
 	// 3) check if command should exit immediately
 	for _, cmd := range Conf.Commands.Exit {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.RecordExec(line, "^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@") // just to waste some more time ;)
+			fs.RecordExec(line, GeneratePseudoEmptyString(0)) // just to waste some more time ;)
 			return true
 		}
 	}
 
-	// 4) check if command matches a simple command
+	// 3) check if command matches a simple command
 	for _, cmd := range Conf.Commands.Simple {
 		if strings.HasPrefix(line+"  ", cmd[0]+" ") {
 			fs.RecordExec(line, ParseTemplateFromString(cmd[1], data))
@@ -265,7 +152,7 @@ func (fs *FakeShell) Exec(line string) bool {
 		}
 	}
 
-	// 5) check if command should return permission denied error
+	// 4) check if command should return permission denied error
 	for _, cmd := range Conf.Commands.PermissionDenied {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
 			fs.RecordExec(line, ParseTemplateFromString("{{ .Command }}: permission denied", data))
@@ -273,15 +160,15 @@ func (fs *FakeShell) Exec(line string) bool {
 		}
 	}
 
-	// 6) check if command should return disk i/o error
+	// 5) check if command should return disk i/o error
 	for _, cmd := range Conf.Commands.DiskError {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.RecordExec(line, ParseTemplateFromString("end_request: I/O error", data))
+			fs.RecordExec(line, ParseTemplateFromString(GenerateGarbageString(1000)+"\nend_request: I/O error", data))
 			return false
 		}
 	}
 
-	// 7) check if command should return command not found error
+	// 6) check if command should return command not found error
 	for _, cmd := range Conf.Commands.CommandNotFound {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
 			fs.RecordExec(line, ParseTemplateFromString("{{ .Command }}: command not found", data))
@@ -289,18 +176,26 @@ func (fs *FakeShell) Exec(line string) bool {
 		}
 	}
 
-	// 8) check if command should return file not found error
+	// 7) check if command should return file not found error
 	for _, cmd := range Conf.Commands.FileNotFound {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.RecordExec(line, ParseTemplateFromString("{{ .Command }}: No such file or directory", data))
+			fs.RecordExec(line, ParseTemplateFromString("\"{{ .Command }}\": No such file or directory (os error 2)", data))
 			return false
 		}
 	}
 
-	// 9) check if command should return not implemented error
+	// 8) check if command should return not implemented error
 	for _, cmd := range Conf.Commands.NotImplemented {
 		if strings.HasPrefix(line+" ", cmd+" ") {
 			fs.RecordExec(line, ParseTemplateFromString("{{ .Command }}: Function not implemented", data))
+			return false
+		}
+	}
+
+	// 9) check if command should return bullshit
+	for _, cmd := range Conf.Commands.Bullshit {
+		if strings.HasPrefix(line+" ", cmd+" ") {
+			fs.RecordExec(line, GenerateGarbageString(1000))
 			return false
 		}
 	}
@@ -366,6 +261,12 @@ func (fs *FakeShell) Process() *FakeShellStats {
 		}
 
 		commands := strings.Split(raw, "\n")
+		host, port, _ := net.SplitHostPort(fs.session.RemoteAddr().String())
+		LogFakeShell.Info(
+			"%s wants to run %s commands",
+			colorConnID(fs.User(), host, StringToInt(port, 0)),
+			colorInt(len(commands)),
+		)
 		for _, cmd := range commands {
 			if fs.Exec(cmd) {
 				break
@@ -375,7 +276,6 @@ func (fs *FakeShell) Process() *FakeShellStats {
 		fs.HandleInput()
 	}
 	fs.Close()
-	fs.stats.TimeSpent = uint(time.Now().Unix()) - uint(fs.created.Unix())
 	return fs.stats
 }
 
@@ -386,7 +286,6 @@ func NewFakeShell(s ssh.Session, overlay *OverlayFS) *FakeShell {
 		writer:   nil,
 		created:  time.Now(),
 		stats: &FakeShellStats{
-			TimeSpent:        0,
 			CommandsExecuted: 0,
 			CommandHistory:   []string{},
 			Host:             "",
@@ -400,14 +299,15 @@ func NewFakeShell(s ssh.Session, overlay *OverlayFS) *FakeShell {
 	fs.writer = NewSlowWriter(fs.terminal)
 	fs.stats.Host = fs.Host()
 
-	if !overlay.DirExists("/home") {
-		overlay.Mkdir("/home", 700)
-	}
+	if overlay != nil {
+		if !overlay.DirExists("/home") {
+			_ = overlay.Mkdir("/home", 700)
+		}
 
-	if !overlay.DirExists("/home/" + s.User()) {
-		overlay.Mkdir("/home/"+s.User(), 700)
+		if !overlay.DirExists("/home/" + s.User()) {
+			_ = overlay.Mkdir("/home/"+s.User(), 700)
+		}
 	}
-
 	fs.cwd = "/home/" + s.User()
 
 	fs.UpdatePrompt("~")

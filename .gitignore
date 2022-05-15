@@ -17,4 +17,13 @@
 .vscode
 
 config.yaml
+config.*.yaml
+config.yaml.bak
 ossh
+captures/*
+ffs/defaultfs
+ffs/sandboxes
+hosts.txt
+fingerprints.txt
+users.txt
+passwords.txt

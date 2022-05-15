@@ -33,7 +33,7 @@ type ASCIICastV2Header struct {
 func (ac2h *ASCIICastV2Header) String() string {
 	json, err := json.Marshal(ac2h)
 	if err != nil {
-		Log('x', "Could not marshal ASCIICastV2Header: %s\n", err.Error())
+		LogASCIICastV2.Error("Could not marshal ASCIICastV2Header: %s", colorError(err))
 		return ""
 	}
 
@@ -48,9 +48,8 @@ type ASCIICastV2Event struct {
 
 func (ac2e *ASCIICastV2Event) String() string {
 	if ac2e.Type != "o" && ac2e.Type != "i" {
-		Log(
-			'x',
-			"Could not convert ASCIICastV2Event to string, type '%s' is unknown.\n",
+		LogASCIICastV2.Error(
+			"Could not convert ASCIICastV2Event to string, type '%s' is unknown.",
 			colorWrap(ac2e.Type, colorOrange),
 		)
 		return ""
@@ -62,7 +61,7 @@ func (ac2e *ASCIICastV2Event) String() string {
 		ac2e.Data,
 	})
 	if err != nil {
-		Log('x', "Could not marshal ASCIICastV2Event data: %s\n", err.Error())
+		LogASCIICastV2.Error("Could not marshal ASCIICastV2Event data: %s", colorError(err))
 		return ""
 	}
 
@@ -127,11 +126,10 @@ func (ac2 *ASCIICastV2) Save(file string) error {
 func (ac2 *ASCIICastV2) Load(file string) {
 	data, err := os.ReadFile(file)
 	if err != nil {
-		Log(
-			'x',
-			"Could not load ASCIICastV2 from file '%s': %s\n",
-			colorWrap(file, colorOrange),
-			colorWrap(err.Error(), colorRed),
+		LogASCIICastV2.Error(
+			"Could not load ASCIICastV2 from file '%s': %s",
+			colorFile(file),
+			colorError(err),
 		)
 		return
 	}
@@ -141,11 +139,10 @@ func (ac2 *ASCIICastV2) Load(file string) {
 		lines = lines[1:]
 		err = json.Unmarshal([]byte(meta), &ac2.Header)
 		if err != nil {
-			Log(
-				'x',
-				"Could not unmarshal ASCIICastV2Header from file '%s': %s\n",
-				colorWrap(file, colorOrange),
-				colorWrap(err.Error(), colorRed),
+			LogASCIICastV2.Error(
+				"Could not unmarshal ASCIICastV2Header from file '%s': %s",
+				colorFile(file),
+				colorError(err),
 			)
 			return
 		}
@@ -155,12 +152,11 @@ func (ac2 *ASCIICastV2) Load(file string) {
 			err := json.Unmarshal([]byte(line), &ed)
 
 			if err != nil {
-				Log(
-					'x',
-					"Could not unmarshal ASCIICastV2Event from file '%s': %s (input was: '%s')\n",
-					colorWrap(file, colorOrange),
-					colorWrap(err.Error(), colorRed),
-					colorWrap(line, colorCyan),
+				LogASCIICastV2.Error(
+					"Could not unmarshal ASCIICastV2Event from file '%s': %s (input was: '%s')",
+					colorFile(file),
+					colorError(err),
+					colorHighlight(line),
 				)
 				continue
 			}

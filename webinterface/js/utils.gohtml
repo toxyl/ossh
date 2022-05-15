@@ -1,0 +1,29 @@
+{{ define "utils" }} 
+<script type="text/javascript">
+    function log_to_class(category) {
+        return category.toLowerCase().replace(" ", "-");
+    }
+
+    function humanTimeInterval(seconds) {
+        const SECONDS_PER_MINUTE = 60;
+        const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * 60;
+        const SECONDS_PER_DAY = SECONDS_PER_HOUR * 24;
+
+        var seconds = parseInt(seconds, 10);
+        var days    = Math.floor(seconds / SECONDS_PER_DAY);
+        seconds    -= days * SECONDS_PER_DAY;
+        var hours   = Math.floor(seconds / SECONDS_PER_HOUR);
+        seconds    -= hours * SECONDS_PER_HOUR;
+        var minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
+        seconds    -= minutes * SECONDS_PER_MINUTE;
+
+        var res = "";
+        if (days > 0) res += `${days}d `;
+        if (days > 0 || hours > 0) res += `${hours}h `;
+        if (hours > 0 || minutes > 0) res += `${minutes}m `;
+        res += `${seconds}s`;
+        
+        return res;
+    }
+</script>
+{{ end }}

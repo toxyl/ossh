@@ -1,33 +1,36 @@
 package main
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
 	"log"
-	"regexp"
-	"strings"
-	"text/template"
-	"time"
+	"os"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/spf13/viper"
 )
 
 type SyncNode struct {
-	Host     string `mapstructure:"host"`
-	Port     int    `mapstructure:"port"`
-	User     string `mapstructure:"user"`
-	Password string `mapstructure:"password"`
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
 }
 
 type Config struct {
+	Debug struct {
+		ASCIICastV2  bool `mapstructure:"asciicast_v2"`
+		FakeShell    bool `mapstructure:"fake_shell"`
+		SyncCommands bool `mapstructure:"sync_commands"`
+		SyncServer   bool `mapstructure:"sync_server"`
+		SyncClient   bool `mapstructure:"sync_client"`
+		OSSHServer   bool `mapstructure:"ossh_server"`
+		UIServer     bool `mapstructure:"ui_server"`
+		OverlayFS    bool `mapstructure:"overlay_fs"`
+	} `mapstructure:"debug"`
 	PathData         string   `mapstructure:"path_data"`
 	PathFingerprints string   `mapstructure:"path_fingerprints"`
 	PathPasswords    string   `mapstructure:"path_passwords"`
 	PathUsers        string   `mapstructure:"path_users"`
 	PathHosts        string   `mapstructure:"path_hosts"`
 	PathCommands     string   `mapstructure:"path_commands"`
+	PathWebinterface string   `mapstructure:"path_webinterface"`
 	PathCaptures     string   `mapstructure:"path_captures"`
 	PathFFS          string   `mapstructure:"path_ffs"`
 	HostName         string   `mapstructure:"host_name"`
@@ -38,7 +41,17 @@ type Config struct {
 	MaxIdleTimeout   uint     `mapstructure:"max_idle"`
 	InputDelay       uint     `mapstructure:"input_delay"`
 	Ratelimit        float64  `mapstructure:"ratelimit"`
-	Sync             struct {
+	Webinterface     struct {
+		Host     string `mapstructure:"host"`
+		Port     uint   `mapstructure:"port"`
+		CertFile string `mapstructure:"cert_file"`
+		KeyFile  string `mapstructure:"key_file"`
+	} `mapstructure:"webinterface"`
+	SyncServer struct {
+		Host string `mapstructure:"host"`
+		Port uint   `mapstructure:"port"`
+	} `mapstructure:"sync_server"`
+	Sync struct {
 		Interval int        `mapstructure:"interval"`
 		Nodes    []SyncNode `mapstructure:"nodes"`
 	} `mapstructure:"sync"`
@@ -51,10 +64,11 @@ type Config struct {
 		CommandNotFound  []string   `mapstructure:"command_not_found"`
 		FileNotFound     []string   `mapstructure:"file_not_found"`
 		NotImplemented   []string   `mapstructure:"not_implemented"`
+		Bullshit         []string   `mapstructure:"bullshit"`
 	} `mapstructure:"commands"`
 }
 
-var cfgFile string
+var cfgFile string = ""
 var Conf Config
 
 func isIPWhitelisted(ip string) bool {
@@ -66,26 +80,7 @@ func isIPWhitelisted(ip string) bool {
 	return false
 }
 
-func initConfig() {
-	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
-	} else {
-		viper.SetConfigName("config")
-		viper.SetConfigType("yaml")
-		viper.AddConfigPath("/etc/ossh/")
-		viper.AddConfigPath("$HOME/.ossh")
-		viper.AddConfigPath(".")
-	}
-
-	err := viper.ReadInConfig()
-	if err != nil {
-		log.Panic(fmt.Errorf("[Config] Fatal error config file: %w", err))
-	}
-
-	err = viper.Unmarshal(&Conf)
-	if err != nil {
-		log.Printf("[Config] Unable to decode into Config struct, %v", err)
-	}
+func InitPaths() {
 
 	if Conf.PathData == "" {
 		Conf.PathData = "/etc/ossh"
@@ -97,6 +92,10 @@ func initConfig() {
 
 	if Conf.PathCommands == "" {
 		Conf.PathCommands = fmt.Sprintf("%s/commands", Conf.PathData)
+	}
+
+	if Conf.PathWebinterface == "" {
+		Conf.PathWebinterface = fmt.Sprintf("%s/webinterface", Conf.PathData)
 	}
 
 	if Conf.PathFFS == "" {
@@ -119,76 +118,106 @@ func initConfig() {
 		Conf.PathUsers = fmt.Sprintf("%s/users.txt", Conf.PathData)
 	}
 
-	templateFunctions = template.FuncMap{
-		"nl": func() string {
-			return "\n"
-		},
-		"subint": func(a, b int) int {
-			return a - b
-		},
-		"sub": func(a, b float64) float64 {
-			return a - b
-		},
-		"add": func(a, b interface{}) float64 {
-			af, _ := GetFloat(a)
-			bf, _ := GetFloat(b)
-			return af + bf
-		},
-		"div": func(a, b float64) float64 {
-			return a / b
-		},
-		"mul": func(a, b float64) float64 {
-			return a * b
-		},
-		"sha1": func(s string) string {
-			return StringToSha1(s)
-		},
-		"sha256": func(s string) string {
-			return StringToSha256(s)
-		},
-		"replace": func(s, re, repl string) string {
-			rx := regexp.MustCompile(re)
-			s = rx.ReplaceAllString(s, repl)
-			return s
-		},
-		"lower": func(s string) string {
-			return strings.ToLower(s)
-		},
-		"upper": func(s string) string {
-			return strings.ToUpper(s)
-		},
-		"trim": func(s string) string {
-			return strings.Trim(s, " \r\n")
-		},
-		"time": func(prefix, suffix string) string {
-			return fmt.Sprintf("%s%d%s", prefix, time.Now().Unix(), suffix)
-		},
-		"concat": func(a, b string) string {
-			return fmt.Sprintf("%s%s", a, b)
-		},
-		"dict": func(values ...interface{}) (map[string]interface{}, error) {
-			if len(values)%2 != 0 {
-				return nil, errors.New("invalid dict call")
-			}
-			dict := make(map[string]interface{}, len(values)/2)
-			for i := 0; i < len(values); i += 2 {
-				key, ok := values[i].(string)
-				if !ok {
-					return nil, errors.New("dict keys must be strings")
-				}
-				dict[key] = values[i+1]
-			}
-			return dict, nil
-		},
-		"dump": func(v interface{}) string {
-			spew.Dump(v)
-			return ""
-		},
-		"template_string": func(name string, values interface{}) (string, error) {
-			var tpl bytes.Buffer
-			_ = ParseTemplate(name, &tpl, values)
-			return strings.ReplaceAll(strings.Trim(tpl.String(), " \r\n\t"), "\n", ""), nil
-		},
+	if Conf.Webinterface.CertFile == "" {
+		Conf.Webinterface.CertFile = fmt.Sprintf("%s/ossh.crt", Conf.PathData)
 	}
 
+	if Conf.Webinterface.KeyFile == "" {
+		Conf.Webinterface.KeyFile = fmt.Sprintf("%s/ossh.key", Conf.PathData)
+	}
+}
+
+func InitDebug() {
+	if Conf.Debug.ASCIICastV2 {
+		LogASCIICastV2.EnableDebug()
+	}
+
+	if Conf.Debug.SyncCommands {
+		LogSyncCommands.EnableDebug()
+	}
+
+	if Conf.Debug.SyncClient {
+		LogSyncClient.EnableDebug()
+	}
+
+	if Conf.Debug.SyncServer {
+		LogSyncServer.EnableDebug()
+	}
+
+	if Conf.Debug.OSSHServer {
+		LogOSSHServer.EnableDebug()
+	}
+
+	if Conf.Debug.UIServer {
+		LogUIServer.EnableDebug()
+	}
+
+	if Conf.Debug.OverlayFS {
+		LogOverlayFS.EnableDebug()
+	}
+
+	if Conf.Debug.FakeShell {
+		LogFakeShell.EnableDebug()
+	}
+}
+
+func initConfig() {
+	if cfgFile != "" {
+		viper.SetConfigFile(cfgFile)
+	} else {
+		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath("/etc/ossh/")
+		viper.AddConfigPath("$HOME/.ossh")
+		viper.AddConfigPath(".")
+	}
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		log.Panic(fmt.Errorf("[Config] Fatal error config file: %w", err))
+	}
+	cfgFile = viper.ConfigFileUsed()
+
+	err = viper.Unmarshal(&Conf)
+	if err != nil {
+		log.Panicf("[Config] Unable to decode into Config struct, %v", err)
+	}
+
+	InitPaths()
+	InitDebug()
+	InitTemplaterFunctions()
+	InitTemplaterFunctionsHTML()
+
+	LogGlobal.OK("Config loaded from %s", colorWrap(cfgFile, colorOrange))
+}
+
+func getConfig() string {
+	cfg, err := os.ReadFile(cfgFile)
+	if err != nil {
+		LogGlobal.Error(
+			"Could not read config from '%s': %s",
+			colorFile(cfgFile),
+			colorError(err),
+		)
+	}
+	return string(cfg)
+}
+
+func updateConfig(config []byte) error {
+	pathSrc := viper.ConfigFileUsed()
+	pathBak := fmt.Sprintf("%s.bak", pathSrc)
+	err := CopyFile(pathSrc, pathBak)
+	if err != nil {
+		LogGlobal.Error("Failed to backup config from %s to %s!", pathSrc, pathBak)
+		return err
+	}
+	err = os.WriteFile(pathSrc, config, 0644)
+	if err != nil {
+		LogGlobal.Error("Failed to backup config from %s to %s!", pathSrc, pathBak)
+		return err
+	}
+	LogGlobal.Success("Written new config to: %s", pathSrc)
+
+	initConfig()
+	return nil
 }

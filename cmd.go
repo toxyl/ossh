@@ -17,6 +17,7 @@ var CmdLookup = map[string]Command{
 	"pwd":   cmdPwd,
 	"cat":   cmdCat,
 	"touch": cmdTouch,
+	"rm":    cmdRm,
 }
 
 func toAbs(fs *FakeShell, path string) string {
@@ -59,6 +60,42 @@ func cmdCd(fs *FakeShell, line string) (exit bool) {
 	} else {
 		fs.UpdatePrompt(filepath.Base(path))
 	}
+
+	// cd runs way too fast without any output,
+	// let's fuck a bit with the bots
+	fs.RecordWriteLn(GeneratePseudoEmptyString(0))
+
+	return
+}
+
+func cmdRm(fs *FakeShell, line string) (exit bool) {
+	parts := strings.Split(line, " ")
+
+	if len(parts) == 1 {
+		fs.RecordWriteLn("rm: missing operand")
+		fs.RecordWriteLn("Try 'rm --help' for more information.")
+		return
+	}
+
+	// TODO handle options
+
+	for _, pt := range parts[1:] {
+		if strings.HasPrefix(pt, "~") {
+			pt = filepath.Join("/home", fs.User(), strings.TrimPrefix(pt, "~"))
+		}
+		path := toAbs(fs, pt)
+
+		if !fs.overlayFS.DirExists(path) && !fs.overlayFS.FileExists(path) {
+			fs.RecordWriteLn("rm: no such file or directory: " + pt)
+			return
+		}
+
+		_ = fs.overlayFS.RemoveFile(path, false)
+	}
+
+	// rm runs way too fast without any output,
+	// let's fuck a bit with the bots
+	fs.RecordWriteLn(GeneratePseudoEmptyString(0))
 
 	return
 }
