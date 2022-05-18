@@ -24,6 +24,10 @@ func (p *Payload) Save() {
 		return // no need to save, we already have this payload
 	}
 
+	if strings.TrimSpace(p.payload) == "" {
+		return // no need to save an empty payload
+	}
+
 	err := os.WriteFile(p.file, []byte(p.payload), 0744)
 	if err == nil {
 		LogPayloads.Success("Payload saved: %s", colorFile(p.file))
@@ -54,18 +58,12 @@ func (p *Payload) DecodeFromString(encodedPayload string) bool {
 	return true
 }
 
-func (p *Payload) Download(hash string) bool {
-	if SrvSync == nil {
-		return false
+func (p *Payload) EncodeToString() string {
+	pl := strings.TrimSpace(p.payload)
+	if pl == "" {
+		return ""
 	}
-	res := SrvSync.GetPayload(hash)
-	if res != "" {
-		if p.DecodeFromString(res) {
-			p.Save()
-			return true
-		}
-	}
-	return false
+	return base64.RawStdEncoding.EncodeToString([]byte(pl))
 }
 
 func (p *Payload) SetHash(hash string) {

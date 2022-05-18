@@ -19,7 +19,11 @@ type SyncClient struct {
 func (sc *SyncClient) connect() {
 	c, err := net.Dial("tcp", sc.ID())
 	if err != nil {
-		LogSyncClient.Error("Failed to connect: %s", colorError(err))
+		if strings.Contains(err.Error(), "connect: connection refused") {
+			LogSyncClient.Warning("%s: Node is probably %s (only investigate if every sync fails)", colorHost(sc.ID()), colorHighlight("busy syncing"))
+			return
+		}
+		LogSyncClient.Error("%s: Failed to connect: %s", colorHost(sc.ID()), colorError(err))
 		return
 	}
 	LogSyncClient.Debug("%s: connect", colorHost(sc.ID()))
@@ -55,7 +59,7 @@ func (sc *SyncClient) Exec(command string) (string, error) {
 	resp, err := reader.ReadString('\n')
 
 	if err != nil && err != io.EOF {
-		LogSyncClient.Error("\"%s\", failed to read response: %s", colorHighlight(command), colorError(err))
+		LogSyncClient.Debug("\"%s\", failed to read response: %s", colorHighlight(command), colorError(err))
 		return "", err
 	}
 	resp = strings.TrimSpace(resp)
@@ -91,6 +95,12 @@ func (sc *SyncClient) AddPassword(password string) {
 
 func (sc *SyncClient) AddFingerprint(fingerprint string) {
 	_, _ = sc.Exec(fmt.Sprintf("ADD-FINGERPRINT %s", fingerprint))
+	for _, fp := range strings.Split(fingerprint, " ") {
+		pl, err := SrvOSSH.Loot.payloads.Get(fp)
+		if err == nil {
+			_, _ = sc.Exec(fmt.Sprintf("ADD-PAYLOAD %s %s", fp, pl.EncodeToString()))
+		}
+	}
 }
 
 func (sc *SyncClient) SyncData(cmd string, fnGet func() []string, fnAddRemote func(data string)) {

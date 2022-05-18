@@ -155,7 +155,7 @@ func (ossh *OSSHServer) addLoginSuccess(s *Session, reason string) {
 
 func (ossh *OSSHServer) GracefulCloseOnError(err error, s *Session, sess *ssh.Session, ofs *OverlayFS) {
 	// TODO  graceful fallback?
-	LogOSSHServer.Error("Graceful close because %s.", colorError(err))
+	LogOSSHServer.Debug("Graceful close because %s.", colorError(err))
 	if ofs != nil {
 		ofs.Close()
 	}
@@ -293,6 +293,7 @@ func (ossh *OSSHServer) authHandler(ctx ssh.Context, pwd string) bool {
 
 	if ossh.Loot.HasUser(s.User) && ossh.Loot.HasPassword(s.Password) {
 		ossh.addLoginFailure(s, "host does not have new credentials")
+		ossh.Sessions.Remove(s.ID)
 		return false // come back when you have something we don't know yet!
 	}
 
@@ -309,6 +310,7 @@ func (ossh *OSSHServer) authHandler(ctx ssh.Context, pwd string) bool {
 	// ok, the attacker has credentials we don't know yet, let's roll dice.
 	if time.Now().Unix()%3 != 0 {
 		ossh.addLoginFailure(s, "host lost a game of dice")
+		ossh.Sessions.Remove(s.ID)
 		return false // no luck, big boy, try again
 	}
 

@@ -138,12 +138,6 @@ func (l *Loot) AddFingerprint(fingerprint string) bool {
 func (l *Loot) AddPayload(fingerprint string) {
 	p := NewPayload()
 	p.SetHash(fingerprint)
-	if !p.Exists() {
-		if !p.Download(fingerprint) { // try to download from known nodes
-			// LogErrorLn("Payload %s was not found anywhere", colorFile(p.file))
-			return
-		}
-	}
 	l.payloads.Add(p)
 }
 

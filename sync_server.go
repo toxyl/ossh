@@ -120,10 +120,6 @@ func (ss *SyncServer) Exec(msg string) string {
 	return ss.nodes.Exec(msg)
 }
 
-func (ss *SyncServer) GetPayload(fingerprint string) string {
-	return ss.Exec(fmt.Sprintf("GET-PAYLOAD %s", fingerprint))
-}
-
 func (ss *SyncServer) GetOutOfSyncNodes() map[string]string {
 	res := ss.Broadcast(fmt.Sprintf("SYNC %s", SrvOSSH.Loot.Fingerprint()))
 	LogSyncServer.Debug("out of sync nodes: %s", colorHighlight(spew.Sdump(res)))

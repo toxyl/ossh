@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"strings"
 )
 
 type SyncCommand func(args []string) (string, error)
@@ -101,18 +100,19 @@ var SyncCommands = map[string]SyncCommand{
 		}
 		return "", nil
 	},
-	"GET-PAYLOAD": func(args []string) (string, error) {
-		if len(args) < 1 {
-			return "", errors.New("need fingerprint") // TODO return payload list?
+	"ADD-PAYLOAD": func(args []string) (string, error) {
+		if len(args) < 2 {
+			return "", errors.New("need fingerprint and data") // TODO return payload list?
 		}
 
-		val := args[0]
-		ret, err := SrvOSSH.Loot.payloads.Get(val)
-		if err != nil {
-			return "", nil
-		}
+		hash := args[0]
+		data := args[1]
+		pl := NewPayload()
+		pl.SetHash(hash)
+		pl.DecodeFromString(data)
+		pl.Save()
+		LogSyncCommands.OK("Added payload %s", colorFile(pl.file))
 
-		payload, _ := ret.Read()
-		return strings.TrimSpace(payload), nil
+		return "", nil
 	},
 }

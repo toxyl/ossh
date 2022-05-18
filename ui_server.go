@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -333,6 +334,15 @@ func (ws *UIServer) init() {
 			LogUIServer.Error("Could not retrieve payload %s: %s", colorHighlight(string(msg)), colorError(err))
 			return nil
 		}
+		if p == nil {
+			LogUIServer.Error("Could not retrieve payload %s: %s", colorHighlight(string(msg)), colorError(errors.New("no error reported")))
+			return nil
+		}
+		if !p.Exists() {
+			LogUIServer.Error("Could not find payload %s: %s", colorHighlight(string(msg)), colorError(err))
+			return nil
+		}
+
 		pl, err := p.Read()
 		if err != nil {
 			LogUIServer.Error("Could not read payload %s: %s", colorHighlight(string(msg)), colorError(err))
