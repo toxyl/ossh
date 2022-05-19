@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"sync"
+
+	"golang.org/x/exp/maps"
 )
 
 type Payload struct {
@@ -59,7 +61,11 @@ func (p *Payload) DecodeFromString(encodedPayload string) bool {
 }
 
 func (p *Payload) EncodeToString() string {
-	pl := strings.TrimSpace(p.payload)
+	pl, err := p.Read()
+	if err != nil {
+		return ""
+	}
+	pl = strings.TrimSpace(pl)
 	if pl == "" {
 		return ""
 	}
@@ -115,6 +121,12 @@ func (ps *Payloads) Get(sha1 string) (*Payload, error) {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
 	return ps.payloads[sha1], nil
+}
+
+func (ps *Payloads) GetKeys() []string {
+	ps.lock.Lock()
+	defer ps.lock.Unlock()
+	return maps.Keys(ps.payloads)
 }
 
 func NewPayloads() *Payloads {

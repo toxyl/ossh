@@ -170,8 +170,8 @@ func (ss *SyncServer) SyncToNodes() {
 			}
 
 			if fpLocal[3] != fpRemote[3] {
-				LogSyncServer.Debug("%s are outdated", colorHighlight("fingerprints"))
-				client.SyncData("FINGERPRINTS", SrvOSSH.Loot.GetFingerprints, client.AddFingerprint)
+				LogSyncServer.Debug("%s are outdated", colorHighlight("payloads"))
+				client.SyncData("PAYLOADS", SrvOSSH.Loot.GetPayloads, client.AddPayload)
 			}
 		}
 		LogSyncServer.Debug("sync complete")

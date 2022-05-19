@@ -24,6 +24,6 @@ captures/*
 ffs/defaultfs
 ffs/sandboxes
 hosts.txt
-fingerprints.txt
+payloads.txt
 users.txt
 passwords.txt

@@ -28,7 +28,7 @@ func (ossh *OSSHServer) statsJSONSimple() string {
 		Hosts            int     `json:"hosts"`
 		Passwords        int     `json:"passwords"`
 		Users            int     `json:"users"`
-		Fingerprints     int     `json:"fingerprints"`
+		Payloads         int     `json:"payloads"`
 		Sessions         int     `json:"sessions"`
 		AttemptedLogins  uint    `json:"logins_attempted"`
 		SuccessfulLogins uint    `json:"logins_successful"`
@@ -39,7 +39,7 @@ func (ossh *OSSHServer) statsJSONSimple() string {
 		Hosts:            ossh.Loot.CountHosts(),
 		Passwords:        ossh.Loot.CountPasswords(),
 		Users:            ossh.Loot.CountUsers(),
-		Fingerprints:     ossh.Loot.CountFingerprints(),
+		Payloads:         ossh.Loot.CountPayloads(),
 		Sessions:         ossh.Sessions.Count(),
 		AttemptedLogins:  ossh.Logins.GetAttempts(),
 		SuccessfulLogins: ossh.Logins.GetSuccesses(),
@@ -76,7 +76,7 @@ func (ossh *OSSHServer) loadData() {
 	ossh.loadDataFile(Conf.PathHosts, "hosts", ossh.Loot.AddHost)
 	ossh.loadDataFile(Conf.PathUsers, "users", ossh.Loot.AddUser)
 	ossh.loadDataFile(Conf.PathPasswords, "passwords", ossh.Loot.AddPassword)
-	ossh.loadDataFile(Conf.PathFingerprints, "fingerprints", ossh.Loot.AddFingerprint)
+	ossh.loadDataFile(Conf.PathPayloads, "payloads", ossh.Loot.AddPayload)
 	LogOSSHServer.Debug("Loaded data files")
 }
 
@@ -92,7 +92,7 @@ func (ossh *OSSHServer) SaveData() {
 	ossh.saveDataFile(Conf.PathHosts, "hosts", ossh.Loot.GetHosts())
 	ossh.saveDataFile(Conf.PathUsers, "users", ossh.Loot.GetUsers())
 	ossh.saveDataFile(Conf.PathPasswords, "passwords", ossh.Loot.GetPasswords())
-	ossh.saveDataFile(Conf.PathFingerprints, "fingerprints", ossh.Loot.GetFingerprints())
+	ossh.saveDataFile(Conf.PathPayloads, "payloads", ossh.Loot.GetPayloads())
 	LogOSSHServer.Debug("Saved data files")
 }
 

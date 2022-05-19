@@ -41,7 +41,6 @@ func (fss *FakeShellStats) SaveCapture() {
 			LogFakeShell.Success("Capture saved: %s", colorFile(f))
 		}
 	}
+	SrvOSSH.Loot.AddPayload(pl.hash)
 	pl.Save()
-	SrvOSSH.Loot.payloads.Add(pl)
-	SrvOSSH.Loot.AddFingerprint(pl.hash)
 }

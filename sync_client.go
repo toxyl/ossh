@@ -93,12 +93,33 @@ func (sc *SyncClient) AddPassword(password string) {
 	_, _ = sc.Exec(fmt.Sprintf("ADD-PASSWORD %s", password))
 }
 
-func (sc *SyncClient) AddFingerprint(fingerprint string) {
-	_, _ = sc.Exec(fmt.Sprintf("ADD-FINGERPRINT %s", fingerprint))
-	for _, fp := range strings.Split(fingerprint, " ") {
+func (sc *SyncClient) AddPayload(fingerprint string) {
+	pls := strings.Split(fingerprint, " ")
+	cnt := 0
+	for _, fp := range pls {
+		fp = strings.TrimSpace(fp)
+		if fp == "" {
+			continue
+		}
+
+		if !SrvOSSH.Loot.payloads.Has(fp) {
+			LogSyncClient.Info("%s: We can't send payload %s, we don't have it.", colorHost(sc.ID()), colorHighlight(fp))
+			continue
+		}
+
 		pl, err := SrvOSSH.Loot.payloads.Get(fp)
-		if err == nil {
-			_, _ = sc.Exec(fmt.Sprintf("ADD-PAYLOAD %s %s", fp, pl.EncodeToString()))
+		if err != nil {
+			LogSyncClient.Error("%s: Looks like we can't give them the payload %s, we got an error retrieving it: %s", colorHost(sc.ID()), colorHighlight(fp), colorError(err))
+			continue
+		}
+
+		if pl.Exists() {
+			penc := pl.EncodeToString()
+			if strings.TrimSpace(penc) == "" {
+				continue
+			}
+			_, _ = sc.Exec(fmt.Sprintf("ADD-PAYLOAD %s %s", pl.hash, penc))
+			cnt++
 		}
 	}
 }

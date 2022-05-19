@@ -25,7 +25,7 @@ type Config struct {
 		OverlayFS    bool `mapstructure:"overlay_fs"`
 	} `mapstructure:"debug"`
 	PathData         string   `mapstructure:"path_data"`
-	PathFingerprints string   `mapstructure:"path_fingerprints"`
+	PathPayloads     string   `mapstructure:"path_payloads"`
 	PathPasswords    string   `mapstructure:"path_passwords"`
 	PathUsers        string   `mapstructure:"path_users"`
 	PathHosts        string   `mapstructure:"path_hosts"`
@@ -102,8 +102,8 @@ func InitPaths() {
 		Conf.PathFFS = fmt.Sprintf("%s/ffs", Conf.PathData)
 	}
 
-	if Conf.PathFingerprints == "" {
-		Conf.PathFingerprints = fmt.Sprintf("%s/fingerprints.txt", Conf.PathData)
+	if Conf.PathPayloads == "" {
+		Conf.PathPayloads = fmt.Sprintf("%s/payloads.txt", Conf.PathData)
 	}
 
 	if Conf.PathHosts == "" {

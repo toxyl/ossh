@@ -45,7 +45,7 @@
             payloads = message.split(":")[1].split(",");
             payloads.sort();
             for (i = 0; i < payloads.length; i++) {
-                $('#payloads').append(`<div class="w3-btn w3-hover-green w100" onclick="ws_payloads_send('${payloads[i]}')">${payloads[i]}</div>`);
+                $('#payloads').append(`<div class="w3-btn w3-hover-green w100 monospace" onclick="ws_payloads_send('${payloads[i]}')">${payloads[i]}</div>`);
             }
         } else {
             load_asciicast(message);
