@@ -49,7 +49,7 @@ func cmdCd(fs *FakeShell, line string) (exit bool) {
 	path = toAbs(fs, path)
 
 	if !fs.overlayFS.DirExists(path) {
-		fs.RecordWriteLn("cd: no such file or directory: " + parts[1])
+		fs.RecordWriteLn(fmt.Sprintf("cd: %s: no such file or directory", parts[1]))
 		return
 	}
 
@@ -86,7 +86,7 @@ func cmdRm(fs *FakeShell, line string) (exit bool) {
 		path := toAbs(fs, pt)
 
 		if !fs.overlayFS.DirExists(path) && !fs.overlayFS.FileExists(path) {
-			fs.RecordWriteLn("rm: no such file or directory: " + pt)
+			fs.RecordWriteLn(fmt.Sprintf("rm: %s: no such file or directory", pt))
 			return
 		}
 
