@@ -27,3 +27,6 @@ hosts.txt
 payloads.txt
 users.txt
 passwords.txt
+
+ossh.crt
+ossh.key
