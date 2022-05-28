@@ -44,9 +44,14 @@
             $('#payloads').text("");
             payloads = message.split(":")[1].split(",");
             payloads.sort();
+            payloads.reverse();
             $('#payloads').append(`<ul>`);
             for (i = 0; i < payloads.length; i++) {
-                $('#payloads').append(`<li id='payload${payloads[i]}' class="w3-btn w3-hover-green w100 monospace" onclick="ws_payloads_send('${payloads[i]}');select_payload('${payloads[i]}');">${payloads[i]}</li>`);
+                ptime = new Date();
+                ptime.setTime(parseInt(payloads[i].split("-")[0]));
+                ptime = ptime.toLocaleString();
+                phash = payloads[i].split("-")[1];
+                $('#payloads').append(`<li id='payload${phash}' class="w3-btn w3-hover-green w100 monospace" onclick="ws_payloads_send('${phash}');select_payload('${phash}');">${ptime}: ${phash}</li>`);
             }
             $('#payloads').append(`</ul>`);
             li = $('li');
@@ -110,11 +115,11 @@
 {{ template "ws_conn" dict "Scheme" .Scheme "Name" "payloads" "OpenFn" "ws_pl_open" "CloseFn" "ws_pl_close" "PreConnectFn" "ws_pl_preconnect" "ReceiveFn" "ws_pl_receive" "ReceiveCompleteFn" "ws_pl_receive_complete" "SendFn" "ws_pl_send" }}
 <div id="tabPayloads" class="w3-display-container w3-dark-gray tab hidden">
     <div class="w3-left w100 h100 overflow-hidden">
-        <div class="w20 h100 float-left overflow-hidden">
+        <div class="w30 h100 float-left overflow-hidden">
             <button class="w3-bar-item w3-btn tablink w3-hover-red h5 w100" onclick="ws_payloads_send('list')"><i class="fa fa-refresh fa-lg"></i>&nbsp;&nbsp;<span class="w3-hide-small">Refresh Payloads</span></button>
             <div id="payloads" class="w100 h95 overflow-y-scroll overflow-x-hidden"></div>
         </div>
-        <div class="w80 h100 float-left overflow-hidden">
+        <div class="w70 h100 float-left overflow-hidden">
             <div id="title-asciicast" class="w100 h5 center bold" style="padding-top:10px;font-size: 14px"></div>
             <div id="player" class="w100 h95"></div>
         </div>

@@ -327,7 +327,7 @@ func (ws *UIServer) init() {
 	})
 	ws.AddHandler("/payloads", func(msg []byte) []byte {
 		if string(msg) == "list" {
-			return []byte(fmt.Sprintf("list:%s", strings.Join(SrvOSSH.Loot.GetPayloads(), ",")))
+			return []byte(fmt.Sprintf("list:%s", strings.Join(SrvOSSH.Loot.GetPayloadsWithTimestamp(), ",")))
 		}
 		p, err := SrvOSSH.Loot.payloads.Get(string(msg))
 		if err != nil {

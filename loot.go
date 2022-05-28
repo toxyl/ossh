@@ -176,6 +176,23 @@ func (l *Loot) GetPayloads() []string {
 	return res
 }
 
+func (l *Loot) GetPayloadsWithTimestamp() []string {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	res := []string{}
+	for _, fp := range l.payloads.GetKeys() {
+		p := NewPayload()
+		p.SetHash(fp)
+		if p.Exists() {
+			m, err := FileModTime(p.file)
+			if err == nil {
+				res = append(res, fmt.Sprintf("%d-%s", m.UnixMilli(), p.hash))
+			}
+		}
+	}
+	return res
+}
+
 func (l *Loot) JSON() string {
 	data := LootJSON{
 		Hosts:     l.GetHosts(),

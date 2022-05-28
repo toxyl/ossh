@@ -114,6 +114,21 @@ func (s *Session) Uptime() time.Duration {
 	return time.Since(s.CreatedAt)
 }
 
+// Expire checks if the session exists and is older than the given age.
+// It will then exit the session with code -1 and close the connection.
+// The function returns true if the session is expired, else false.
+func (s *Session) Expire(age uint) bool {
+	if s.SSHSession == nil {
+		return true // maybe it was never established
+	}
+	if s.Uptime().Seconds() > float64(age) {
+		LogOSSHServer.Info("%s: Expiring session...", s.LogID())
+		_ = (*s.SSHSession).Exit(-1) // clean up
+		return true
+	}
+	return false
+}
+
 func NewSession() *Session {
 	s := &Session{
 		CreatedAt:  time.Now(),
@@ -181,9 +196,29 @@ func (ss *Sessions) Count() int {
 	return len(ss.sessions)
 }
 
-func NewActiveSessions(autoCreate bool) *Sessions {
-	return &Sessions{
+func (ss *Sessions) CleanUp(age uint) {
+	ss.lock.Lock()
+	defer ss.lock.Unlock()
+
+	for sessionID, session := range ss.sessions {
+		if session.Expire(age) {
+			ss.lock.Unlock()
+			ss.Remove(sessionID)
+			ss.lock.Lock()
+		}
+	}
+}
+
+func NewActiveSessions(maxAge uint) *Sessions {
+	ss := &Sessions{
 		sessions: map[string]*Session{},
 		lock:     &sync.Mutex{},
 	}
+	go func(maxAge uint) {
+		for {
+			time.Sleep(1 * time.Minute)
+			ss.CleanUp(maxAge)
+		}
+	}(maxAge)
+	return ss
 }

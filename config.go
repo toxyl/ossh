@@ -39,6 +39,7 @@ type Config struct {
 	Host             string   `mapstructure:"host"`
 	Port             uint     `mapstructure:"port"`
 	MaxIdleTimeout   uint     `mapstructure:"max_idle"`
+	MaxSessionAge    uint     `mapstructure:"max_session_age"`
 	InputDelay       uint     `mapstructure:"input_delay"`
 	Ratelimit        float64  `mapstructure:"ratelimit"`
 	Webinterface     struct {

@@ -280,3 +280,11 @@ func GetLastError(err error) string {
 	s := sl[len(sl)-1]
 	return strings.TrimSpace(s)
 }
+
+func FileModTime(path string) (time.Time, error) {
+	file, err := os.Stat(path)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return file.ModTime(), nil
+}

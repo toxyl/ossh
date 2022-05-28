@@ -355,7 +355,7 @@ func NewOSSHServer() *OSSHServer {
 		Loot:       NewLoot(),
 		Logins:     NewLogins(),
 		server:     nil,
-		Sessions:   NewActiveSessions(true),
+		Sessions:   NewActiveSessions(Conf.MaxSessionAge),
 		TimeWasted: 0,
 	}
 	ossh.init()
