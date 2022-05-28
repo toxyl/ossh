@@ -44,9 +44,12 @@
             $('#payloads').text("");
             payloads = message.split(":")[1].split(",");
             payloads.sort();
+            $('#payloads').append(`<ul>`);
             for (i = 0; i < payloads.length; i++) {
-                $('#payloads').append(`<div class="w3-btn w3-hover-green w100 monospace" onclick="ws_payloads_send('${payloads[i]}')">${payloads[i]}</div>`);
+                $('#payloads').append(`<li id='payload${payloads[i]}' class="w3-btn w3-hover-green w100 monospace" onclick="ws_payloads_send('${payloads[i]}');select_payload('${payloads[i]}');">${payloads[i]}</li>`);
             }
+            $('#payloads').append(`</ul>`);
+            li = $('li');
         } else {
             load_asciicast(message);
         }
@@ -59,6 +62,50 @@
         }
         return msg;
     }
+
+    function select_payload(hash) {
+        if(liSelected) {
+            liSelected.removeClass('selected');
+        }
+        liSelected = $("#payload"+hash).addClass("selected");
+    }
+
+    // keyboard scroll handling, adapted from https://stackoverflow.com/a/8902976/3337885
+    var li = $('li');
+    var liSelected;
+    $(window).keydown(function(e) {
+        if(e.which === 40) {
+            if(liSelected) {
+                liSelected.removeClass('selected');
+                next = liSelected.next();
+                if(next.length > 0) {
+                    liSelected = next.addClass('selected');
+                    next.click();
+                } else {
+                    liSelected = li.eq(0).addClass('selected');
+                    li.eq(0).click();
+                }
+            } else {
+                liSelected = li.eq(0).addClass('selected');
+                li.eq(0).click();
+            }
+        } else if(e.which === 38) {
+            if(liSelected) {
+                liSelected.removeClass('selected');
+                next = liSelected.prev();
+                if(next.length > 0) {
+                    liSelected = next.addClass('selected');
+                    next.click();
+                } else {
+                    liSelected = li.last().addClass('selected');
+                    li.last().click();
+                }
+            } else {
+                liSelected = li.last().addClass('selected');
+                li.last().click();
+            }
+        }
+    });
 </script>
 {{ template "ws_conn" dict "Scheme" .Scheme "Name" "payloads" "OpenFn" "ws_pl_open" "CloseFn" "ws_pl_close" "PreConnectFn" "ws_pl_preconnect" "ReceiveFn" "ws_pl_receive" "ReceiveCompleteFn" "ws_pl_receive_complete" "SendFn" "ws_pl_send" }}
 <div id="tabPayloads" class="w3-display-container w3-dark-gray tab hidden">
