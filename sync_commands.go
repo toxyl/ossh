@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"strings"
 )
 
 type SyncCommand func(args []string) (string, error)
@@ -34,8 +33,8 @@ var SyncCommands = map[string]SyncCommand{
 	"PASSWORDS": func(args []string) (string, error) {
 		return ImplodeLines(SrvOSSH.Loot.GetPasswords()), nil
 	},
-	"FINGERPRINTS": func(args []string) (string, error) {
-		return ImplodeLines(SrvOSSH.Loot.GetFingerprints()), nil
+	"PAYLOADS": func(args []string) (string, error) {
+		return ImplodeLines(SrvOSSH.Loot.GetPayloads()), nil
 	},
 	"ADD-HOST": func(args []string) (string, error) {
 		if len(args) < 1 {
@@ -85,34 +84,24 @@ var SyncCommands = map[string]SyncCommand{
 		}
 		return "", nil
 	},
-	"ADD-FINGERPRINT": func(args []string) (string, error) {
-		if len(args) < 1 {
-			return "", nil
+	"ADD-PAYLOAD": func(args []string) (string, error) {
+		if len(args) < 2 {
+			return "", errors.New("need fingerprint and data")
 		}
-		added := 0
-		for _, f := range args {
-			if SrvOSSH.Loot.AddFingerprint(f) {
-				added++
+
+		hash := args[0]
+		data := args[1]
+		pl := NewPayload()
+		pl.SetHash(hash)
+		pl.DecodeFromString(data)
+		pl.Save()
+		if pl.Exists() {
+			if SrvOSSH.Loot.AddPayload(hash) {
+				LogSyncCommands.OK("Added payload %s", colorFile(pl.file))
+				SrvOSSH.SaveData()
 			}
 		}
-		if added > 0 {
-			LogSyncCommands.OK("Added %s fingerprint(s)", colorInt(added))
-			SrvOSSH.SaveData()
-		}
+
 		return "", nil
-	},
-	"GET-PAYLOAD": func(args []string) (string, error) {
-		if len(args) < 1 {
-			return "", errors.New("need fingerprint") // TODO return payload list?
-		}
-
-		val := args[0]
-		ret, err := SrvOSSH.Loot.payloads.Get(val)
-		if err != nil {
-			return "", nil
-		}
-
-		payload, _ := ret.Read()
-		return strings.TrimSpace(payload), nil
 	},
 }

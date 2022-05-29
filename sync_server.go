@@ -120,10 +120,6 @@ func (ss *SyncServer) Exec(msg string) string {
 	return ss.nodes.Exec(msg)
 }
 
-func (ss *SyncServer) GetPayload(fingerprint string) string {
-	return ss.Exec(fmt.Sprintf("GET-PAYLOAD %s", fingerprint))
-}
-
 func (ss *SyncServer) GetOutOfSyncNodes() map[string]string {
 	res := ss.Broadcast(fmt.Sprintf("SYNC %s", SrvOSSH.Loot.Fingerprint()))
 	LogSyncServer.Debug("out of sync nodes: %s", colorHighlight(spew.Sdump(res)))
@@ -174,8 +170,8 @@ func (ss *SyncServer) SyncToNodes() {
 			}
 
 			if fpLocal[3] != fpRemote[3] {
-				LogSyncServer.Debug("%s are outdated", colorHighlight("fingerprints"))
-				client.SyncData("FINGERPRINTS", SrvOSSH.Loot.GetFingerprints, client.AddFingerprint)
+				LogSyncServer.Debug("%s are outdated", colorHighlight("payloads"))
+				client.SyncData("PAYLOADS", SrvOSSH.Loot.GetPayloads, client.AddPayload)
 			}
 		}
 		LogSyncServer.Debug("sync complete")

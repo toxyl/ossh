@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"strings"
 	"sync"
 )
 
@@ -100,7 +101,7 @@ func (sn *SyncNodes) Exec(command string) string {
 	defer sn.lock.Unlock()
 	for _, c := range sn.clients {
 		r, err := c.Exec(command)
-		if err == nil && r != "" {
+		if err == nil && strings.TrimSpace(r) != "" {
 			return r
 		}
 		if err != nil {

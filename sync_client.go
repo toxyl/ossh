@@ -19,7 +19,11 @@ type SyncClient struct {
 func (sc *SyncClient) connect() {
 	c, err := net.Dial("tcp", sc.ID())
 	if err != nil {
-		LogSyncClient.Error("Failed to connect: %s", colorError(err))
+		if strings.Contains(err.Error(), "connect: connection refused") {
+			LogSyncClient.Warning("%s: Node is probably %s (only investigate if every sync fails)", colorHost(sc.ID()), colorHighlight("busy syncing"))
+			return
+		}
+		LogSyncClient.Error("%s: Failed to connect: %s", colorHost(sc.ID()), colorError(err))
 		return
 	}
 	LogSyncClient.Debug("%s: connect", colorHost(sc.ID()))
@@ -55,7 +59,7 @@ func (sc *SyncClient) Exec(command string) (string, error) {
 	resp, err := reader.ReadString('\n')
 
 	if err != nil && err != io.EOF {
-		LogSyncClient.Error("\"%s\", failed to read response: %s", colorHighlight(command), colorError(err))
+		LogSyncClient.Debug("\"%s\", failed to read response: %s", colorHighlight(command), colorError(err))
 		return "", err
 	}
 	resp = strings.TrimSpace(resp)
@@ -89,8 +93,35 @@ func (sc *SyncClient) AddPassword(password string) {
 	_, _ = sc.Exec(fmt.Sprintf("ADD-PASSWORD %s", password))
 }
 
-func (sc *SyncClient) AddFingerprint(fingerprint string) {
-	_, _ = sc.Exec(fmt.Sprintf("ADD-FINGERPRINT %s", fingerprint))
+func (sc *SyncClient) AddPayload(fingerprint string) {
+	pls := strings.Split(fingerprint, " ")
+	cnt := 0
+	for _, fp := range pls {
+		fp = strings.TrimSpace(fp)
+		if fp == "" {
+			continue
+		}
+
+		if !SrvOSSH.Loot.payloads.Has(fp) {
+			LogSyncClient.Info("%s: We can't send payload %s, we don't have it.", colorHost(sc.ID()), colorHighlight(fp))
+			continue
+		}
+
+		pl, err := SrvOSSH.Loot.payloads.Get(fp)
+		if err != nil {
+			LogSyncClient.Error("%s: Looks like we can't give them the payload %s, we got an error retrieving it: %s", colorHost(sc.ID()), colorHighlight(fp), colorError(err))
+			continue
+		}
+
+		if pl.Exists() {
+			penc := pl.EncodeToString()
+			if strings.TrimSpace(penc) == "" {
+				continue
+			}
+			_, _ = sc.Exec(fmt.Sprintf("ADD-PAYLOAD %s %s", pl.hash, penc))
+			cnt++
+		}
+	}
 }
 
 func (sc *SyncClient) SyncData(cmd string, fnGet func() []string, fnAddRemote func(data string)) {

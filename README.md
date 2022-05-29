@@ -10,7 +10,7 @@ In addition to being painfully slow, the bot will connect to a pretty broken sys
 
 How oSSH behaves can be configured via a YAML config file, a fake file system and command templates. 
 
-oSSH can also sync with other oSSH nodes to share hosts, user names, passwords and fingerprints. 
+oSSH can also sync with other oSSH nodes to share hosts, user names, passwords and payloads. 
 
 ## Installation
 The following assumes that you will use `/etc/ossh` as [data directory](#data-directory). If you want something else you need to substitute accordingly and set `path_data` in the config.
@@ -172,7 +172,7 @@ Within that directory you will find bind a bunch of files with data collected by
 | `hosts.txt` | List of attacker IPs |
 | `users.txt` | List of user names |
 | `passwords.txt` | List of passwords |
-| `fingerprints.txt` | List of payload fingerprints |
+| `payloads.txt` | List of payload fingerprints |
 
 ### Captures directory
 The subdirectory `captures` is the collection of payloads received from bots. Whenever a bot connects oSSH will record what it's doing and then save that recording as an ASCIICast v2 (you can use [`asciinema`](https://asciinema.org/) to play them back). Captures are saved per host, so you can, e.g., identify especially aggressive bots. The last part of the file name is the fingerprint of the sequence. Existing files will not be overwritten. 

@@ -44,9 +44,17 @@
             $('#payloads').text("");
             payloads = message.split(":")[1].split(",");
             payloads.sort();
+            payloads.reverse();
+            $('#payloads').append(`<ul>`);
             for (i = 0; i < payloads.length; i++) {
-                $('#payloads').append(`<div class="w3-btn w3-hover-green w100" onclick="ws_payloads_send('${payloads[i]}')">${payloads[i]}</div>`);
+                ptime = new Date();
+                ptime.setTime(parseInt(payloads[i].split("-")[0]));
+                ptime = ptime.toLocaleString();
+                phash = payloads[i].split("-")[1];
+                $('#payloads').append(`<li id='payload${phash}' class="w3-btn w3-hover-green w100 monospace" onclick="ws_payloads_send('${phash}');select_payload('${phash}');">${ptime}: ${phash}</li>`);
             }
+            $('#payloads').append(`</ul>`);
+            li = $('li');
         } else {
             load_asciicast(message);
         }
@@ -59,15 +67,59 @@
         }
         return msg;
     }
+
+    function select_payload(hash) {
+        if(liSelected) {
+            liSelected.removeClass('selected');
+        }
+        liSelected = $("#payload"+hash).addClass("selected");
+    }
+
+    // keyboard scroll handling, adapted from https://stackoverflow.com/a/8902976/3337885
+    var li = $('li');
+    var liSelected;
+    $(window).keydown(function(e) {
+        if(e.which === 40) {
+            if(liSelected) {
+                liSelected.removeClass('selected');
+                next = liSelected.next();
+                if(next.length > 0) {
+                    liSelected = next.addClass('selected');
+                    next.click();
+                } else {
+                    liSelected = li.eq(0).addClass('selected');
+                    li.eq(0).click();
+                }
+            } else {
+                liSelected = li.eq(0).addClass('selected');
+                li.eq(0).click();
+            }
+        } else if(e.which === 38) {
+            if(liSelected) {
+                liSelected.removeClass('selected');
+                next = liSelected.prev();
+                if(next.length > 0) {
+                    liSelected = next.addClass('selected');
+                    next.click();
+                } else {
+                    liSelected = li.last().addClass('selected');
+                    li.last().click();
+                }
+            } else {
+                liSelected = li.last().addClass('selected');
+                li.last().click();
+            }
+        }
+    });
 </script>
 {{ template "ws_conn" dict "Scheme" .Scheme "Name" "payloads" "OpenFn" "ws_pl_open" "CloseFn" "ws_pl_close" "PreConnectFn" "ws_pl_preconnect" "ReceiveFn" "ws_pl_receive" "ReceiveCompleteFn" "ws_pl_receive_complete" "SendFn" "ws_pl_send" }}
 <div id="tabPayloads" class="w3-display-container w3-dark-gray tab hidden">
     <div class="w3-left w100 h100 overflow-hidden">
-        <div class="w20 h100 float-left overflow-hidden">
+        <div class="w30 h100 float-left overflow-hidden">
             <button class="w3-bar-item w3-btn tablink w3-hover-red h5 w100" onclick="ws_payloads_send('list')"><i class="fa fa-refresh fa-lg"></i>&nbsp;&nbsp;<span class="w3-hide-small">Refresh Payloads</span></button>
             <div id="payloads" class="w100 h95 overflow-y-scroll overflow-x-hidden"></div>
         </div>
-        <div class="w80 h100 float-left overflow-hidden">
+        <div class="w70 h100 float-left overflow-hidden">
             <div id="title-asciicast" class="w100 h5 center bold" style="padding-top:10px;font-size: 14px"></div>
             <div id="player" class="w100 h95"></div>
         </div>

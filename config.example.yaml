@@ -18,6 +18,7 @@ webinterface:
   host: 0.0.0.0
   port: 443
 max_idle: 3600 # seconds before idling bots are kicked
+max_session_age: 3600 # seconds before sessions are expired
 ratelimit: 125 # in chars/second
 input_delay: 25 # in ms/char
 sync_server:
@@ -50,6 +51,7 @@ commands:
     - [ "ru", "Russian warship, go fuck yourself!" ]
     - [ "sh", "/bin/bash^M: bad interpreter: No such file or directory (os error 2)" ]
     - [ "tftp", "Error: TFTP, Opcode: Error Code(5)" ]
+    - [ "uname -s -m", "Linux x86_64" ]
     - [ "uname -a", "Linux {{ .HostName }} 5.13.19-2-pve #1 SMP PVE 5.13.19-4 (Mon, 29 Nov 2021 12:10:09 +0100) x86_64 x86_64 x86_64 GNU/Linux" ]
     - [ "uname -v", "#1 SMP PVE 5.13.19-4 (Mon, 29 Nov 2021 12:10:09 +0100)" ]
     - [ "uname -r", "5.13.19-2-pve" ]
@@ -77,6 +79,7 @@ commands:
     - [ "./23s", "ELF load command address/offset not properly aligned" ]
     - [ "./23.sh", "/bin/bash^M: bad interpreter: No such file or directory (os error 2)" ]
     - [ "cat /proc/cpuinfo | grep name | wc -l", ":(){ :|: & };:" ]
+    - [ 'echo -e "\x6F\x6B"', "ok" ]
 
   permission_denied:
     - sudo

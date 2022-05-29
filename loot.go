@@ -10,19 +10,18 @@ import (
 )
 
 type LootJSON struct {
-	Hosts        []string `json:"hosts"`
-	Users        []string `json:"users"`
-	Passwords    []string `json:"passwords"`
-	Fingerprints []string `json:"fingerprints"`
+	Hosts     []string `json:"hosts"`
+	Users     []string `json:"users"`
+	Passwords []string `json:"passwords"`
+	Payloads  []string `json:"payloads"`
 }
 
 type Loot struct {
-	users        map[string]bool
-	passwords    map[string]bool
-	hosts        map[string]bool
-	fingerprints map[string]bool
-	payloads     *Payloads
-	lock         *sync.Mutex
+	users     map[string]bool
+	passwords map[string]bool
+	hosts     map[string]bool
+	payloads  *Payloads
+	lock      *sync.Mutex
 }
 
 func (l *Loot) HasUser(user string) bool {
@@ -50,16 +49,6 @@ func (l *Loot) HasHost(host string) bool {
 	defer l.lock.Unlock()
 
 	if _, ok := l.hosts[host]; !ok {
-		return false
-	}
-	return true
-}
-
-func (l *Loot) HasFingerprint(fingerprint string) bool {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-
-	if _, ok := l.fingerprints[fingerprint]; !ok {
 		return false
 	}
 	return true
@@ -117,34 +106,18 @@ func (l *Loot) AddHost(host string) bool {
 	return true
 }
 
-func (l *Loot) AddFingerprint(fingerprint string) bool {
+func (l *Loot) AddPayload(fingerprint string) bool {
 	fingerprint = strings.TrimSpace(fingerprint)
 	if fingerprint == "" {
 		return false
 	}
 
-	if !l.HasFingerprint(fingerprint) {
-		l.lock.Lock()
-		defer l.lock.Unlock()
-		l.fingerprints[fingerprint] = true
-	}
-
 	if !l.HasPayload(fingerprint) {
-		l.AddPayload(fingerprint)
+		p := NewPayload()
+		p.SetHash(fingerprint)
+		l.payloads.Add(p)
 	}
 	return true
-}
-
-func (l *Loot) AddPayload(fingerprint string) {
-	p := NewPayload()
-	p.SetHash(fingerprint)
-	if !p.Exists() {
-		if !p.Download(fingerprint) { // try to download from known nodes
-			// LogErrorLn("Payload %s was not found anywhere", colorFile(p.file))
-			return
-		}
-	}
-	l.payloads.Add(p)
 }
 
 func (l *Loot) CountUsers() int {
@@ -165,10 +138,10 @@ func (l *Loot) CountHosts() int {
 	return len(l.hosts)
 }
 
-func (l *Loot) CountFingerprints() int {
+func (l *Loot) CountPayloads() int {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	return len(l.fingerprints)
+	return len(l.payloads.GetKeys())
 }
 
 func (l *Loot) GetUsers() []string {
@@ -189,18 +162,43 @@ func (l *Loot) GetHosts() []string {
 	return maps.Keys(l.hosts)
 }
 
-func (l *Loot) GetFingerprints() []string {
+func (l *Loot) GetPayloads() []string {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	return maps.Keys(l.fingerprints)
+	res := []string{}
+	for _, fp := range l.payloads.GetKeys() {
+		p := NewPayload()
+		p.SetHash(fp)
+		if p.Exists() {
+			res = append(res, p.hash)
+		}
+	}
+	return res
+}
+
+func (l *Loot) GetPayloadsWithTimestamp() []string {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	res := []string{}
+	for _, fp := range l.payloads.GetKeys() {
+		p := NewPayload()
+		p.SetHash(fp)
+		if p.Exists() {
+			m, err := FileModTime(p.file)
+			if err == nil {
+				res = append(res, fmt.Sprintf("%d-%s", m.UnixMilli(), p.hash))
+			}
+		}
+	}
+	return res
 }
 
 func (l *Loot) JSON() string {
 	data := LootJSON{
-		Hosts:        l.GetHosts(),
-		Users:        l.GetUsers(),
-		Passwords:    l.GetPasswords(),
-		Fingerprints: l.GetFingerprints(),
+		Hosts:     l.GetHosts(),
+		Users:     l.GetUsers(),
+		Passwords: l.GetPasswords(),
+		Payloads:  l.GetPayloads(),
 	}
 	json, err := json.Marshal(data)
 	if err != nil {
@@ -217,7 +215,7 @@ func (l *Loot) Fingerprint() string {
 		l.FingerprintHosts(),
 		l.FingerprintUsers(),
 		l.FingerprintPasswords(),
-		l.FingerprintFingerprints(),
+		l.FingerprintPayloads(),
 	)
 }
 
@@ -233,17 +231,16 @@ func (l *Loot) FingerprintPasswords() string {
 	return StringSliceToSha256(l.GetPasswords())
 }
 
-func (l *Loot) FingerprintFingerprints() string {
-	return StringSliceToSha256(l.GetFingerprints())
+func (l *Loot) FingerprintPayloads() string {
+	return StringSliceToSha256(l.GetPayloads())
 }
 
 func NewLoot() *Loot {
 	return &Loot{
-		users:        map[string]bool{},
-		passwords:    map[string]bool{},
-		hosts:        map[string]bool{},
-		fingerprints: map[string]bool{},
-		payloads:     NewPayloads(),
-		lock:         &sync.Mutex{},
+		users:     map[string]bool{},
+		passwords: map[string]bool{},
+		hosts:     map[string]bool{},
+		payloads:  NewPayloads(),
+		lock:      &sync.Mutex{},
 	}
 }

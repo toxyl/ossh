@@ -274,3 +274,17 @@ func GenerateGarbageString(n int) string {
 	rand.Read(token)
 	return string(token)
 }
+
+func GetLastError(err error) string {
+	sl := strings.Split(err.Error(), ":")
+	s := sl[len(sl)-1]
+	return strings.TrimSpace(s)
+}
+
+func FileModTime(path string) (time.Time, error) {
+	file, err := os.Stat(path)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return file.ModTime(), nil
+}

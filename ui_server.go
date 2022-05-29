@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -326,13 +327,22 @@ func (ws *UIServer) init() {
 	})
 	ws.AddHandler("/payloads", func(msg []byte) []byte {
 		if string(msg) == "list" {
-			return []byte(fmt.Sprintf("list:%s", strings.Join(SrvOSSH.Loot.GetFingerprints(), ",")))
+			return []byte(fmt.Sprintf("list:%s", strings.Join(SrvOSSH.Loot.GetPayloadsWithTimestamp(), ",")))
 		}
 		p, err := SrvOSSH.Loot.payloads.Get(string(msg))
 		if err != nil {
 			LogUIServer.Error("Could not retrieve payload %s: %s", colorHighlight(string(msg)), colorError(err))
 			return nil
 		}
+		if p == nil {
+			LogUIServer.Error("Could not retrieve payload %s: %s", colorHighlight(string(msg)), colorError(errors.New("no error reported")))
+			return nil
+		}
+		if !p.Exists() {
+			LogUIServer.Warning("Could not find payload %s: %s", colorHighlight(string(msg)), colorError(errors.New("file does not exist")))
+			return nil
+		}
+
 		pl, err := p.Read()
 		if err != nil {
 			LogUIServer.Error("Could not read payload %s: %s", colorHighlight(string(msg)), colorError(err))

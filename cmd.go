@@ -49,7 +49,7 @@ func cmdCd(fs *FakeShell, line string) (exit bool) {
 	path = toAbs(fs, path)
 
 	if !fs.overlayFS.DirExists(path) {
-		fs.RecordWriteLn("cd: no such file or directory: " + parts[1])
+		fs.RecordWriteLn(fmt.Sprintf("cd: %s: no such file or directory", parts[1]))
 		return
 	}
 
@@ -86,7 +86,7 @@ func cmdRm(fs *FakeShell, line string) (exit bool) {
 		path := toAbs(fs, pt)
 
 		if !fs.overlayFS.DirExists(path) && !fs.overlayFS.FileExists(path) {
-			fs.RecordWriteLn("rm: no such file or directory: " + pt)
+			fs.RecordWriteLn(fmt.Sprintf("rm: %s: no such file or directory", pt))
 			return
 		}
 
@@ -114,7 +114,7 @@ func cmdLs(fs *FakeShell, line string) (exit bool) {
 	entries, err := fs.overlayFS.ReadDir(dir)
 	if err != nil {
 		if err.(*os.PathError).Err.Error() != "not a directory" {
-			fs.RecordWriteLn(fmt.Sprintf("ls: cannot access '%s': %s", dir, err.(*os.PathError).Err.Error()))
+			fs.RecordWriteLn(fmt.Sprintf("ls: cannot access '%s': %s", dir, GetLastError(err.(*os.PathError).Err)))
 			return
 		}
 
@@ -152,14 +152,14 @@ func cmdCat(fs *FakeShell, line string) (exit bool) {
 	path := toAbs(fs, parts[1])
 	file, err := fs.overlayFS.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {
-		fs.RecordWriteLn(fmt.Sprintf("cat: %s: %s", parts[1], err.Error()))
+		fs.RecordWriteLn(fmt.Sprintf("cat: %s: %s", parts[1], GetLastError(err)))
 		return
 	}
 	defer file.Close()
 
 	stat, err := file.Stat()
 	if err != nil {
-		fs.RecordWriteLn(fmt.Sprintf("cat: %s: %s", parts[1], err.Error()))
+		fs.RecordWriteLn(fmt.Sprintf("cat: %s: %s", parts[1], GetLastError(err)))
 		return
 	}
 
@@ -170,7 +170,7 @@ func cmdCat(fs *FakeShell, line string) (exit bool) {
 
 	fileContents, err := io.ReadAll(file)
 	if err != nil {
-		fs.RecordWriteLn(fmt.Sprintf("cat: %s: %s", parts[1], err.Error()))
+		fs.RecordWriteLn(fmt.Sprintf("cat: %s: %s", parts[1], GetLastError(err)))
 		return
 	}
 
@@ -191,7 +191,7 @@ func cmdTouch(fs *FakeShell, line string) (exit bool) {
 	path := toAbs(fs, parts[1])
 	file, err := fs.overlayFS.OpenFile(path, os.O_CREATE, 0)
 	if err != nil {
-		fs.RecordWriteLn(fmt.Sprintf("touch: %s: %s", parts[1], err.Error()))
+		fs.RecordWriteLn(fmt.Sprintf("touch: %s: %s", parts[1], GetLastError(err)))
 		return
 	}
 	defer file.Close()
