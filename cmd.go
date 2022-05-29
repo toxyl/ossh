@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	fso "io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +19,7 @@ var CmdLookup = map[string]Command{
 	"cat":   cmdCat,
 	"touch": cmdTouch,
 	"rm":    cmdRm,
+	"scp":   cmdScp,
 }
 
 func toAbs(fs *FakeShell, path string) string {
@@ -197,4 +199,132 @@ func cmdTouch(fs *FakeShell, line string) (exit bool) {
 	defer file.Close()
 
 	return
+}
+
+func cmdScp(fs *FakeShell, line string) (exit bool) {
+	parts := strings.Split(line, " ")
+	if len(parts) < 2 {
+		fs.RecordWriteLn("usage: scp [-346ABCpqrTv] [-c cipher] [-F ssh_config] [-i identity_file]")
+		fs.RecordWriteLn("[-J destination] [-l limit] [-o ssh_option] [-P port]")
+		fs.RecordWriteLn("[-S program] source ... target")
+		return
+	}
+
+	isSink := false
+	for i, p := range parts {
+		if i > 0 && strings.HasPrefix(p, "-") && strings.Contains(p, "t") {
+			isSink = true
+			break
+		}
+	}
+
+	if isSink {
+		// someone wants to donate a file
+		fs.WriteBinary(0b0) // ready to receive
+
+		dirs := []string{parts[len(parts)-1]}
+
+		// read all messages
+		for {
+			msgType, err := fs.ReadBytes(1)
+
+			if err != nil {
+				if err.Error() != "EOF" {
+					LogOverlayFS.Error("Could not read type: %s", colorError(err))
+				}
+				break
+			}
+
+			mt := msgType[0]
+
+			if mt == 'C' {
+				// C = single file copy
+				msgMode, err := fs.ReadBytesUntil(' ')
+				if err != nil {
+					LogOverlayFS.Error("Could not read mode: %s", colorError(err))
+					break
+				}
+				msgLength, err := fs.ReadBytesUntil(' ')
+				if err != nil {
+					LogOverlayFS.Error("Could not read length: %s", colorError(err))
+					break
+				}
+				msgLengthInt := StringToInt(string(msgLength), 0)
+
+				msgFileName, err := fs.ReadBytesUntil('\n')
+				if err != nil {
+					LogOverlayFS.Error("Could not read file name: %s", colorError(err))
+					break
+				}
+				msgFileNameFull := fmt.Sprintf("%s/%s", strings.Join(dirs, "/"), string(msgFileName))
+
+				fs.WriteBinary(0b0) // ready to receive
+
+				path := toAbs(fs, msgFileNameFull)
+				file, err := fs.overlayFS.OpenFile(path, os.O_RDWR|os.O_CREATE, fso.FileMode(StringToInt(string(msgMode), 0777)))
+				if err != nil && GetLastError(err) != "is a directory" {
+					fs.RecordWriteLn(fmt.Sprintf("scp: %s: %s", msgFileNameFull, GetLastError(err)))
+					return
+				}
+				defer file.Close()
+
+				msgFileData, err := fs.ReadBytes(msgLengthInt)
+				if err != nil && err.Error() != "EOF" {
+					LogOverlayFS.Error("Could not read file data: %s", colorError(err))
+					break
+				}
+
+				_, _ = file.Write(msgFileData)
+
+				LogOverlayFS.Info("File uploaded via SCP: %s", colorHighlight(msgFileNameFull))
+
+				fs.WriteBinary(0b0) // data read
+				continue
+			}
+
+			if mt == 'D' {
+				// D = recursive dir copy
+				msgMode, err := fs.ReadBytesUntil(' ')
+				if err != nil {
+					LogOverlayFS.Error("Could not read mode: %s", colorError(err))
+					break
+				}
+
+				_, err = fs.ReadBytesUntil(' ')
+				if err != nil {
+					LogOverlayFS.Error("Could not read length: %s", colorError(err))
+					break
+				}
+
+				msgDirName, err := fs.ReadBytesUntil('\n')
+				if err != nil {
+					LogOverlayFS.Error("Could not read dir name: %s", colorError(err))
+					break
+				}
+
+				dirs = append(dirs, string(msgDirName))
+				_ = fs.overlayFS.MkdirAll(strings.Join(dirs, "/"), fso.FileMode(StringToInt(string(msgMode), 0777)))
+
+				fs.WriteBinary(0b0) // data read
+				continue
+			}
+
+			if mt == 'E' {
+				// end of dir
+				dirs = dirs[0 : len(dirs)-1]
+
+				fs.WriteBinary(0b0) // data read
+				continue
+			}
+
+			if mt == 'T' {
+				// modification time
+				_, _ = fs.ReadBytesUntil('\n')
+
+				fs.WriteBinary(0b0) // data read
+				continue
+			}
+		}
+	}
+	return false
 }
