@@ -105,7 +105,6 @@ commands:
     - readlink
     - realpath
     - rmdir
-    - scp
 
   command_not_found:
     - date
