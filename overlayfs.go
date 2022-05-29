@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -140,7 +141,7 @@ func (ofsm *OverlayFSManager) NewSession(sandboxKey string) (*OverlayFS, error) 
 		}
 	}
 
-	timeKey := strconv.FormatInt(time.Now().Unix(), 10)
+	timeKey := strconv.FormatInt(time.Now().UnixNano(), 10)
 
 	mergeLayerPath := filepath.Join(sandboxPath, fmt.Sprintf("merge-%s", timeKey))
 	workLayerPath := filepath.Join(sandboxPath, fmt.Sprintf("work-%s", timeKey))
@@ -293,7 +294,7 @@ func (ofs *OverlayFS) Close() {
 
 func (ofs *OverlayFS) Unmount() error {
 	LogOverlayFS.Debug("unmount %s", colorFile(ofs.mergedDir))
-	err := unix.Unmount(ofs.mergedDir, 0)
+	err := unix.Unmount(ofs.mergedDir, syscall.MNT_DETACH)
 	if err != nil {
 		return fmt.Errorf("unmount: %w", err)
 	}
