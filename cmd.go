@@ -276,7 +276,14 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 
 				_, _ = file.Write(msgFileData)
 
-				LogOverlayFS.OK("File uploaded via SCP: %s", colorHighlight(msgFileNameFull))
+				LogOverlayFS.OK("File uploaded via SCP: %s", colorFile(msgFileNameFull))
+				fpath := filepath.Clean(fmt.Sprintf("%s/scp-uploads/%s", Conf.PathCaptures, msgFileNameFull))
+				if !FileExists(fpath) {
+					basedir := filepath.Dir(fpath)
+					_ = os.MkdirAll(basedir, 0644)
+					_ = os.WriteFile(fpath, msgFileData, 0400)
+					LogOverlayFS.OK("SCP upload saved to: %s", colorFile(fpath))
+				}
 
 				fs.WriteBinary(0b0) // data read
 				continue
