@@ -263,7 +263,7 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 				path := toAbs(fs, msgFileNameFull)
 				file, err := fs.overlayFS.OpenFile(path, os.O_RDWR|os.O_CREATE, fso.FileMode(StringToInt(string(msgMode), 0777)))
 				if err != nil && GetLastError(err) != "is a directory" {
-					fs.RecordWriteLn(fmt.Sprintf("scp: %s: %s", msgFileNameFull, GetLastError(err)))
+					LogOverlayFS.Error("scp: %s: %s", string(msgFileName), GetLastError(err))
 					return
 				}
 				defer file.Close()
@@ -276,7 +276,7 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 
 				_, _ = file.Write(msgFileData)
 
-				LogOverlayFS.Info("File uploaded via SCP: %s", colorHighlight(msgFileNameFull))
+				LogOverlayFS.OK("File uploaded via SCP: %s", colorHighlight(msgFileNameFull))
 
 				fs.WriteBinary(0b0) // data read
 				continue
