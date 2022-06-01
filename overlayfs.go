@@ -349,6 +349,10 @@ func (ofs *OverlayFS) OpenFile(path string, flag int, perm fs.FileMode) (*os.Fil
 		return nil, errors.New("path outside root")
 	}
 
+	// create the directory structure, so we don't get not found errors
+	// because our fake file system is incomplete
+	_ = ofs.MkdirAll(filepath.Dir(path), perm)
+
 	return os.OpenFile(filepath.Join(ofs.mergedDir, path), flag, perm)
 }
 
@@ -375,6 +379,15 @@ func (ofs *OverlayFS) Mkdir(path string, mode fs.FileMode) error {
 	}
 
 	return os.Mkdir(filepath.Join(ofs.mergedDir, path), mode)
+}
+
+func (ofs *OverlayFS) MkdirAll(path string, mode fs.FileMode) error {
+	LogOverlayFS.Debug("mkdir-all %s", colorFile(path))
+	if !ofs.insideMerged(path) {
+		return errors.New("path outside root")
+	}
+
+	return os.MkdirAll(filepath.Join(ofs.mergedDir, path), mode)
 }
 
 func (ofs *OverlayFS) ReadDir(path string) ([]os.DirEntry, error) {

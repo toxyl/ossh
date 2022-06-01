@@ -72,6 +72,52 @@ func (fs *FakeShell) RecordWrite(output string) {
 	fs.stats.recording.AddOutputEvent(output)
 }
 
+// WriteBinary writes a binary value.
+// Unlike the Record* functions it does not record this in the session capture.
+func (fs *FakeShell) WriteBinary(val int) {
+	fs.writer.Write(string(val))
+}
+
+// WriteBinary writes a binary value and sends it.
+// Unlike the Record* functions it does not record this in the session capture.
+func (fs *FakeShell) WriteBinaryLn(val int) {
+	fs.writer.WriteLn(string(val))
+}
+
+// ReadBytes reads and returns a byte array with the given number of bytes from the SSH session.
+func (fs *FakeShell) ReadBytes(numBytes int) ([]byte, error) {
+	b := make([]byte, numBytes)
+	_, err := fs.session.Read(b)
+	return b, err
+}
+
+// ReadString reads and returns a string with the given length from the SSH session.
+func (fs *FakeShell) ReadString(length int) (string, error) {
+	b, err := fs.ReadBytes(length)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// ReadBytesUntil reads from the SSH session until it encounters the separator byte.
+// The separator byte will be discarded and the read bytes will be returned as byte array.
+func (fs *FakeShell) ReadBytesUntil(sep byte) ([]byte, error) {
+	bytes := []byte{}
+	for {
+		b, err := fs.ReadBytes(1)
+		if err != nil {
+			return nil, err
+		}
+		if b[0] != sep {
+			bytes = append(bytes, b[0])
+		} else {
+			break
+		}
+	}
+	return bytes, nil
+}
+
 func (fs *FakeShell) Exec(line string) bool {
 	fs.stats.AddCommandToHistory(line)
 
@@ -119,7 +165,7 @@ func (fs *FakeShell) Exec(line string) bool {
 		return true
 	}
 
-	LogFakeShell.Debug(
+	LogFakeShell.Info(
 		"%s runs %s %s",
 		colorConnID(data.User, data.IP, data.Port),
 		colorReason(command),

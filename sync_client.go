@@ -81,16 +81,25 @@ func (sc *SyncClient) ID() string {
 	return fmt.Sprintf("%s:%d", sc.Host, sc.Port)
 }
 
-func (sc *SyncClient) AddHost(host string) {
-	_, _ = sc.Exec(fmt.Sprintf("ADD-HOST %s", host))
+func (sc *SyncClient) AddHosts(hosts string) {
+	chunks := ChunkString(sc.Host, " ", 50)
+	for _, chunk := range chunks {
+		_, _ = sc.Exec(fmt.Sprintf("ADD-HOST %s", chunk))
+	}
 }
 
-func (sc *SyncClient) AddUser(user string) {
-	_, _ = sc.Exec(fmt.Sprintf("ADD-USER %s", user))
+func (sc *SyncClient) AddUsers(users string) {
+	chunks := ChunkString(users, " ", 50)
+	for _, chunk := range chunks {
+		_, _ = sc.Exec(fmt.Sprintf("ADD-USER %s", chunk))
+	}
 }
 
-func (sc *SyncClient) AddPassword(password string) {
-	_, _ = sc.Exec(fmt.Sprintf("ADD-PASSWORD %s", password))
+func (sc *SyncClient) AddPasswords(passwords string) {
+	chunks := ChunkString(passwords, " ", 50)
+	for _, chunk := range chunks {
+		_, _ = sc.Exec(fmt.Sprintf("ADD-PASSWORD %s", chunk))
+	}
 }
 
 func (sc *SyncClient) AddPayload(fingerprint string) {
