@@ -294,9 +294,9 @@ func ChunkString(s string, sep string, chunkSize int) [][]string {
 	pieces := strings.Split(s, sep)
 	var chunk []string
 	for len(pieces) > 0 {
-		if len(pieces) > 10 {
-			chunk = pieces[0:10]
-			pieces = pieces[10:]
+		if len(pieces) > chunkSize {
+			chunk = pieces[0:chunkSize]
+			pieces = pieces[chunkSize:]
 		} else {
 			chunk = pieces[0:]
 			pieces = []string{}

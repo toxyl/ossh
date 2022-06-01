@@ -221,7 +221,7 @@ func (ss *SyncServer) Start() {
 		}
 
 		if ss.busy {
-			LogSyncServer.Info("%s, don't you see I'm busy?", colorHost(host))
+			LogSyncServer.Debug("%s, don't you see I'm busy?", colorHost(host))
 			ss.write(EmptyCommandResponse)
 			ss.close()
 			continue

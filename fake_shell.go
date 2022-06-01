@@ -165,7 +165,7 @@ func (fs *FakeShell) Exec(line string) bool {
 		return true
 	}
 
-	LogFakeShell.Debug(
+	LogFakeShell.Info(
 		"%s runs %s %s",
 		colorConnID(data.User, data.IP, data.Port),
 		colorReason(command),
