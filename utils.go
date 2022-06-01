@@ -288,3 +288,20 @@ func FileModTime(path string) (time.Time, error) {
 	}
 	return file.ModTime(), nil
 }
+
+func ChunkString(s string, sep string, chunkSize int) [][]string {
+	res := [][]string{}
+	pieces := strings.Split(s, sep)
+	var chunk []string
+	for len(pieces) > 0 {
+		if len(pieces) > 10 {
+			chunk = pieces[0:10]
+			pieces = pieces[10:]
+		} else {
+			chunk = pieces[0:]
+			pieces = []string{}
+		}
+		res = append(res, chunk)
+	}
+	return res
+}
