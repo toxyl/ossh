@@ -276,7 +276,7 @@ func (ossh *OSSHServer) sessionRequestCallback(sess ssh.Session, requestType str
 func (ossh *OSSHServer) connectionFailedCallback(conn net.Conn, err error) {
 	s := ossh.Sessions.Create(conn.RemoteAddr().String())
 
-	if err.Error() != "EOF" {
+	if err.Error() != "EOF" && err.Error() != "[ssh: no auth passed yet, permission denied]" {
 		LogOSSHServer.Warning("%s's connection failed: %s",
 			s.LogID(),
 			colorError(err),
@@ -354,7 +354,7 @@ func (ossh *OSSHServer) init() {
 }
 
 func (ossh *OSSHServer) Start() {
-	LogOSSHServer.Default("Starting oSSH server on %s...", colorHost("ssh://"+ossh.server.Addr))
+	LogOSSHServer.Default("Starting oSSH server on %s...", colorWrap("ssh://"+ossh.server.Addr, colorBrightYellow))
 	log.Fatal(ossh.server.ListenAndServe())
 }
 

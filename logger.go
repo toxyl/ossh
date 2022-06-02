@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -18,7 +19,14 @@ func colorUser(user string) string {
 }
 
 func colorHost(host string) string {
-	return colorWrap(host, colorBrightYellow)
+	parts := strings.Split(host, ".")
+	pt := 0.0
+	for _, p := range parts {
+		f, _ := GetFloat(p)
+		pt += f
+	}
+	// 88 - 231 (143 total)
+	return colorWrap(host, uint(88.0+143.0*(pt/4.0/255.0)))
 }
 
 func colorPassword(password string) string {
