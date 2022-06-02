@@ -156,22 +156,22 @@ func (ss *SyncServer) SyncToNodes() {
 
 			if fpLocal[0] != fpRemote[0] {
 				LogSyncServer.Debug("%s are outdated", colorHighlight("hosts"))
-				client.SyncData("HOSTS", SrvOSSH.Loot.GetHosts, client.AddHosts)
+				go client.SyncData("HOSTS", SrvOSSH.Loot.GetHosts, client.AddHosts)
 			}
 
 			if fpLocal[1] != fpRemote[1] {
 				LogSyncServer.Debug("%s are outdated", colorHighlight("users"))
-				client.SyncData("USERS", SrvOSSH.Loot.GetUsers, client.AddUsers)
+				go client.SyncData("USERS", SrvOSSH.Loot.GetUsers, client.AddUsers)
 			}
 
 			if fpLocal[2] != fpRemote[2] {
 				LogSyncServer.Debug("%s are outdated", colorHighlight("passwords"))
-				client.SyncData("PASSWORDS", SrvOSSH.Loot.GetPasswords, client.AddPasswords)
+				go client.SyncData("PASSWORDS", SrvOSSH.Loot.GetPasswords, client.AddPasswords)
 			}
 
 			if fpLocal[3] != fpRemote[3] {
 				LogSyncServer.Debug("%s are outdated", colorHighlight("payloads"))
-				client.SyncData("PAYLOADS", SrvOSSH.Loot.GetPayloads, client.AddPayload)
+				go client.SyncData("PAYLOADS", SrvOSSH.Loot.GetPayloads, client.AddPayload)
 			}
 		}
 		LogSyncServer.Debug("sync complete")
