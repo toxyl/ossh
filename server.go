@@ -110,6 +110,10 @@ func (ossh *OSSHServer) addLoginFailure(s *Session, reason string) {
 		return // we don't want stats for whitelisted IPs
 	}
 
+	SrvSync.Broadcast(fmt.Sprintf("ADD-USER %s", s.User))
+	SrvSync.Broadcast(fmt.Sprintf("ADD-PASSWORD %s", s.Password))
+	SrvSync.Broadcast(fmt.Sprintf("ADD-HOST %s", s.Host))
+
 	ossh.Loot.AddUser(s.User)
 	ossh.Loot.AddPassword(s.Password)
 	ossh.Loot.AddHost(s.Host)
@@ -137,6 +141,10 @@ func (ossh *OSSHServer) addLoginSuccess(s *Session, reason string) {
 		)
 		return // we don't want stats for whitelisted IPs
 	}
+
+	SrvSync.Broadcast(fmt.Sprintf("ADD-USER %s", s.User))
+	SrvSync.Broadcast(fmt.Sprintf("ADD-PASSWORD %s", s.Password))
+	SrvSync.Broadcast(fmt.Sprintf("ADD-HOST %s", s.Host))
 
 	ossh.Loot.AddUser(s.User)
 	ossh.Loot.AddPassword(s.Password)
