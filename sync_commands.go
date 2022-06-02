@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"strings"
 )
 
 type SyncCommand func(args []string) (string, error)
@@ -15,11 +16,48 @@ var SyncCommands = map[string]SyncCommand{
 			return "", errors.New("need your fingerprint")
 		}
 		fp := args[0]
+		if fp == "" {
+			return "", errors.New("need your fingerprint")
+		}
+
 		fpsrv := SrvOSSH.Loot.Fingerprint()
 		if fp == fpsrv {
+			LogSyncCommands.Debug("Ignored SYNC request: %s (we have: %s)", colorHighlight(fp), colorHighlight(fpsrv))
 			return "", nil
 		}
-		return fpsrv, nil
+		fpRemote := strings.Split(fp, ":")
+		fpLocal := strings.Split(fpsrv, ":")
+
+		if len(fpRemote) != len(fpLocal) {
+			LogSyncCommands.Debug("Ignored SYNC request, fingerprints are not the same length: %s (we have: %s)", colorHighlight(fp), colorHighlight(fpsrv))
+			return "", nil
+		}
+
+		if len(fpRemote) == 0 || len(fpLocal) == 0 {
+			LogSyncCommands.Debug("Ignored SYNC request, one of the fingerprints is empty: %s (we have: %s)", colorHighlight(fp), colorHighlight(fpsrv))
+			return "", nil
+		}
+
+		syncList := []string{}
+		if fpRemote[0] != fpLocal[0] {
+			syncList = append(syncList, "hosts")
+		}
+
+		if fpRemote[1] != fpLocal[1] {
+			syncList = append(syncList, "users")
+		}
+
+		if fpRemote[2] != fpLocal[2] {
+			syncList = append(syncList, "passwords")
+		}
+
+		if fpRemote[3] != fpLocal[3] {
+			syncList = append(syncList, "payloads")
+		}
+
+		sl := strings.Join(syncList, ",")
+		LogSyncCommands.Debug("Responding to SYNC request: %s (we want: %s)", colorHighlight(fp), colorHighlight(sl))
+		return sl, nil
 	},
 	"STATS": func(args []string) (string, error) {
 		return SrvOSSH.statsJSONSimple(), nil

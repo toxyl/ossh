@@ -34,15 +34,12 @@ func (sc *SyncClient) write(msg string) {
 	if sc.conn != nil {
 		_ = sc.conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
 		msg = strings.TrimSpace(msg)
-		LogSyncClient.Debug("%s: write: %s", colorHost(sc.ID()), colorReason(msg))
 		msg = EncodeGzBase64String(msg)
-		LogSyncClient.Debug("%s: write: %s", colorHost(sc.ID()), colorHighlight(msg))
 		fmt.Fprintf(sc.conn, msg+"\n")
 	}
 }
 
 func (sc *SyncClient) exit() {
-	LogSyncClient.Debug("%s: exit", colorHost(sc.ID()))
 	sc.write("exit")
 }
 
@@ -63,15 +60,14 @@ func (sc *SyncClient) Exec(command string) (string, error) {
 		return "", err
 	}
 	resp = strings.TrimSpace(resp)
-	LogSyncClient.Debug("%s: read: %s", colorHost(sc.ID()), colorReason(resp))
 	if resp == "" {
 		return "", nil
 	}
 	resp, err = DecodeGzBase64String(resp)
-	LogSyncClient.Debug("%s: read: %s", colorHost(sc.ID()), colorHighlight(resp))
 	if err != nil {
 		LogSyncClient.Debug("%s: Decoding %s failed: %s", colorHost(sc.ID()), colorHighlight(command), colorError(err))
 		LogSyncClient.Debug("%s: Response was: %s", colorHost(sc.ID()), colorHighlight(resp))
+		return "", nil
 	}
 
 	return resp, nil
@@ -82,21 +78,21 @@ func (sc *SyncClient) ID() string {
 }
 
 func (sc *SyncClient) AddHosts(hosts string) {
-	chunks := ChunkString(sc.Host, " ", 1000)
+	chunks := ChunkString(hosts, " ", 5000)
 	for _, chunk := range chunks {
 		_, _ = sc.Exec(fmt.Sprintf("ADD-HOST %s", chunk))
 	}
 }
 
 func (sc *SyncClient) AddUsers(users string) {
-	chunks := ChunkString(users, " ", 1000)
+	chunks := ChunkString(users, " ", 5000)
 	for _, chunk := range chunks {
 		_, _ = sc.Exec(fmt.Sprintf("ADD-USER %s", chunk))
 	}
 }
 
 func (sc *SyncClient) AddPasswords(passwords string) {
-	chunks := ChunkString(passwords, " ", 1000)
+	chunks := ChunkString(passwords, " ", 5000)
 	for _, chunk := range chunks {
 		_, _ = sc.Exec(fmt.Sprintf("ADD-PASSWORD %s", chunk))
 	}

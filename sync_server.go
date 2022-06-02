@@ -7,8 +7,6 @@ import (
 	"net"
 	"strings"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 const InvalidCommand = "Command not recognized"
@@ -31,9 +29,7 @@ func (ss *SyncServer) write(msg string) {
 	if ss.conn != nil {
 		msg = strings.TrimSpace(msg)
 		if msg != "" {
-			LogSyncServer.Debug("%s:%s: write: %s", colorHost(Conf.SyncServer.Host), colorInt(int(Conf.SyncServer.Port)), colorHighlight(msg))
 			msg = EncodeGzBase64String(msg)
-			LogSyncServer.Debug("%s:%s: write: %s", colorHost(Conf.SyncServer.Host), colorInt(int(Conf.SyncServer.Port)), colorHighlight(msg))
 		}
 		_, _ = ss.conn.Write([]byte(msg))
 	}
@@ -56,7 +52,6 @@ func (ss *SyncServer) process(cmd string) {
 			ss.write(EmptyCommandResponse)
 			return
 		}
-		LogSyncServer.Debug("Command %s => %s", colorHighlight(command), colorHighlight(res))
 		ss.write(res)
 	}
 }
@@ -72,8 +67,6 @@ func (ss *SyncServer) handleConnection() {
 			LogSyncServer.Error("Could not decode input: %s", colorError(err))
 			return
 		}
-
-		LogSyncServer.Debug("processing: %s", colorHighlight(data))
 
 		if data == EmptyCommandResponse {
 			ss.write(EmptyCommandResponse)
@@ -120,9 +113,8 @@ func (ss *SyncServer) Exec(msg string) string {
 	return ss.nodes.Exec(msg)
 }
 
-func (ss *SyncServer) GetOutOfSyncNodes() map[string]string {
-	res := ss.Broadcast(fmt.Sprintf("SYNC %s", SrvOSSH.Loot.Fingerprint()))
-	LogSyncServer.Debug("out of sync nodes: %s", colorHighlight(spew.Sdump(res)))
+func (ss *SyncServer) GetOutOfSyncNodes(fingerprint string) map[string]string {
+	res := ss.Broadcast(fmt.Sprintf("SYNC %s", fingerprint))
 	return res
 }
 
@@ -131,16 +123,16 @@ func (ss *SyncServer) SyncToNodes() {
 	for {
 		ss.busy = true
 		fp := SrvOSSH.Loot.Fingerprint()
-		LogSyncServer.Debug("syncing to nodes: %s", colorHighlight(fp))
+		fp = strings.TrimSpace(fp)
+		LogSyncServer.Debug("Starting sync: %s", colorHighlight(fp))
 
-		fpLocal := strings.Split(fp, ":")
-
-		for k, v := range ss.GetOutOfSyncNodes() {
+		for k, v := range ss.GetOutOfSyncNodes(fp) {
+			v = strings.TrimSpace(v)
 			if v == "" {
 				continue // node is already in sync
 			}
-			LogSyncServer.Debug("syncing to node %s", colorHost(k))
-			fpRemote := strings.Split(v, ":")
+			LogSyncServer.Debug("Node %s needs update: %s", colorHost(k), colorHighlight(v))
+			sections := strings.Split(v, ",")
 			parts := strings.Split(k, ":")
 			client, err := ss.GetClient(parts[0], StringToInt(parts[1], 0))
 			if err != nil {
@@ -148,33 +140,21 @@ func (ss *SyncServer) SyncToNodes() {
 				continue
 			}
 
-			if len(fpLocal) != 4 || len(fpRemote) != 4 {
-				// probably something went wrong with the transmission,
-				// let's ignore it for now
-				continue
-			}
-
-			if fpLocal[0] != fpRemote[0] {
-				LogSyncServer.Debug("%s are outdated", colorHighlight("hosts"))
-				go client.SyncData("HOSTS", SrvOSSH.Loot.GetHosts, client.AddHosts)
-			}
-
-			if fpLocal[1] != fpRemote[1] {
-				LogSyncServer.Debug("%s are outdated", colorHighlight("users"))
-				go client.SyncData("USERS", SrvOSSH.Loot.GetUsers, client.AddUsers)
-			}
-
-			if fpLocal[2] != fpRemote[2] {
-				LogSyncServer.Debug("%s are outdated", colorHighlight("passwords"))
-				go client.SyncData("PASSWORDS", SrvOSSH.Loot.GetPasswords, client.AddPasswords)
-			}
-
-			if fpLocal[3] != fpRemote[3] {
-				LogSyncServer.Debug("%s are outdated", colorHighlight("payloads"))
-				go client.SyncData("PAYLOADS", SrvOSSH.Loot.GetPayloads, client.AddPayload)
+			for _, section := range sections {
+				LogSyncServer.Debug("Sending %s to %s", colorHighlight(section), colorHost(k))
+				switch section {
+				case "hosts":
+					client.SyncData("HOSTS", SrvOSSH.Loot.GetHosts, client.AddHosts)
+				case "users":
+					client.SyncData("USERS", SrvOSSH.Loot.GetUsers, client.AddUsers)
+				case "passwords":
+					client.SyncData("PASSWORDS", SrvOSSH.Loot.GetPasswords, client.AddPasswords)
+				case "payloads":
+					client.SyncData("PAYLOADS", SrvOSSH.Loot.GetPayloads, client.AddPayload)
+				}
 			}
 		}
-		LogSyncServer.Debug("sync complete")
+		LogSyncServer.Debug("Sync complete!")
 		ss.busy = false
 
 		time.Sleep(time.Duration(Conf.Sync.Interval) * time.Minute)
@@ -221,7 +201,6 @@ func (ss *SyncServer) Start() {
 		}
 
 		if ss.busy {
-			LogSyncServer.Debug("%s, don't you see I'm busy?", colorHost(host))
 			ss.write(EmptyCommandResponse)
 			ss.close()
 			continue
