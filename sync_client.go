@@ -20,7 +20,7 @@ func (sc *SyncClient) connect() {
 	c, err := net.Dial("tcp", sc.ID())
 	if err != nil {
 		if strings.Contains(err.Error(), "connect: connection refused") {
-			LogSyncClient.Warning("%s: Node is probably %s (only investigate if every sync fails)", colorHost(sc.ID()), colorHighlight("busy syncing"))
+			LogSyncClient.Warning("%s: Node is probably %s (only investigate if every sync fails)", colorHost(sc.Host), colorHighlight("busy syncing"))
 			return
 		}
 		LogSyncClient.Error("%s: Failed to connect: %s", colorHost(sc.ID()), colorError(err))
