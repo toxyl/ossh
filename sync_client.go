@@ -80,21 +80,21 @@ func (sc *SyncClient) ID() string {
 func (sc *SyncClient) AddHosts(hosts string) {
 	chunks := ChunkString(hosts, " ", 5000)
 	for _, chunk := range chunks {
-		_, _ = sc.Exec(fmt.Sprintf("ADD-HOST %s", chunk))
+		_, _ = sc.Exec(fmt.Sprintf("ADD-HOST %s", strings.Join(chunk, " ")))
 	}
 }
 
 func (sc *SyncClient) AddUsers(users string) {
 	chunks := ChunkString(users, " ", 5000)
 	for _, chunk := range chunks {
-		_, _ = sc.Exec(fmt.Sprintf("ADD-USER %s", chunk))
+		_, _ = sc.Exec(fmt.Sprintf("ADD-USER %s", strings.Join(chunk, " ")))
 	}
 }
 
 func (sc *SyncClient) AddPasswords(passwords string) {
 	chunks := ChunkString(passwords, " ", 5000)
 	for _, chunk := range chunks {
-		_, _ = sc.Exec(fmt.Sprintf("ADD-PASSWORD %s", chunk))
+		_, _ = sc.Exec(fmt.Sprintf("ADD-PASSWORD %s", strings.Join(chunk, " ")))
 	}
 }
 

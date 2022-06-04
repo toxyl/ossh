@@ -184,6 +184,12 @@ func (ss *SyncServer) Start() {
 			continue
 		}
 
+		if ss.busy {
+			_, _ = conn.Write([]byte(EmptyCommandResponse))
+			conn.Close()
+			continue
+		}
+
 		ss.conn = conn
 
 		host, _, err := net.SplitHostPort(ss.conn.RemoteAddr().String())
@@ -196,12 +202,6 @@ func (ss *SyncServer) Start() {
 		if !ss.nodes.IsAllowedHost(host) {
 			LogSyncServer.NotOK("%s is not a sync node, I'll give a bullshit response.", colorHost(host))
 			ss.write(GenerateGarbageString(1000))
-			ss.close()
-			continue
-		}
-
-		if ss.busy {
-			ss.write(EmptyCommandResponse)
 			ss.close()
 			continue
 		}
