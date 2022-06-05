@@ -27,7 +27,7 @@ func (sc *SyncClient) connect() error {
 			LogSyncClient.Debug("%s: Node is probably %s (only investigate if every sync fails)", colorHost(sc.Host), colorHighlight("down"))
 			return fmt.Errorf("down")
 		}
-		if strings.Contains(err.Error(), "i/o timeout") {
+		if strings.Contains(err.Error(), "connect: no route to host") || strings.Contains(err.Error(), "i/o timeout") {
 			LogSyncClient.Warning("%s: Node is %s", colorHost(sc.Host), colorHighlight("unreachable"))
 			return fmt.Errorf("unreachable")
 		}

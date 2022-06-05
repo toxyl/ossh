@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -29,18 +28,4 @@ func (fss *FakeShellStats) ToPayload() *Payload {
 	p.Set(pl)
 	p.payload = fss.recording.String()
 	return p
-}
-
-func (fss *FakeShellStats) SaveCapture() {
-	pl := fss.ToPayload()
-	f := fmt.Sprintf("%s/ocap-%s-%s.cast", Conf.PathCaptures, fss.Host, pl.hash)
-
-	if !FileExists(f) {
-		err := fss.recording.Save(f)
-		if err == nil {
-			LogFakeShell.Success("Capture saved: %s", colorFile(f))
-		}
-	}
-	SrvOSSH.Loot.AddPayload(pl.hash)
-	pl.Save()
 }

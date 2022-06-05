@@ -7,7 +7,10 @@ import (
 )
 
 func colorConnID(user, host string, port int) string {
-	return fmt.Sprintf("%s@%s:%s", colorUser(user), colorHost(host), colorInt(port))
+	if user == "" {
+		return fmt.Sprintf("%s:%s", colorHost(host), colorPort(port))
+	}
+	return fmt.Sprintf("%s:%s > %s", colorHost(host), colorPort(port), colorUser(user))
 }
 
 func colorWrap(str string, color uint) string {
@@ -16,6 +19,11 @@ func colorWrap(str string, color uint) string {
 
 func colorUser(user string) string {
 	return colorWrap(user, colorGreen)
+}
+
+func colorPort(port int) string {
+	// 94 - 231 (137 total)
+	return colorWrap(fmt.Sprint(port), uint(94.0+137.0*(float64(port)/65535.0)))
 }
 
 func colorHost(host string) string {
@@ -172,6 +180,7 @@ var (
 	LogOverlayFS     = NewLogger("Overlay FS", colorLightBlue)
 	LogPayloads      = NewLogger("Payloads", colorDarkYellow)
 	LogOSSHServer    = NewLogger("oSSH Server", colorLime)
+	LogSessions      = NewLogger("Sessions", colorDarkOrange)
 	LogSyncClient    = NewLogger("Sync Client", colorBlue)
 	LogSyncCommands  = NewLogger("Sync Commands", colorDarkGreen)
 	LogSyncServer    = NewLogger("Sync Server", colorDarkRed)

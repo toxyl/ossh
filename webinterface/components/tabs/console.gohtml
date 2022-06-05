@@ -83,7 +83,7 @@
 </script>
 {{ template "ws_conn" dict "Scheme" .Scheme "Name" "console" "OpenFn" "ws_con_open" "CloseFn" "ws_con_close" "PreConnectFn" "ws_con_preconnect" "ReceiveFn" "ws_con_receive" "ReceiveCompleteFn" "ws_con_receive_complete" "SendFn" "ws_con_send" }}
 <div id="tabConsole" class="w3-display-container w3-dark-gray tab">
-    <div style="padding-top: 7px;">
+    <div style="padding-top: 7px;" class="pad-top-5px bg-color-lighter">
         <table class="w100 no-margin">
             <tr>
                 <td><b>Message types</b></td>
@@ -94,6 +94,7 @@
                 <td><tag class="w3-button w3-text-black bg-color-ok w100" onclick="filter_log('ok')">ok</tag></td>
                 <td><tag class="w3-button w3-text-black bg-color-success w100" onclick="filter_log('success')">success</tag></td>
                 <td><tag class="w3-button w3-text-black bg-color-debug w100" onclick="filter_log('debug')">debug</tag></td>
+                <td></td>
                 <td></td>
                 <td></td>
                 <td></td>
@@ -108,13 +109,14 @@
                 <td><tag class="w3-button w3-text-black bg-color-overlay-fs w100" onclick="filter_log('overlay-fs')">overlay-fs</tag></td>
                 <td><tag class="w3-button w3-text-black bg-color-payloads w100" onclick="filter_log('payloads')">payloads</tag></td>
                 <td><tag class="w3-button w3-text-black bg-color-fake-shell w100" onclick="filter_log('fake-shell')">fake-shell</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-sessions w100" onclick="filter_log('sessions')">sessions</tag></td>
                 <td><tag class="w3-button w3-text-black bg-color-text-templater w100" onclick="filter_log('text-templater')">text-templater</tag></td>
                 <td><tag class="w3-button w3-text-black bg-color-html-templater w100" onclick="filter_log('html-templater')">html-templater</tag></td>
             </tr>
             <tr>
                 <td></td>
                 <td class="center"><tag class="w3-button w3-text-black bg-color-other w100" onclick="filter_log('*')">Reset</tag></td>
-                <td colspan="9"></td>
+                <td colspan="10"></td>
             </tr>
         </table>
     </div>

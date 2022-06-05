@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gliderlabs/ssh"
@@ -20,6 +21,7 @@ type OSSHServer struct {
 	TimeWasted int
 	server     *ssh.Server
 	fs         *OverlayFSManager
+	lock       *sync.Mutex
 }
 
 func (ossh *OSSHServer) stats() *SyncNodeStats {
@@ -121,8 +123,8 @@ func (ossh *OSSHServer) addLoginFailure(s *Session, reason string) {
 	ossh.Loot.AddHost(s.Host)
 	ossh.Logins.Get(s.Host).AddFailure()
 	LogOSSHServer.NotOK(
-		"%s failed to login with password %s: %s. (%d attempts; %d failed; %d success)",
-		s.LogID(),
+		"%s: Failed to login with password %s: %s. (%d attempts; %d failed; %d success)",
+		s.LogIDFull(),
 		colorPassword(s.Password),
 		colorReason(reason),
 		ossh.Logins.Get(s.Host).GetAttempts(),
@@ -153,8 +155,8 @@ func (ossh *OSSHServer) addLoginSuccess(s *Session, reason string) {
 	ossh.Loot.AddHost(s.Host)
 	ossh.Logins.Get(s.Host).AddSuccess()
 	LogOSSHServer.OK(
-		"%s logged in with password %s: %s. (%d attempts; %d failed; %d success)",
-		s.LogID(),
+		"%s: Logged in with password %s: %s. (%d attempts; %d failed; %d success)",
+		s.LogIDFull(),
 		colorPassword(s.Password),
 		colorReason(reason),
 		ossh.Logins.Get(s.Host).GetAttempts(),
@@ -171,7 +173,7 @@ func (ossh *OSSHServer) GracefulCloseOnError(err error, s *Session, sess *ssh.Se
 	}
 	(*sess).Close()
 	if s != nil {
-		ossh.Sessions.Remove(s.ID)
+		ossh.Sessions.Remove(s.ID, err.Error())
 	}
 }
 
@@ -188,7 +190,6 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 		return
 	}
 
-	// only create for bots, sync nodes don't need it
 	overlayFS, err := ossh.fs.NewSession(fmt.Sprintf("%s:%d", s.Host, s.Port))
 	if err != nil {
 		ossh.GracefulCloseOnError(err, s, s.SSHSession, overlayFS)
@@ -205,12 +206,12 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 	}()
 
 	s.SetShell(NewFakeShell((*s.SSHSession), overlayFS))
-	stats := s.Shell.Process()
+	s.RandomSleep(1, 10)
+	stats := s.Shell.Process(s)
 
 	if !s.Whitelisted {
-		LogOSSHServer.Success("%s spent %s running %s command(s)",
-			s.LogID(),
-			colorDuration(uint(s.Uptime().Seconds())),
+		LogOSSHServer.Success("%s: Finished running %s command(s)",
+			s.LogIDFull(),
 			colorInt(int(stats.CommandsExecuted)),
 		)
 	} else {
@@ -220,64 +221,64 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 		)
 	}
 
-	ossh.SaveData()
-
 	if !s.Whitelisted {
-		stats.SaveCapture()
+		ossh.SaveData()
+		pl := stats.ToPayload()
+		SrvOSSH.Loot.AddPayload(pl.hash)
+		pl.Save()
 	}
 
-	ossh.Sessions.Remove(s.ID)
+	ossh.Sessions.Remove(s.ID, "")
 }
 
 func (ossh *OSSHServer) localPortForwardingCallback(ctx ssh.Context, bindHost string, bindPort uint32) bool {
 	s := ossh.Sessions.Create(ctx.RemoteAddr().String())
-	LogOSSHServer.Warning("%s tried to locally port forward to %s:%s. Request denied!",
-		s.LogID(),
+	LogOSSHServer.Warning("%s: Tried to locally port forward to %s:%s. Request denied!",
+		s.LogIDFull(),
 		colorHost(bindHost),
 		colorInt(int(bindPort)),
 	)
-	ossh.Sessions.Remove(s.ID)
+	ossh.Sessions.Remove(s.ID, "local port forwarding denied")
 	return false
 }
 
 func (ossh *OSSHServer) reversePortForwardingCallback(ctx ssh.Context, bindHost string, bindPort uint32) bool {
 	s := ossh.Sessions.Create(ctx.RemoteAddr().String())
-	LogOSSHServer.Warning("%s tried to reverse port forward to %s:%s. Request denied!",
-		s.LogID(),
+	LogOSSHServer.Warning("%s: Tried to reverse port forward to %s:%s. Request denied!",
+		s.LogIDFull(),
 		colorHost(bindHost),
 		colorInt(int(bindPort)),
 	)
-	ossh.Sessions.Remove(s.ID)
+	ossh.Sessions.Remove(s.ID, "reverse port forwarding denied")
 	return false
 }
 
 func (ossh *OSSHServer) ptyCallback(ctx ssh.Context, pty ssh.Pty) bool {
 	s := ossh.Sessions.Create(ctx.RemoteAddr().String()).SetTerm(pty.Term)
-	if s.Whitelisted {
-		return true
+	if !s.Whitelisted {
+		LogOSSHServer.OK("%s: Started %s PTY session",
+			s.LogIDFull(),
+			colorHighlight(s.Term),
+		)
 	}
-	LogOSSHServer.OK("%s started %s PTY session",
-		s.LogID(),
-		colorHighlight(s.Term),
-	)
+	s.RandomSleep(1, 10)
 	return true
 }
 
 func (ossh *OSSHServer) sessionRequestCallback(sess ssh.Session, requestType string) bool {
 	s := ossh.Sessions.Create(sess.RemoteAddr().String()).SetType(requestType)
-	if s.Whitelisted {
-		return true
+	if !s.Whitelisted {
+		LogOSSHServer.OK("%s: Requested %s session",
+			s.LogIDFull(),
+			colorHighlight(s.Type),
+		)
 	}
-	LogOSSHServer.OK("%s requested %s session",
-		s.LogID(),
-		colorHighlight(s.Type),
-	)
+	s.RandomSleep(1, 10)
 	return true
 }
 
 func (ossh *OSSHServer) connectionFailedCallback(conn net.Conn, err error) {
 	s := ossh.Sessions.Create(conn.RemoteAddr().String())
-
 	e := err.Error()
 
 	if e == "EOF" {
@@ -294,29 +295,33 @@ func (ossh *OSSHServer) connectionFailedCallback(conn net.Conn, err error) {
 		// ok, that's fine, come back another time.
 	} else {
 		// ok, this might be relevant
-		LogOSSHServer.Warning("%s's connection failed: %s", s.LogID(), colorError(err))
+		LogOSSHServer.Warning("%s: Connection failed because %s", s.LogIDFull(), colorError(err))
+		ossh.Sessions.Remove(s.ID, err.Error())
+		return
 	}
 
-	ossh.Sessions.Remove(s.ID)
+	ossh.Sessions.Remove(s.ID, "")
 }
 
 func (ossh *OSSHServer) authHandler(ctx ssh.Context, pwd string) bool {
-	s := ossh.Sessions.Create(ctx.RemoteAddr().String())
-	s.SetUser(ctx.User()).SetPassword(pwd)
-
+	s := ossh.Sessions.Create(ctx.RemoteAddr().String()).SetUser(ctx.User()).SetPassword(pwd)
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.UpdateActivity("auth handler start")
+	defer s.UpdateActivity("auth handler end")
 	if s.Whitelisted {
 		ossh.addLoginSuccess(s, "host is whitelisted")
 		return true // I know you, have fun
 	}
 
-	if ossh.Loot.HasHost(s.Host) {
+	// we know the host, but let's add some dice to the mix anyway
+	if ossh.Loot.HasHost(s.Host) && time.Now().Unix()%7 != 0 {
 		ossh.addLoginSuccess(s, "host is back for more")
 		return true // let's see what it wants
 	}
 
 	if ossh.Loot.HasUser(s.User) && ossh.Loot.HasPassword(s.Password) {
 		ossh.addLoginFailure(s, "host does not have new credentials")
-		ossh.Sessions.Remove(s.ID)
 		return false // come back when you have something we don't know yet!
 	}
 
@@ -333,12 +338,19 @@ func (ossh *OSSHServer) authHandler(ctx ssh.Context, pwd string) bool {
 	// ok, the attacker has credentials we don't know yet, let's roll dice.
 	if time.Now().Unix()%3 != 0 {
 		ossh.addLoginFailure(s, "host lost a game of dice")
-		ossh.Sessions.Remove(s.ID)
 		return false // no luck, big boy, try again
 	}
 
 	ossh.addLoginSuccess(s, "host dodged all obstacles")
 	return true
+}
+
+func (ossh *OSSHServer) connectionCallback(ctx ssh.Context, conn net.Conn) net.Conn {
+	s := ossh.Sessions.Create(conn.RemoteAddr().String())
+	if s != nil {
+		s.RandomSleep(1, 10)
+	}
+	return conn
 }
 
 func (ossh *OSSHServer) init() {
@@ -355,6 +367,7 @@ func (ossh *OSSHServer) init() {
 		ConnectionFailedCallback:      ossh.connectionFailedCallback,
 		SessionRequestCallback:        ossh.sessionRequestCallback,
 		Version:                       Conf.Version,
+		ConnCallback:                  ossh.connectionCallback,
 	}
 
 	ossh.fs = &OverlayFSManager{}
@@ -380,6 +393,7 @@ func NewOSSHServer() *OSSHServer {
 		server:     nil,
 		Sessions:   NewActiveSessions(Conf.MaxSessionAge),
 		TimeWasted: 0,
+		lock:       &sync.Mutex{},
 	}
 	ossh.init()
 	go func() {

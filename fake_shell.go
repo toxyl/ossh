@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -118,7 +117,7 @@ func (fs *FakeShell) ReadBytesUntil(sep byte) ([]byte, error) {
 	return bytes, nil
 }
 
-func (fs *FakeShell) Exec(line string) bool {
+func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 	fs.stats.AddCommandToHistory(line)
 
 	pieces := strings.Split(line, " ")
@@ -159,18 +158,13 @@ func (fs *FakeShell) Exec(line string) bool {
 		Command:   command,
 		Arguments: args,
 	}
-
-	if SrvSync.HasNode(data.IP) {
-		LogFakeShell.Warning("%s, what are you doing here? Go home!", colorConnID(data.User, data.IP, data.Port))
-		return true
+	cmd := fmt.Sprintf("%s %s", colorReason(command), colorWrap(strings.Join(args, " "), colorLightBlue))
+	if lSeq > 1 {
+		cmd = fmt.Sprintf("(%s/%s) %s", colorInt(iSeq), colorInt(lSeq), cmd)
 	}
-
-	LogFakeShell.Info(
-		"%s runs %s %s",
-		colorConnID(data.User, data.IP, data.Port),
-		colorReason(command),
-		colorWrap(strings.Join(args, " "), colorLightBlue),
-	)
+	LogFakeShell.Info("%s @ %s: %s", colorConnID(data.User, data.IP, data.Port), colorDuration(uint(s.ActiveFor().Seconds())), cmd)
+	s.UpdateActivity("run command start")
+	defer s.UpdateActivity("run command end")
 
 	// 1) make sure the client waits some time at least,
 	//    the more input the more wait time, hehe
@@ -259,7 +253,7 @@ func (fs *FakeShell) Exec(line string) bool {
 	return false
 }
 
-func (fs *FakeShell) HandleInput() {
+func (fs *FakeShell) HandleInput(s *Session) {
 	for {
 		line, err := fs.terminal.ReadLine()
 		if err != nil {
@@ -280,8 +274,8 @@ func (fs *FakeShell) HandleInput() {
 
 		lines := strings.Split(line, "\n")
 		mustExit := false
-		for _, ln := range lines {
-			if fs.Exec(ln) {
+		for i, ln := range lines {
+			if fs.Exec(ln, s, i+1, len(lines)) {
 				mustExit = true
 				break
 			}
@@ -292,7 +286,7 @@ func (fs *FakeShell) HandleInput() {
 	}
 }
 
-func (fs *FakeShell) Process() *FakeShellStats {
+func (fs *FakeShell) Process(s *Session) *FakeShellStats {
 	if fs.session.RawCommand() != "" {
 		// this means the client passed a command along (e.g. with -t/-tt param),
 		// let's run it and then close the connection.
@@ -307,19 +301,13 @@ func (fs *FakeShell) Process() *FakeShellStats {
 		}
 
 		commands := strings.Split(raw, "\n")
-		host, port, _ := net.SplitHostPort(fs.session.RemoteAddr().String())
-		LogFakeShell.Info(
-			"%s wants to run %s commands",
-			colorConnID(fs.User(), host, StringToInt(port, 0)),
-			colorInt(len(commands)),
-		)
-		for _, cmd := range commands {
-			if fs.Exec(cmd) {
+		for i, cmd := range commands {
+			if fs.Exec(cmd, s, i+1, len(commands)) {
 				break
 			}
 		}
 	} else {
-		fs.HandleInput()
+		fs.HandleInput(s)
 	}
 	fs.Close()
 	return fs.stats
