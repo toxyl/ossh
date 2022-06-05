@@ -185,7 +185,13 @@ func (ss *Sessions) Remove(sessionID string) {
 	if ss.Has(sessionID) {
 		ss.lock.Lock()
 		defer ss.lock.Unlock()
-		SrvOSSH.TimeWasted += int(ss.sessions[sessionID].Uptime().Seconds())
+		s := ss.sessions[sessionID]
+		tw := int(s.Uptime().Seconds())
+		LogOSSHServer.OK("%s is gone, it wasted %s",
+			s.LogID(),
+			colorDuration(uint(tw)),
+		)
+		SrvOSSH.TimeWasted += tw
 		delete(ss.sessions, sessionID)
 	}
 }
@@ -216,7 +222,7 @@ func NewActiveSessions(maxAge uint) *Sessions {
 	}
 	go func(maxAge uint) {
 		for {
-			time.Sleep(1 * time.Minute)
+			time.Sleep(INTERVAL_SESSIONS_CLEANUP)
 			ss.CleanUp(maxAge)
 		}
 	}(maxAge)

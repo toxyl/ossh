@@ -8,7 +8,16 @@
         const SECONDS_PER_MINUTE = 60;
         const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * 60;
         const SECONDS_PER_DAY = SECONDS_PER_HOUR * 24;
-
+        var leftPad = function(str, len) {
+            str = `${str}`;
+            pl = Math.max(0, len - str.length);
+            pstr = "";
+            while (pl > 0) {
+                pstr += '0';
+                pl--;
+            }
+            return `<span style="color: #585858">${pstr}</span>${str}`;
+        };
         var seconds = parseInt(seconds, 10);
         var days    = Math.floor(seconds / SECONDS_PER_DAY);
         seconds    -= days * SECONDS_PER_DAY;
@@ -18,10 +27,10 @@
         seconds    -= minutes * SECONDS_PER_MINUTE;
 
         var res = "";
-        if (days > 0) res += `${days}d `;
-        if (days > 0 || hours > 0) res += `${hours}h `;
-        if (hours > 0 || minutes > 0) res += `${minutes}m `;
-        res += `${seconds}s`;
+        if (days > 0) res += `${leftPad(days, 4)}d `;
+        if (days > 0 || hours > 0) res += `${leftPad(hours, 2)}h `;
+        if (hours > 0 || minutes > 0) res += `${leftPad(minutes, 2)}m `;
+        res += `${leftPad(seconds, 2)}s`;
         
         return res;
     }

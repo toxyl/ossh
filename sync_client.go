@@ -16,23 +16,32 @@ type SyncClient struct {
 	conn net.Conn
 }
 
-func (sc *SyncClient) connect() {
-	c, err := net.Dial("tcp", sc.ID())
+func (sc *SyncClient) connect() error {
+	c, err := net.DialTimeout("tcp", sc.ID(), 10*time.Second)
 	if err != nil {
 		if strings.Contains(err.Error(), "connect: connection refused") {
-			LogSyncClient.Warning("%s: Node is probably %s (only investigate if every sync fails)", colorHost(sc.Host), colorHighlight("busy syncing"))
-			return
+			LogSyncClient.Debug("%s: Node is probably %s (only investigate if every sync fails)", colorHost(sc.Host), colorHighlight("busy syncing"))
+			return fmt.Errorf("busy syncing")
+		}
+		if strings.Contains(err.Error(), "connect: connection timed out") {
+			LogSyncClient.Debug("%s: Node is probably %s (only investigate if every sync fails)", colorHost(sc.Host), colorHighlight("down"))
+			return fmt.Errorf("down")
+		}
+		if strings.Contains(err.Error(), "i/o timeout") {
+			LogSyncClient.Warning("%s: Node is %s", colorHost(sc.Host), colorHighlight("unreachable"))
+			return fmt.Errorf("unreachable")
 		}
 		LogSyncClient.Error("%s: Failed to connect: %s", colorHost(sc.ID()), colorError(err))
-		return
+		return err
 	}
 	LogSyncClient.Debug("%s: connect", colorHost(sc.ID()))
 	sc.conn = c
+	return nil
 }
 
 func (sc *SyncClient) write(msg string) {
 	if sc.conn != nil {
-		_ = sc.conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
+		_ = sc.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		msg = strings.TrimSpace(msg)
 		msg = EncodeGzBase64String(msg)
 		fmt.Fprintf(sc.conn, msg+"\n")
@@ -44,14 +53,17 @@ func (sc *SyncClient) exit() {
 }
 
 func (sc *SyncClient) Exec(command string) (string, error) {
-	sc.connect()
+	err := sc.connect()
+	if err != nil {
+		return "", err
+	}
 	if sc.conn == nil {
 		return "", errors.New("not connected")
 	}
 	sc.write(command)
 	defer sc.exit()
 
-	_ = sc.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	_ = sc.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	reader := bufio.NewReader(sc.conn)
 	resp, err := reader.ReadString('\n')
 

@@ -119,7 +119,7 @@ func (ss *SyncServer) GetOutOfSyncNodes(fingerprint string) map[string]string {
 }
 
 func (ss *SyncServer) SyncToNodes() {
-	time.Sleep(time.Duration(10) * time.Second)
+	time.Sleep(DELAY_SYNC_START)
 	for {
 		ss.busy = true
 		fp := SrvOSSH.Loot.Fingerprint()

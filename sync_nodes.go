@@ -6,10 +6,35 @@ import (
 	"sync"
 )
 
+type SyncNodeStats struct {
+	Hosts            int     `json:"hosts"`
+	Passwords        int     `json:"passwords"`
+	Users            int     `json:"users"`
+	Payloads         int     `json:"payloads"`
+	Sessions         int     `json:"sessions"`
+	AttemptedLogins  uint    `json:"logins_attempted"`
+	SuccessfulLogins uint    `json:"logins_successful"`
+	FailedLogins     uint    `json:"logins_failed"`
+	TimeWasted       float64 `json:"time_wasted"`
+	Uptime           float64 `json:"uptime"`
+}
+type SyncNode struct {
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
+}
+
 type SyncNodes struct {
 	nodes   map[string]*SyncNode
+	stats   map[string]*SyncNodeStats
 	clients map[string]*SyncClient
 	lock    *sync.Mutex
+}
+
+func (sn *SyncNodes) GetClient(clientID string) (*SyncClient, error) {
+	if !sn.HasClient(clientID) {
+		return nil, errors.New("Client not found")
+	}
+	return sn.clients[clientID], nil
 }
 
 func (sn *SyncNodes) HasClient(clientID string) bool {
@@ -30,13 +55,45 @@ func (sn *SyncNodes) AddClient(client *SyncClient) {
 	sn.clients[client.ID()] = client
 }
 
-func (sn *SyncNodes) GetClient(clientID string) (*SyncClient, error) {
-	if !sn.HasClient(clientID) {
-		return nil, errors.New("Client not found")
-	}
+func (sn *SyncNodes) AddStats(id string, stats *SyncNodeStats) {
 	sn.lock.Lock()
 	defer sn.lock.Unlock()
-	return sn.clients[clientID], nil
+	sn.stats[id] = stats
+}
+
+// GetStats returns a SyncNodeStats struct with
+// the total of all SyncNodes + this oSSH instance.
+func (sn *SyncNodes) GetStats() *SyncNodeStats {
+	sn.lock.Lock()
+	defer sn.lock.Unlock()
+	total := &SyncNodeStats{
+		Hosts:            0,
+		Passwords:        0,
+		Users:            0,
+		Payloads:         0,
+		Sessions:         0,
+		AttemptedLogins:  0,
+		SuccessfulLogins: 0,
+		FailedLogins:     0,
+		TimeWasted:       0,
+		Uptime:           0,
+	}
+	stats := sn.stats
+	stats["_"] = SrvOSSH.stats() // we should include ourselves
+	for _, s := range stats {
+		total.Hosts = MaxOfInts(total.Hosts, s.Hosts)
+		total.Passwords = MaxOfInts(total.Passwords, s.Passwords)
+		total.Users = MaxOfInts(total.Users, s.Users)
+		total.Payloads = MaxOfInts(total.Payloads, s.Payloads)
+		total.Sessions = SumOfInts(total.Sessions, s.Sessions)
+		total.AttemptedLogins = SumOfUints(total.AttemptedLogins, s.AttemptedLogins)
+		total.FailedLogins = SumOfUints(total.FailedLogins, s.FailedLogins)
+		total.SuccessfulLogins = SumOfUints(total.SuccessfulLogins, s.SuccessfulLogins)
+		total.TimeWasted = SumOfFloats(total.TimeWasted, s.TimeWasted)
+		total.Uptime = SumOfFloats(total.Uptime, s.Uptime)
+	}
+
+	return total
 }
 
 func (sn *SyncNodes) Has(host string) bool {
@@ -60,7 +117,7 @@ func (sn *SyncNodes) IsAllowedHost(host string) bool {
 }
 
 func (sn *SyncNodes) Add(host string, node *SyncNode) {
-	if sn.Has(host) {
+	if node == nil || sn.Has(host) {
 		return
 	}
 	sn.lock.Lock()
@@ -115,6 +172,7 @@ func NewSyncNodes() *SyncNodes {
 	return &SyncNodes{
 		nodes:   map[string]*SyncNode{},
 		clients: map[string]*SyncClient{},
+		stats:   map[string]*SyncNodeStats{},
 		lock:    &sync.Mutex{},
 	}
 }

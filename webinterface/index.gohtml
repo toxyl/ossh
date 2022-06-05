@@ -26,7 +26,7 @@
             {{ template "tab_config" dict "Scheme" .Scheme "Config" .Config }}
             {{ template "tab_payloads" dict "Scheme" .Scheme }}
         </div>
-        {{ template "stats" dict "Scheme" .Scheme }}
+        {{ template "stats" dict "Scheme" .Scheme "HostName" .HostName }}
     </body>
 </html>
 {{ end }}

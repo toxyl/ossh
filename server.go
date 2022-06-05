@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -23,19 +22,8 @@ type OSSHServer struct {
 	fs         *OverlayFSManager
 }
 
-func (ossh *OSSHServer) statsJSONSimple() string {
-	data := struct {
-		Hosts            int     `json:"hosts"`
-		Passwords        int     `json:"passwords"`
-		Users            int     `json:"users"`
-		Payloads         int     `json:"payloads"`
-		Sessions         int     `json:"sessions"`
-		AttemptedLogins  uint    `json:"logins_attempted"`
-		SuccessfulLogins uint    `json:"logins_successful"`
-		FailedLogins     uint    `json:"logins_failed"`
-		TimeWasted       float64 `json:"time_wasted"`
-		Uptime           float64 `json:"uptime"`
-	}{
+func (ossh *OSSHServer) stats() *SyncNodeStats {
+	return &SyncNodeStats{
 		Hosts:            ossh.Loot.CountHosts(),
 		Passwords:        ossh.Loot.CountPasswords(),
 		Users:            ossh.Loot.CountUsers(),
@@ -47,13 +35,27 @@ func (ossh *OSSHServer) statsJSONSimple() string {
 		TimeWasted:       time.Duration(ossh.TimeWasted * int(time.Second)).Seconds(),
 		Uptime:           uptime().Round(1 * time.Second).Seconds(),
 	}
-	json, err := json.Marshal(data)
+}
+
+func (ossh *OSSHServer) statsToJSON() string {
+	json, err := json.Marshal(ossh.stats())
 	if err != nil {
-		LogOSSHServer.Error("Could not marshal web interface stats data: %s", colorError(err))
+		LogOSSHServer.Error("Could not marshal stats data: %s", colorError(err))
 		return ""
 	}
 
 	return string(json)
+}
+
+func (ossh *OSSHServer) JSONToStats(jsonString string) *SyncNodeStats {
+	data := &SyncNodeStats{}
+	err := json.Unmarshal([]byte(jsonString), data)
+	if err != nil {
+		LogOSSHServer.Error("Could not unmarshal stats data: %s", colorError(err))
+		return nil
+	}
+
+	return data
 }
 
 func (ossh *OSSHServer) loadDataFile(path, contentType string, fnAdd func(s string) bool) {
@@ -187,7 +189,7 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 	}
 
 	// only create for bots, sync nodes don't need it
-	overlayFS, err := ossh.fs.NewSession(s.Host)
+	overlayFS, err := ossh.fs.NewSession(fmt.Sprintf("%s:%d", s.Host, s.Port))
 	if err != nil {
 		ossh.GracefulCloseOnError(err, s, s.SSHSession, overlayFS)
 		return
@@ -276,12 +278,25 @@ func (ossh *OSSHServer) sessionRequestCallback(sess ssh.Session, requestType str
 func (ossh *OSSHServer) connectionFailedCallback(conn net.Conn, err error) {
 	s := ossh.Sessions.Create(conn.RemoteAddr().String())
 
-	if err.Error() != "EOF" && err.Error() != "[ssh: no auth passed yet, permission denied]" {
-		LogOSSHServer.Warning("%s's connection failed: %s",
-			s.LogID(),
-			colorError(err),
-		)
+	e := err.Error()
+
+	if e == "EOF" {
+		// that's normal, we can ignore it
+	} else if strings.Contains(e, "no auth passed yet, permission denied") {
+		// probably because we denied it
+	} else if strings.Contains(e, "ssh: disconnect, reason 11:") {
+		// bot chickened out
+	} else if strings.Contains(e, "unmarshal error for field Language of type disconnectMsg") {
+		// seems harmless, no need to log it
+	} else if strings.Contains(e, "read: connection reset by peer") {
+		// the bot doesn't want to talk to us anymore. that's fine, you do you.
+	} else if strings.Contains(e, "read: connection timed out") {
+		// ok, that's fine, come back another time.
+	} else {
+		// ok, this might be relevant
+		LogOSSHServer.Warning("%s's connection failed: %s", s.LogID(), colorError(err))
 	}
+
 	ossh.Sessions.Remove(s.ID)
 }
 
@@ -349,13 +364,13 @@ func (ossh *OSSHServer) init() {
 	}
 	err := ossh.fs.Init(path)
 	if err != nil {
-		log.Fatal(err)
+		LogOverlayFS.Error("%s", colorError(ossh.server.ListenAndServe()))
 	}
 }
 
 func (ossh *OSSHServer) Start() {
 	LogOSSHServer.Default("Starting oSSH server on %s...", colorWrap("ssh://"+ossh.server.Addr, colorBrightYellow))
-	log.Fatal(ossh.server.ListenAndServe())
+	LogOSSHServer.Error("%s", colorError(ossh.server.ListenAndServe()))
 }
 
 func NewOSSHServer() *OSSHServer {
@@ -369,8 +384,30 @@ func NewOSSHServer() *OSSHServer {
 	ossh.init()
 	go func() {
 		for {
-			time.Sleep(10 * time.Second)
-			SrvUI.PushStats(SrvOSSH.statsJSONSimple())
+			time.Sleep(INTERVAL_UI_STATS_UPATE)
+			stats := SrvOSSH.stats()
+			totalStats := SrvSync.nodes.GetStats()
+			data := struct {
+				Node  *SyncNodeStats `json:"node"`
+				Total *SyncNodeStats `json:"total"`
+			}{
+				Node:  stats,
+				Total: totalStats,
+			}
+
+			json, err := json.Marshal(data)
+			if err != nil {
+				LogOSSHServer.Error("Could not marshal stats data: %s", colorError(err))
+				continue
+			}
+
+			SrvUI.PushStats(string(json))
+		}
+	}()
+	go func() {
+		for {
+			time.Sleep(INTERVAL_STATS_BROADCAST)
+			_ = SrvSync.Broadcast(fmt.Sprintf("ADD-STATS %s", SrvOSSH.statsToJSON()))
 		}
 	}()
 

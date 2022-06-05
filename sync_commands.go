@@ -59,9 +59,6 @@ var SyncCommands = map[string]SyncCommand{
 		sl := strings.Join(syncList, ",")
 		return sl, nil
 	},
-	"STATS": func(args []string) (string, error) {
-		return SrvOSSH.statsJSONSimple(), nil
-	},
 	"HOSTS": func(args []string) (string, error) {
 		return ImplodeLines(SrvOSSH.Loot.GetHosts()), nil
 	},
@@ -144,6 +141,16 @@ var SyncCommands = map[string]SyncCommand{
 			}
 		}
 
+		return "", nil
+	},
+	"ADD-STATS": func(args []string) (string, error) {
+		if len(args) < 1 {
+			return "", nil
+		}
+		host, _, _ := net.SplitHostPort(SrvSync.conn.RemoteAddr().String())
+		stats := SrvOSSH.JSONToStats(strings.Join(args, " "))
+		SrvSync.nodes.AddStats(host, stats)
+		LogSyncCommands.Debug("%s reported stats", colorHost(host))
 		return "", nil
 	},
 }

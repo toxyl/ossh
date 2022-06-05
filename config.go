@@ -4,14 +4,19 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/spf13/viper"
 )
 
-type SyncNode struct {
-	Host string `mapstructure:"host"`
-	Port int    `mapstructure:"port"`
-}
+const (
+	INTERVAL_UI_STATS_UPATE    = 5 * time.Second
+	INTERVAL_STATS_BROADCAST   = 20 * time.Second
+	INTERVAL_OVERLAYFS_CLEANUP = 30 * time.Second
+	INTERVAL_SESSIONS_CLEANUP  = 1 * time.Minute
+	DELAY_OVERLAYFS_MKDIR      = 100 * time.Millisecond
+	DELAY_SYNC_START           = 10 * time.Second
+)
 
 type Config struct {
 	Debug struct {
@@ -82,7 +87,6 @@ func isIPWhitelisted(ip string) bool {
 }
 
 func InitPaths() {
-
 	if Conf.PathData == "" {
 		Conf.PathData = "/etc/ossh"
 	}

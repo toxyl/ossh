@@ -9,18 +9,24 @@
         if (message.trim() == "")
             return;
 
+        var fnUpdate = function(name, valueNode, valueCluster) {
+            $('#ts'+name).html(valueNode + "<br>" + valueCluster);
+        };
+
         m = JSON.parse(message);
+        mn = m.node;
+        mt = m.total;
         
-        $('#tsHosts').text(m.hosts);
-        $('#tsUsers').text(m.users);
-        $('#tsPasswords').text(m.passwords);
-        $('#tsPayloads').text(m.payloads);
-        $('#tsSessions').text(m.sessions);
-        $('#tsLoginsAttempted').text(m.logins_attempted);
-        $('#tsLoginsSuccessful').text(m.logins_successful);
-        $('#tsLoginsFailed').text(m.logins_failed);
-        $('#tsTimeWasted').text(humanTimeInterval(m.time_wasted));
-        $('#tsUptime').text(humanTimeInterval(m.uptime));
+        fnUpdate('Hosts', mn.hosts, mt.hosts);
+        fnUpdate('Users', mn.users, mt.users);
+        fnUpdate('Passwords', mn.passwords, mt.passwords);
+        fnUpdate('Payloads', mn.payloads, mt.payloads);
+        fnUpdate('Sessions', mn.sessions, mt.sessions);
+        fnUpdate('LoginsAttempted', mn.logins_attempted, mt.logins_attempted);
+        fnUpdate('LoginsSuccessful', mn.logins_successful, mt.logins_successful);
+        fnUpdate('LoginsFailed', mn.logins_failed, mt.logins_failed);
+        fnUpdate('TimeWasted', humanTimeInterval(mn.time_wasted), humanTimeInterval(mt.time_wasted));
+        fnUpdate('Uptime', humanTimeInterval(mn.uptime), humanTimeInterval(mt.uptime));
     }
 
     function ws_st_receive_complete() { }
@@ -28,43 +34,57 @@
 </script>
 <div class="w3-bar w3-black w3-bottom">
     <div class="w3-bar-item">
-        <span id="tsUptime"></span>&nbsp;&nbsp;<b>uptime</b>
+        <div class="left pad-right-5px"><b>{{ .HostName }}</b><br><b>+ neighbors =</b></div>
     </div>
     
     <div class="w3-bar-item">
-        <span id="tsSessions"></span>&nbsp;&nbsp;<b>sessions</b>
+        <div id="tsUptime" class="float-left right pad-right-5px"></div>
+        <div class="float-right left pad-left-5px"><b>uptime</b><br><i>(sum)</i></div>
     </div>
 
     <div class="w3-bar-item">
-        <span id="tsTimeWasted"></span>&nbsp;&nbsp;<b>wasted</b>
+        <div id="tsTimeWasted" class="float-left right pad-right-5px"></div>
+        <div class="float-right left pad-left-5px"><b>wasted</b><br><i>(sum)</i></div>
+    </div>   
+
+    <div class="w3-bar-item">
+        <div id="tsSessions" class="float-left right pad-right-5px"></div>
+        <div class="float-right left pad-left-5px"><b>sessions</b><br><i>(sum)</i></div>
     </div>
 
     <div class="w3-bar-item">
-        <span id="tsLoginsAttempted"></span>&nbsp;&nbsp;<b>attempted logins</b>
+        <div id="tsLoginsAttempted" class="float-left right pad-right-5px"></div>
+        <div class="float-right left pad-left-5px"><b>attempted logins</b><br><i>(sum)</i></div>
     </div>
 
     <div class="w3-bar-item">
-        <span id="tsLoginsSuccessful"></span>&nbsp;&nbsp;<b>successful logins</b>
+        <div id="tsLoginsSuccessful" class="float-left right pad-right-5px"></div>
+        <div class="float-right left pad-left-5px"><b>successful logins</b><br><i>(sum)</i></div>
     </div>
 
     <div class="w3-bar-item">
-        <span id="tsLoginsFailed"></span>&nbsp;&nbsp;<b>failed logins</b>
+        <div id="tsLoginsFailed" class="float-left right pad-right-5px"></div>
+        <div class="float-right left pad-left-5px"><b>failed logins</b><br><i>(sum)</i></div>
     </div>
 
     <div class="w3-bar-item">
-        <span id="tsHosts"></span>&nbsp;&nbsp;<b>known hosts</b>
+        <div id="tsHosts" class="float-left right pad-right-5px"></div>
+        <div class="float-right left pad-left-5px"><b>known hosts</b><br><i>(max)</i></div>
     </div>
 
     <div class="w3-bar-item">
-        <span id="tsUsers"></span>&nbsp;&nbsp;<b>known users</b>
+        <div id="tsUsers" class="float-left right pad-right-5px"></div>
+        <div class="float-right left pad-left-5px"><b>known users</b><br><i>(max)</i></div>
     </div>
 
     <div class="w3-bar-item">
-        <span id="tsPasswords"></span>&nbsp;&nbsp;<b>known passwords</b>
+        <div id="tsPasswords" class="float-left right pad-right-5px"></div>
+        <div class="float-right left pad-left-5px"><b>known passwords</b><br><i>(max)</i></div>
     </div>
     
     <div class="w3-bar-item">
-        <span id="tsPayloads"></span>&nbsp;&nbsp;<b>known payloads</b>
+        <div id="tsPayloads" class="float-left right pad-right-5px"></div>
+        <div class="float-right left pad-left-5px"><b>known payloads</b><br><i>(max)</i></div>
     </div>
 </div>
 <script>

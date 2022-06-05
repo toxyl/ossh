@@ -185,7 +185,7 @@ func (ofsm *OverlayFSManager) CleanupWorker() {
 	sandboxPath := filepath.Join(ofsm.baseDir, "sandboxes")
 
 	for {
-		time.Sleep(5 * time.Second)
+		time.Sleep(INTERVAL_OVERLAYFS_CLEANUP)
 
 		sandboxes, err := os.ReadDir(sandboxPath)
 		if err != nil {
@@ -218,7 +218,7 @@ func (ofsm *OverlayFSManager) CleanupWorker() {
 						workDir:   filepath.Join(sandboxPath, sandbox.Name(), fmt.Sprintf("work-%s", timestamp)),
 					}).Unmount()
 
-					if err != nil {
+					if err != nil && !strings.HasPrefix(err.Error(), "unmount: invalid argument") { // seems that 'unmount: invalid argument' is safe to ignore
 						LogOverlayFS.Error("cleanup worker, close overlay '%s': %s", mergeDirPath, colorError(err))
 						continue
 					}
@@ -255,7 +255,7 @@ func (ofs *OverlayFS) Mount() error {
 		if err != nil {
 			return fmt.Errorf("mkdir merged (%s): %w", ofs.mergedDir, err)
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(DELAY_OVERLAYFS_MKDIR)
 	}
 
 	if !DirExists(ofs.workDir) {
@@ -263,7 +263,7 @@ func (ofs *OverlayFS) Mount() error {
 		if err != nil {
 			return fmt.Errorf("mkdir workdir (%s): %w", ofs.workDir, err)
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(DELAY_OVERLAYFS_MKDIR)
 	}
 
 	if !DirExists(ofs.upperDir) {
@@ -271,7 +271,7 @@ func (ofs *OverlayFS) Mount() error {
 		if err != nil {
 			return fmt.Errorf("mkdir upper (%s): %w", ofs.upperDir, err)
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(DELAY_OVERLAYFS_MKDIR)
 	}
 
 	lowerdirs := strings.Join(ofs.lowerDirs, ":")
