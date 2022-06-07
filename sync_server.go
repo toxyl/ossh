@@ -105,6 +105,10 @@ func (ss *SyncServer) AddClient(host string, port int) {
 	ss.nodes.AddClient(NewSyncClient(host, port))
 }
 
+func (ss *SyncServer) RemoveClient(host string, port int) {
+	ss.nodes.RemoveClient(fmt.Sprintf("%s:%s", host, port))
+}
+
 func (ss *SyncServer) Broadcast(msg string) map[string]string {
 	return ss.nodes.ExecBroadcast(msg)
 }
@@ -161,14 +165,38 @@ func (ss *SyncServer) SyncToNodes() {
 	}
 }
 
-func (ss *SyncServer) Start() {
-	// initialize sync clients
+func (ss *SyncServer) UpdateClients() {
+	// remove existing clients
+	for _, c := range ss.nodes.clients {
+		c.conn.Close()
+		ip := c.Host
+		port := c.Port
+		index := -1
+		for i, v := range Conf.IPWhitelist {
+			if v == ip {
+				index = i
+				break
+			}
+		}
+		if index >= 0 {
+			Conf.IPWhitelist = append(Conf.IPWhitelist[:index], Conf.IPWhitelist[index+1:]...)
+		}
+
+		ss.RemoveClient(ip, port)
+	}
+
+	// add clients
 	for _, node := range Conf.Sync.Nodes {
 		if node.Host != Conf.SyncServer.Host || node.Port != int(Conf.SyncServer.Port) {
+			Conf.IPWhitelist = append(Conf.IPWhitelist, node.Host)
 			LogSyncServer.Debug("adding client: %s:%s", colorHost(node.Host), colorInt(node.Port))
 			ss.nodes.AddClient(NewSyncClient(node.Host, node.Port))
 		}
 	}
+}
+
+func (ss *SyncServer) Start() {
+	ss.UpdateClients()
 	srv := fmt.Sprintf("%s:%d", Conf.SyncServer.Host, Conf.SyncServer.Port)
 	LogSyncServer.Default("Starting sync server on %s...", colorWrap("tcp://"+srv, colorBrightYellow))
 	listener, err := net.Listen("tcp", srv)

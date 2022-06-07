@@ -55,6 +55,15 @@ func (sn *SyncNodes) AddClient(client *SyncClient) {
 	sn.clients[client.ID()] = client
 }
 
+func (sn *SyncNodes) RemoveClient(id string) {
+	if !sn.HasClient(id) {
+		return
+	}
+	sn.lock.Lock()
+	defer sn.lock.Unlock()
+	delete(sn.clients, id)
+}
+
 func (sn *SyncNodes) AddStats(id string, stats *SyncNodeStats) {
 	sn.lock.Lock()
 	defer sn.lock.Unlock()

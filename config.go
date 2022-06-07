@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"fmt"
 	"log"
 	"os"
@@ -10,13 +11,18 @@ import (
 )
 
 const (
-	INTERVAL_UI_STATS_UPATE    = 5 * time.Second
-	INTERVAL_STATS_BROADCAST   = 20 * time.Second
+	INTERVAL_UI_STATS_UPATE    = 10 * time.Second
 	INTERVAL_OVERLAYFS_CLEANUP = 30 * time.Second
 	INTERVAL_SESSIONS_CLEANUP  = 1 * time.Minute
 	DELAY_OVERLAYFS_MKDIR      = 100 * time.Millisecond
 	DELAY_SYNC_START           = 10 * time.Second
 )
+
+//go:embed commands/*
+var fsCommandTemplates embed.FS
+
+//go:embed webinterface/*
+var fsWebinterfaceTemplates embed.FS
 
 type Config struct {
 	Debug struct {
@@ -26,6 +32,7 @@ type Config struct {
 		SyncServer   bool `mapstructure:"sync_server"`
 		SyncClient   bool `mapstructure:"sync_client"`
 		OSSHServer   bool `mapstructure:"ossh_server"`
+		Sessions     bool `mapstructure:"sessions"`
 		UIServer     bool `mapstructure:"ui_server"`
 		OverlayFS    bool `mapstructure:"overlay_fs"`
 	} `mapstructure:"debug"`
@@ -130,6 +137,11 @@ func InitPaths() {
 	if Conf.Webinterface.KeyFile == "" {
 		Conf.Webinterface.KeyFile = fmt.Sprintf("%s/ossh.key", Conf.PathData)
 	}
+
+	err := MkDirs(Conf.PathCommands, Conf.PathCaptures, Conf.PathFFS, Conf.PathWebinterface)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func InitDebug() {
@@ -151,6 +163,10 @@ func InitDebug() {
 
 	if Conf.Debug.OSSHServer {
 		LogOSSHServer.EnableDebug()
+	}
+
+	if Conf.Debug.Sessions {
+		LogSessions.EnableDebug()
 	}
 
 	if Conf.Debug.UIServer {
@@ -190,6 +206,16 @@ func initConfig() {
 
 	InitPaths()
 	InitDebug()
+
+	err = CopyEmbeddedFSToDisk(fsCommandTemplates, Conf.PathCommands, "commands")
+	if err != nil {
+		log.Panicf("[Config] Unable to copy command templates to disk, %v", err)
+	}
+	err = CopyEmbeddedFSToDisk(fsWebinterfaceTemplates, Conf.PathWebinterface, "webinterface")
+	if err != nil {
+		log.Panicf("[Config] Unable to copy webinterface templates to disk, %v", err)
+	}
+
 	InitTemplaterFunctions()
 	InitTemplaterFunctionsHTML()
 
@@ -224,5 +250,6 @@ func updateConfig(config []byte) error {
 	LogGlobal.Success("Written new config to: %s", pathSrc)
 
 	initConfig()
+	SrvSync.UpdateClients()
 	return nil
 }

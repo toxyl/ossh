@@ -5,21 +5,39 @@ import (
 	"compress/gzip"
 	"crypto/sha1"
 	"crypto/sha256"
+	"embed"
 	"encoding/base64"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"math"
 	"math/rand"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// Mkdirs creates the given directory
+func MkDirs(dirs ...string) error {
+	errors := []string{}
+	for _, dir := range dirs {
+		err := os.Mkdir(dir, 0755)
+		if err != nil && !strings.Contains(err.Error(), "file exists") {
+			errors = append(errors, dir)
+		}
+	}
+	if len(errors) > 0 {
+		return fmt.Errorf("failed to create dirs: '%s'", strings.Join(errors, "', '"))
+	}
+	return nil
+}
 
 // DirExists reports whether the dir exists as a boolean,
 // taken from https://stackoverflow.com/a/49697453 / https://stackoverflow.com/a/51870143/3337885
@@ -304,4 +322,42 @@ func ChunkString(s string, sep string, chunkSize int) [][]string {
 		res = append(res, chunk)
 	}
 	return res
+}
+
+func CopyEmbeddedFSToDisk(embeddedFS embed.FS, dstPath, srcPrefix string) error {
+	err := fs.WalkDir(embeddedFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if strings.HasPrefix(path, fmt.Sprintf("%s/", srcPrefix)) {
+			subPath := strings.TrimPrefix(path, fmt.Sprintf("%s/", srcPrefix))
+			dst := filepath.Join(dstPath, subPath)
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+
+			if d.IsDir() {
+				// TODO correct dir permission in later pass
+				err = os.Mkdir(dst, 0755)
+				if err != nil && !strings.Contains(err.Error(), "file exists") {
+					return err
+				}
+
+				return nil
+			}
+
+			data, err := embeddedFS.ReadFile(path)
+			if err != nil {
+				return err
+			}
+
+			err = ioutil.WriteFile(dst, data, info.Mode())
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("can't walk embedded dir: %w", err)
+	}
+	return nil
 }

@@ -7,10 +7,16 @@ import (
 )
 
 func colorConnID(user, host string, port int) string {
-	if user == "" {
-		return fmt.Sprintf("%s:%s", colorHost(host), colorPort(port))
+	whitelisted := isIPWhitelisted(host)
+	host = colorHost(host)
+	if whitelisted {
+		host = fmt.Sprintf("(whitelisted) %s", host)
 	}
-	return fmt.Sprintf("%s:%s > %s", colorHost(host), colorPort(port), colorUser(user))
+
+	if user == "" {
+		return fmt.Sprintf("%s:%s", host, colorPort(port))
+	}
+	return fmt.Sprintf("%s:%s > %s", host, colorPort(port), colorUser(user))
 }
 
 func colorWrap(str string, color uint) string {

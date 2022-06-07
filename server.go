@@ -306,9 +306,14 @@ func (ossh *OSSHServer) connectionFailedCallback(conn net.Conn, err error) {
 func (ossh *OSSHServer) authHandler(ctx ssh.Context, pwd string) bool {
 	s := ossh.Sessions.Create(ctx.RemoteAddr().String()).SetUser(ctx.User()).SetPassword(pwd)
 	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.UpdateActivity("auth handler start")
-	defer s.UpdateActivity("auth handler end")
+	s.lock.Unlock()
+	defer func() {
+		s.lock.Lock()
+		s.UpdateActivity("auth handler end")
+		s.lock.Unlock()
+	}()
+
 	if s.Whitelisted {
 		ossh.addLoginSuccess(s, "host is whitelisted")
 		return true // I know you, have fun
@@ -398,7 +403,7 @@ func NewOSSHServer() *OSSHServer {
 	ossh.init()
 	go func() {
 		for {
-			time.Sleep(INTERVAL_UI_STATS_UPATE)
+			t := time.Now()
 			stats := SrvOSSH.stats()
 			totalStats := SrvSync.nodes.GetStats()
 			data := struct {
@@ -416,14 +421,10 @@ func NewOSSHServer() *OSSHServer {
 			}
 
 			SrvUI.PushStats(string(json))
-		}
-	}()
-	go func() {
-		for {
-			time.Sleep(INTERVAL_STATS_BROADCAST)
 			_ = SrvSync.Broadcast(fmt.Sprintf("ADD-STATS %s", SrvOSSH.statsToJSON()))
+
+			time.Sleep(INTERVAL_UI_STATS_UPATE - (time.Duration(time.Since(t).Seconds()) % time.Duration(INTERVAL_UI_STATS_UPATE.Seconds())))
 		}
 	}()
-
 	return ossh
 }

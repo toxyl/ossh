@@ -163,13 +163,21 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 		cmd = fmt.Sprintf("(%s/%s) %s", colorInt(iSeq), colorInt(lSeq), cmd)
 	}
 	LogFakeShell.Info("%s @ %s: %s", colorConnID(data.User, data.IP, data.Port), colorDuration(uint(s.ActiveFor().Seconds())), cmd)
+	s.lock.Lock()
 	s.UpdateActivity("run command start")
-	defer s.UpdateActivity("run command end")
+	s.lock.Unlock()
+	defer func() {
+		s.lock.Lock()
+		s.UpdateActivity("run command end")
+		s.lock.Unlock()
+	}()
 
-	// 1) make sure the client waits some time at least,
-	//    the more input the more wait time, hehe
-	dly := time.Duration(len(line) * int(Conf.InputDelay))
-	time.Sleep(dly * time.Millisecond)
+	if !s.Whitelisted {
+		// 1) make sure the client waits some time at least,
+		//    the more input the more wait time, hehe
+		dly := time.Duration(len(line) * int(Conf.InputDelay))
+		time.Sleep(dly * time.Millisecond)
+	}
 
 	// Ignore just pressing enter with whitespace
 	if strings.TrimSpace(line) == "" {

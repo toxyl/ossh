@@ -46,13 +46,15 @@ func (s *Session) UpdateActivity(action string) {
 }
 
 func (s *Session) RandomSleep(min, max int) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	if !s.Whitelisted {
 		wait := time.Duration(GetRandomInt(min, max)) * time.Second
+		s.lock.Lock()
 		s.UpdateActivity("sleep start")
+		s.lock.Unlock()
 		time.Sleep(wait)
+		s.lock.Lock()
 		s.UpdateActivity("sleep end")
+		s.lock.Unlock()
 	}
 }
 
@@ -169,12 +171,12 @@ func (s *Session) ActiveFor() time.Duration {
 // It will then exit the session with code -1 and close the connection.
 // The function returns true if the session is expired, else false.
 func (s *Session) Expire(age uint) bool {
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	if s.SSHSession == nil && s.StaleSince().Seconds() > 600 {
 		// if 10 minutes have passed without establishing a connection,
 		// we consider this to be an orphan
+		s.lock.Lock()
 		s.Orphan = true
+		s.lock.Unlock()
 		return true
 	}
 	if s.StaleSince().Seconds() > float64(age) {
@@ -250,7 +252,6 @@ func (ss *Sessions) Remove(sessionID, reason string) {
 		ss.lock.Lock()
 		defer ss.lock.Unlock()
 		s := ss.sessions[sessionID]
-		s.lock.Lock()
 		tw := 0
 		cid := colorConnID("", s.Host, s.Port)
 		if s.Orphan {
@@ -259,6 +260,7 @@ func (ss *Sessions) Remove(sessionID, reason string) {
 		} else {
 			tw = int(s.Uptime().Seconds())
 		}
+		s.lock.Lock()
 		s.UpdateActivity("remove")
 		s.lock.Unlock()
 
