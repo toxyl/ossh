@@ -1,0 +1,5 @@
+alias lha='ls -lha'
+alias ossh-log='sudo journalctl -u ossh -f --output cat'
+alias ossh-start='sudo service ossh start'
+alias ossh-stop='sudo service ossh stop'
+alias ossh-restart='sudo service ossh restart'

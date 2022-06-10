@@ -36,7 +36,7 @@ type Session struct {
 func (s *Session) UpdateActivity(action string) {
 	if !s.Orphan {
 		SrvOSSH.lock.Lock()
-		SrvOSSH.TimeWasted += int(time.Now().Sub(s.LastActivity).Seconds())
+		SrvOSSH.TimeWasted += int(time.Since(s.LastActivity).Seconds())
 		SrvOSSH.lock.Unlock()
 	}
 
@@ -47,7 +47,7 @@ func (s *Session) UpdateActivity(action string) {
 
 func (s *Session) RandomSleep(min, max int) {
 	if !s.Whitelisted {
-		wait := time.Duration(GetRandomInt(min, max)) * time.Second
+		wait := time.Duration(GetRandomInt(min, max)) * time.Millisecond
 		s.lock.Lock()
 		s.UpdateActivity("sleep start")
 		s.lock.Unlock()

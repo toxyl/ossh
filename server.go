@@ -205,8 +205,8 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 		overlayFS.Close()
 	}()
 
-	s.SetShell(NewFakeShell((*s.SSHSession), overlayFS))
-	s.RandomSleep(1, 10)
+	s.SetShell(NewFakeShell((*s.SSHSession), overlayFS, !s.Whitelisted))
+	s.RandomSleep(1, 250)
 	stats := s.Shell.Process(s)
 
 	if !s.Whitelisted {
@@ -261,7 +261,7 @@ func (ossh *OSSHServer) ptyCallback(ctx ssh.Context, pty ssh.Pty) bool {
 			colorHighlight(s.Term),
 		)
 	}
-	s.RandomSleep(1, 10)
+	s.RandomSleep(1, 250)
 	return true
 }
 
@@ -273,7 +273,7 @@ func (ossh *OSSHServer) sessionRequestCallback(sess ssh.Session, requestType str
 			colorHighlight(s.Type),
 		)
 	}
-	s.RandomSleep(1, 10)
+	s.RandomSleep(1, 250)
 	return true
 }
 
@@ -283,6 +283,7 @@ func (ossh *OSSHServer) connectionFailedCallback(conn net.Conn, err error) {
 
 	if e == "EOF" {
 		// that's normal, we can ignore it
+		return
 	} else if strings.Contains(e, "no auth passed yet, permission denied") {
 		// probably because we denied it
 	} else if strings.Contains(e, "ssh: disconnect, reason 11:") {
@@ -296,7 +297,7 @@ func (ossh *OSSHServer) connectionFailedCallback(conn net.Conn, err error) {
 	} else {
 		// ok, this might be relevant
 		LogOSSHServer.Warning("%s: Connection failed because %s", s.LogIDFull(), colorError(err))
-		ossh.Sessions.Remove(s.ID, err.Error())
+		ossh.Sessions.Remove(s.ID, e)
 		return
 	}
 
@@ -353,9 +354,31 @@ func (ossh *OSSHServer) authHandler(ctx ssh.Context, pwd string) bool {
 func (ossh *OSSHServer) connectionCallback(ctx ssh.Context, conn net.Conn) net.Conn {
 	s := ossh.Sessions.Create(conn.RemoteAddr().String())
 	if s != nil {
-		s.RandomSleep(1, 10)
+		s.RandomSleep(1, 250)
 	}
 	return conn
+}
+
+func (ossh *OSSHServer) publicKeyHandler(ctx ssh.Context, key ssh.PublicKey) bool {
+	s := ossh.Sessions.Create(ctx.RemoteAddr().String()).SetUser(ctx.User())
+	kb := key.Marshal()
+	sha1 := StringToSha1(string(kb))
+	fpath := fmt.Sprintf("%s/%s/%s.pub", Conf.PathCaptures, "ssh-keys", sha1)
+	if !FileExists(fpath) {
+		_ = os.WriteFile(fpath, kb, 0400)
+		LogOSSHServer.OK("SSH key saved to: %s", colorFile(fpath))
+		ossh.addLoginSuccess(s, "host gave us a public key")
+		return true
+	}
+
+	// we already know the key, let's roll dice
+	if time.Now().Unix()%3 == 0 {
+		ossh.addLoginFailure(s, "public key rejected, host lost a game of dice")
+		return false
+	}
+
+	ossh.addLoginSuccess(s, "host gave us a known public key")
+	return true
 }
 
 func (ossh *OSSHServer) init() {
@@ -366,6 +389,7 @@ func (ossh *OSSHServer) init() {
 		Handler:                       ossh.sessionHandler,
 		PasswordHandler:               ossh.authHandler,
 		IdleTimeout:                   time.Duration(Conf.MaxIdleTimeout) * time.Second,
+		MaxTimeout:                    time.Duration(Conf.MaxSessionAge) * time.Second,
 		ReversePortForwardingCallback: ossh.reversePortForwardingCallback,
 		LocalPortForwardingCallback:   ossh.localPortForwardingCallback,
 		PtyCallback:                   ossh.ptyCallback,
@@ -373,6 +397,7 @@ func (ossh *OSSHServer) init() {
 		SessionRequestCallback:        ossh.sessionRequestCallback,
 		Version:                       Conf.Version,
 		ConnCallback:                  ossh.connectionCallback,
+		PublicKeyHandler:              ossh.publicKeyHandler,
 	}
 
 	ossh.fs = &OverlayFSManager{}
@@ -382,7 +407,7 @@ func (ossh *OSSHServer) init() {
 	}
 	err := ossh.fs.Init(path)
 	if err != nil {
-		LogOverlayFS.Error("%s", colorError(ossh.server.ListenAndServe()))
+		LogOverlayFS.Error("%s", colorError(err))
 	}
 }
 

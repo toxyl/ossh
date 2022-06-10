@@ -106,7 +106,7 @@ func (ss *SyncServer) AddClient(host string, port int) {
 }
 
 func (ss *SyncServer) RemoveClient(host string, port int) {
-	ss.nodes.RemoveClient(fmt.Sprintf("%s:%s", host, port))
+	ss.nodes.RemoveClient(fmt.Sprintf("%s:%d", host, port))
 }
 
 func (ss *SyncServer) Broadcast(msg string) map[string]string {

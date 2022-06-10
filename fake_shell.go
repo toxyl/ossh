@@ -321,7 +321,7 @@ func (fs *FakeShell) Process(s *Session) *FakeShellStats {
 	return fs.stats
 }
 
-func NewFakeShell(s ssh.Session, overlay *OverlayFS) *FakeShell {
+func NewFakeShell(s ssh.Session, overlay *OverlayFS, useSlowWriter bool) *FakeShell {
 	fs := &FakeShell{
 		session:  s,
 		terminal: nil,
@@ -339,6 +339,9 @@ func NewFakeShell(s ssh.Session, overlay *OverlayFS) *FakeShell {
 
 	fs.terminal = term.NewTerminal(s, "")
 	fs.writer = NewSlowWriter(fs.terminal)
+	if !useSlowWriter {
+		fs.writer.ratelimit = 10000 // set ridicuously high to effectively disable rate limit
+	}
 	fs.stats.Host = fs.Host()
 
 	if overlay != nil {

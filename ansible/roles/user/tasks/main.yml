@@ -1,0 +1,59 @@
+---
+- name: Create admin user group
+  group:
+    name: "{{ admin_username }}"
+  tags: install
+
+- name: Setup passwordless sudo for admin user
+  copy:
+    content: "%{{ admin_username }} ALL=(ALL) NOPASSWD: ALL"
+    dest: "/etc/sudoers.d/{{ admin_username }}"
+    mode: 0440
+  tags: install
+
+- name: Add admin user
+  user:
+    name: "{{ admin_username }}"
+    groups: "{{ admin_username }}"
+    shell: "/bin/bash"
+    append: yes
+  tags: install
+
+- name: Install admin's public key
+  authorized_key:
+    user: "{{ admin_username }}"
+    key: "{{ admin_public_key }}"
+  tags: install
+
+- name: Copy files to admin home
+  become: true 
+  copy:
+    src: "files/home/"
+    dest: "/home/{{ admin_username }}/"
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"  
+  tags: install
+
+- name: Copy .bashrc to root
+  become: true 
+  copy:
+    src: "files/home/.bashrc"
+    dest: "/root/.bashrc"
+    owner: "root"
+    group: "root"  
+  tags: install
+    
+- name: Copy .bash_aliases to root
+  become: true 
+  copy:
+    src: "files/home/.bash_aliases"
+    dest: "/root/.bash_aliases"
+    owner: "root"
+    group: "root"  
+  tags: install
+    
+- name: Clear root password
+  user:
+    name: root
+    password: '!'
+  tags: install

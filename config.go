@@ -138,7 +138,7 @@ func InitPaths() {
 		Conf.Webinterface.KeyFile = fmt.Sprintf("%s/ossh.key", Conf.PathData)
 	}
 
-	err := MkDirs(Conf.PathCommands, Conf.PathCaptures, Conf.PathFFS, Conf.PathWebinterface)
+	err := MkDirs(Conf.PathCommands, Conf.PathCaptures, fmt.Sprintf("%s/%s", Conf.PathCaptures, "scp-uploads"), fmt.Sprintf("%s/%s", Conf.PathCaptures, "ssh-keys"), Conf.PathFFS, Conf.PathWebinterface)
 	if err != nil {
 		panic(err)
 	}

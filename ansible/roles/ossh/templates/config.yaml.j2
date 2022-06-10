@@ -1,0 +1,217 @@
+debug:
+  asciicast_v2: false
+  fake_shell: false
+  sync_commands: false
+  sync_server: false
+  sync_client: false
+  ossh_server: false
+  ui_server: false
+  overlay_fs: false
+  sessions: false
+
+host_name: {{ inventory_hostname }}
+version: {{ version }}
+ip_whitelist:
+  - 127.0.0.1
+{% for item in admin_ips %}
+  - {{ item }}
+{% endfor %}
+{% if additional_admin_ips %}
+{% for item in additional_admin_ips %}
+  - {{ item }}
+{% endfor %}
+{% endif %}
+
+host: 0.0.0.0
+port: {{ ossh_port }}
+max_idle: 36000
+max_session_age: 72000 
+ratelimit: 0.075
+input_delay: 200
+
+webinterface: 
+  host: 0.0.0.0
+  port: {{ ui_port }}
+
+sync_server:
+  host: 0.0.0.0
+  port: {{ sync_port }}
+
+sync:
+  interval: 10 
+  nodes:
+{% for item in sync_nodes %}
+{% if (item != ansible_host) %}
+{% if (item != public_ip) %}
+    - host: {{ item }}
+      port: {{ sync_port }}
+{% endif %}
+{% endif %}
+{% endfor %}
+
+commands:
+  rewriters:
+    - [ ";\\s*", "\n" ]
+    - [ "&&\\s*", "\n" ]
+    - [ "\\|\\|\\s*", "\n" ]
+    - [ "sudo\\s*", "" ]
+    - [ "/ip\\s*", "ifconfig" ]
+
+  exit:
+    - logout
+    - logoff
+    - shutdown
+    - poweroff
+    - exit
+
+  simple:
+    - [ "fsb", "Fat Sucker Bunch" ]
+    - [ "fbi", "Fat Bureaucrat Investigators" ]
+    - [ "cia", "Central Idiots Agency" ]
+    - [ "nsa", "National Suckers Agency" ]
+    - [ "ru", "Russian warship, go fuck yourself!" ]
+    - [ "sh", "/bin/bash^M: bad interpreter: No such file or directory (os error 2)" ]
+    - [ "tftp", "Error: TFTP, Opcode: Error Code(5)" ]
+    - [ "uname -s -m", "Linux x86_64" ]
+    - [ "uname -a", "Linux {{ '{{' }}.HostName }} 5.13.19-2-pve #1 SMP PVE 5.13.19-4 (Mon, 29 Nov 2021 12:10:09 +0100) x86_64 x86_64 x86_64 GNU/Linux" ]
+    - [ "uname -v", "#1 SMP PVE 5.13.19-4 (Mon, 29 Nov 2021 12:10:09 +0100)" ]
+    - [ "uname -r", "5.13.19-2-pve" ]
+    - [ "uname -n", "{{ '{{' }}.HostName }}" ]
+    - [ "uname -s", "Linux" ]
+    - [ "uname -m", "x86_64" ]
+    - [ "uname -p", "x86_64" ]
+    - [ "uname -i", "x86_64" ]
+    - [ "uname -o", "GNU/Linux" ]
+    - [ "uname", "Linux" ]
+    - [ "nproc", "128" ]
+    - [ "whoami", "{{ '{{' }}.User }}" ]
+    - [ "id", "uid=0({{ '{{' }}.User }}) gid=0({{ '{{' }}.User }}) groups=0({{ '{{' }}.User }})" ]
+    - [ "echo", "{{ '{{' }}.InputRaw }}" ]
+    - [ "command", "What is your wish, {{ '{{' }}.User }}?" ]
+    - [ "ifconfig", "ifconfig has been deprecated, use ip instead." ]
+    - [ "ifconfigcloud", "ifconfigcloud has been deprecated, use ip instead." ]
+    - [ "gcc", "Global Coal Conglomerate" ]
+    - [ "./sh", "/bin/sh^M: bad interpreter: No such file or directory (os error 2)" ]
+    - [ "./bash", "/bin/bash^M: bad interpreter: No such file or directory (os error 2)" ]
+    - [ "./x86_64", "/bin/bash^M: bad interpreter: No such file or directory (os error 2)" ]
+    - [ "./.senpai.loader", "/bin/bash^M: bad interpreter: No such file or directory (os error 2)" ]
+    - [ "#!/bin/sh", "/bin/sh^M: bad interpreter: No such file or directory (os error 2)" ]
+    - [ "./23", "ELF load command address/offset not properly aligned" ]
+    - [ "./23s", "ELF load command address/offset not properly aligned" ]
+    - [ "./23.sh", "/bin/bash^M: bad interpreter: No such file or directory (os error 2)" ]
+    - [ "cat /proc/cpuinfo | grep name | wc -l", ":(){ :|: & };:" ]
+    - [ 'echo -e "\x6F\x6B"', "ok" ]
+
+  permission_denied:
+    - sudo
+    - arch
+    - chcon
+    - chgrp
+    - chmod
+    - chown
+    - chroot
+    - env
+    - unlink
+    - ftpget
+
+  disk_error:
+    - base64
+    - cksum
+    - cp
+    - dd
+    - dir
+    - df
+    - dirname
+    - du
+    - readlink
+    - realpath
+    - rmdir
+
+  command_not_found:
+    - date
+    - false
+    - md5sum
+    - fold
+    - link
+    - ps
+
+  file_not_found:
+    - basename
+    - groups
+    - sha1sum
+    - sha224sum
+    - sha256sum
+    - sha384sum
+    - sha512sum
+
+  not_implemented:
+    - cal
+    - comm
+    - csplit
+    - cut
+    - dircolors
+    - expand
+    - expr
+    - factor
+    - fmt
+    - head
+    - hostid
+    - install
+    - join
+    - ln
+    - logname
+    - mkdir
+    - mkfifo
+    - mknod
+    - mktemp
+    - mv
+    - nice
+    - nl
+    - nohup
+    - numfmt
+    - od
+    - paste
+    - pathchk
+    - pinky
+    - pr
+    - printenv
+    - printf
+    - ptx
+    - runcon
+    - seq
+    - shred
+    - shuf
+    - sleep
+    - sort
+    - split
+    - stat
+    - stdbuf
+    - stty
+    - sum
+    - sync
+    - tac
+    - tail
+    - tee
+    - test
+    - timeout
+    - tr
+    - true
+    - truncate
+    - tsort
+    - tty
+    - uname
+    - unexpand
+    - uniq
+    - uptime
+    - users
+    - vdir
+    - wc
+    - who
+    - xxd
+    - yes
+
+  bullshit:
+    - bullshit
+    - pkill
+    - hive-passwd
+    - history

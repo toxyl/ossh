@@ -19,7 +19,7 @@
 config.yaml
 config.*.yaml
 config.yaml.bak
-ossh
+/ossh
 captures/*
 ffs/defaultfs
 ffs/sandboxes
@@ -30,3 +30,6 @@ passwords.txt
 
 ossh.crt
 ossh.key
+
+ansible/inventory.yml
+ansible/ansible.cfg

@@ -1,0 +1,10 @@
+---
+packages:
+  - acl
+  - git
+  - gnupg
+  - sudo
+  - nano
+  - mc
+  - ufw
+  - tree

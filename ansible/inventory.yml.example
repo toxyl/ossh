@@ -1,0 +1,128 @@
+---
+all:
+  # The variables used by this playbook. 
+  # Adjust to your needs, make sure to read the comments to know what you are doing. 
+  vars:
+    # Some Ansible options, adjust if needed.
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_ssh_extra_args: -C -o ControlMaster=auto -o ControlPersist=120s -o StrictHostKeyChecking=no 
+
+    # Directory where the oSSH sources can be found.
+    data_dir: ../
+
+    # List of oSSH node IPs you want this playbook to join together in a cluster.
+    # Note that these DO NOT have to be oSSH nodes handled by this playbook.
+    # However, usually this list would match the hosts defined below.
+    sync_nodes:
+      - 1.2.3.1
+      - 1.2.3.2
+      - 1.2.3.3
+
+    # This will be the SSH user used for connections to the oSSH instances
+    # after the initial setup has been completed. The setup will use your current
+    # user.
+    admin_username: ossh
+    
+    # This is the SSH key used for the connections, for the initial setup we use
+    # the current user's default key. If you need a different key to be used,
+    # this is the place to change it.
+    admin_public_key: "{{ lookup('file', \"~/.ssh/id_rsa.pub\") }}"
+
+    # This is the SSH port to be used for administrative purposes
+    # whilst oSSH is served on 22. After the initial setup the
+    # SSH server will be restarted and is from then on available
+    # at this port.
+    admin_port: 1984
+
+    # These IPs are whitelisted for administrative use.
+    # Any other IP that tries to connect to the web server
+    # or the sync server, will receive bullshit responses.
+    admin_ips: 
+      - 1.2.3.4
+
+    # The SSH version announced by your oSSH instances. 
+    version: OpenSSH_8.4p1 Ubuntu-6ubuntu2.1
+
+    # The SSH key to use after the initial setup.
+    ssh_key_file: "~/.ssh/{{ admin_username }}"
+
+    # The port of the oSSH server. Usually 22. Only change if strictly necessary.
+    ossh_port: 22
+
+    # The port of the HTTPS server. Usually 443.
+    ui_port: 443
+
+    # The port of the sync server. Usually 1337.
+    sync_port: 1337
+
+    # No need to change here, needs to be defined per host
+    # if you are on the same network and you want to use
+    # local IP addresses. This happens, for example,
+    # when you run an oSSH in your home network. 
+    # When a public IP is provided the playbook
+    # ensures that the node won't try to sync with itself.
+    # Without a public IP the playbook relies on the
+    # ansible_host.
+    public_ip: 
+
+    # You can use this property under a host
+    # if you need additional admin IPs for it.
+    additional_admin_ips: 
+
+  # The oSSH instances you want to deploy,
+  # all above options defined above can be
+  # overwritten on a per host basis to
+  # accomodate different network setups.
+  hosts:
+    # This is the simplest config
+    # that works for freshly setup servers
+    # that are publicly reachable.
+    example-01:
+      ansible_host: 1.2.3.1
+      # Uncomment if you want to reinstall.
+      ansible_port: "{{ admin_port }}"
+
+    # In this case the server already uses port 443, 
+    # so we use 4343 instead for the web interface.
+    # And oSSH has to run on 2222, so we change that as well. 
+    example-02:
+      ansible_host: 1.2.3.2
+      # Uncomment if you want to reinstall.
+      # ansible_port: "{{ admin_port }}"
+      ossh_port: 2222
+      ui_port: 4343
+
+    # This the most complex config example.
+    # It installs/updates an oSSH instance 
+    # in your local network.
+    example-03:
+      # Here we specify the public IP (i.e. your home IP)
+      # that will be compared against the sync clients list
+      # to avoid syncing with yourself. When the ansible_host
+      # is identical to the public_ip, there is no need to provide
+      # a public_ip.
+      public_ip: 1.2.3.3
+    
+      # This is where we want oSSH to run on
+      ansible_host: 192.168.0.10 
+    
+      # Uncomment if you want to reinstall.
+      # ansible_port: "{{ admin_port }}"
+    
+      # Uncomment if you want to reinstall.
+      # ansible_user: "{{ admin_username }}"
+    
+      # To spice things up a little we don't use 22
+      # for oSSH but instead use 2200. 
+      # In this scenario I configured my router to
+      # redirect 22 (external) to 2200 (internal). 
+      # Usually you don't need to use a port other than 22.
+      ossh_port: 2200
+    
+      # When locally administrating this instance oSSH
+      # will see your local IP address as source, 
+      # not your remote IP. Therefore we need to 
+      # whitelist that IP as well. 
+      additional_admin_ips: 
+        - 192.168.0.150
+    

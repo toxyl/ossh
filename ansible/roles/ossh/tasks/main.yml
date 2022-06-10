@@ -1,0 +1,55 @@
+---
+- name: Create oSSH directory
+  file:
+    path: /etc/ossh
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"
+    state: directory
+    mode: '0755'
+  tags: install
+
+- name: Generate oSSH config
+  template:
+    src: templates/config.yaml.j2
+    dest: /etc/ossh/config.yaml
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"
+    mode: '0644'
+    force: yes
+
+- name: Stop oSSH service
+  service:
+    name: ossh
+    state: stopped
+  tags: update
+
+- name: Install oSSH binary
+  copy:
+    src: "files/ossh"
+    dest: /etc/ossh/
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"
+    mode: '0744'
+    force: yes
+
+- name: Install oSSH service
+  template:
+    src: templates/service.conf.j2
+    dest: /etc/systemd/system/ossh.service
+    mode: '0644'
+    force: yes
+
+- name: Reload SystemD services
+  systemd:
+    daemon_reload: yes
+
+- name: Enable oSSH service
+  service:
+    name: ossh
+    enabled: yes
+  tags: install
+
+- name: Reload oSSH service
+  service:
+    name: ossh
+    state: reloaded

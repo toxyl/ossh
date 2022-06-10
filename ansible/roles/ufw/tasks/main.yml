@@ -1,0 +1,62 @@
+---
+# First we protect our real SSH port with a whitelist
+# in case a stray bot finds it.
+- name: Whitelist IPs for (real) SSH access
+  ufw:
+    rule: allow
+    proto: tcp
+    port: "{{ admin_port }}"
+    src: '{{ item }}'
+  with_items:
+    - '{{ admin_ips }}'
+
+- name: Whitelist additional IPs for (real) SSH access
+  ufw:
+    rule: allow
+    proto: tcp
+    port: "{{ admin_port }}"
+    src: '{{ item }}'
+  with_items:
+    - '{{ additional_admin_ips }}'
+
+# Now we open all ports oSSH needs.
+# Note that oSSH does whitelist validatation,
+# DO NOT apply whitelists to these ports.
+- name: Enable oSSH port
+  ufw:
+    rule: allow
+    proto: tcp
+    port: "{{ ossh_port }}"
+
+- name: Enable sync server port
+  ufw:
+    rule: allow
+    proto: tcp
+    port: "{{ sync_port }}"
+
+- name: Enable web interface server port
+  ufw:
+    rule: allow
+    proto: tcp
+    port: "{{ ui_port }}"
+
+# All other traffic should be denied (incoming) or allowed (outgoing)
+- name: Deny incoming traffic by default
+  ufw:
+    default: deny
+    direction: incoming
+  tags: install
+
+- name: Allow outgoing traffic by default
+  ufw:
+    default: allow
+    direction: outgoing
+  tags: install
+
+# Ready to go
+- name: Enable ufw
+  ufw:
+    state: enabled
+  tags: install
+
+    
