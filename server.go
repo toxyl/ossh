@@ -449,11 +449,9 @@ func NewOSSHServer() *OSSHServer {
 	go func() {
 		for {
 			data := struct {
-				Node  *SyncNodeStats `json:"node"`
-				Total *SyncNodeStats `json:"total"`
+				Node *SyncNodeStats `json:"node"`
 			}{
-				Node:  SrvOSSH.stats(),
-				Total: SrvSync.nodes.GetStats(),
+				Node: SrvOSSH.stats(),
 			}
 
 			jsonStats, err := json.Marshal(data)
@@ -467,9 +465,18 @@ func NewOSSHServer() *OSSHServer {
 
 	go func() {
 		for {
-			stats := SrvOSSH.stats()
+			data := struct {
+				Total *SyncNodeStats `json:"total"`
+			}{
+				Total: SrvSync.nodes.GetStats(),
+			}
 
-			jsonStats, err := json.Marshal(stats)
+			jsonStats, err := json.Marshal(data)
+			if err == nil {
+				SrvUI.PushStats(string(jsonStats))
+			}
+
+			jsonStats, err = json.Marshal(SrvOSSH.stats())
 			if err == nil {
 				_ = SrvSync.Broadcast(fmt.Sprintf("ADD-STATS %s", string(jsonStats)))
 			}
