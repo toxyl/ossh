@@ -12,54 +12,51 @@ import (
 const InvalidCommand = "Command not recognized"
 const EmptyCommandResponse = ""
 
-type SyncServer struct {
-	listener net.Listener
-	conn     net.Conn
-	nodes    *SyncNodes
-	busy     bool
+type SyncServerConnection struct {
+	conn net.Conn
 }
 
-func (ss *SyncServer) close() {
-	if ss.conn != nil {
-		ss.conn.Close()
+func (ssc *SyncServerConnection) close() {
+	if ssc.conn != nil {
+		ssc.conn.Close()
 	}
 }
 
-func (ss *SyncServer) write(msg string) {
-	if ss.conn != nil {
+func (ssc *SyncServerConnection) write(msg string) {
+	if ssc.conn != nil {
 		msg = strings.TrimSpace(msg)
 		if msg != "" {
 			msg = EncodeGzBase64String(msg)
 		}
-		_, _ = ss.conn.Write([]byte(msg))
+		_, _ = ssc.conn.Write([]byte(msg))
 	}
 }
 
-func (ss *SyncServer) process(cmd string) {
+func (ssc *SyncServerConnection) process(cmd string) {
 	str := strings.Split(cmd, " ")
 
 	if len(str) <= 0 {
-		ss.write(InvalidCommand)
+		ssc.write(InvalidCommand)
 		return
 	}
 
 	command := str[0]
 
 	if _, ok := SyncCommands[command]; ok {
-		res, err := SyncCommands[command](str[1:])
+		res, err := SyncCommands[command](ssc, str[1:])
 		if err != nil {
 			LogSyncServer.Error("Command %s failed: %s", colorHighlight(command), colorError(err))
-			ss.write(EmptyCommandResponse)
+			ssc.write(EmptyCommandResponse)
 			return
 		}
-		ss.write(res)
+		ssc.write(res)
 	}
 }
 
-func (ss *SyncServer) handleConnection() {
-	defer ss.close()
+func (ssc *SyncServerConnection) handleConnection() {
+	defer ssc.close()
 
-	s := bufio.NewScanner(ss.conn)
+	s := bufio.NewScanner(ssc.conn)
 	for s.Scan() {
 		data := s.Text()
 		data, err := DecodeGzBase64String(data)
@@ -69,7 +66,7 @@ func (ss *SyncServer) handleConnection() {
 		}
 
 		if data == EmptyCommandResponse {
-			ss.write(EmptyCommandResponse)
+			ssc.write(EmptyCommandResponse)
 			continue
 		}
 
@@ -77,8 +74,20 @@ func (ss *SyncServer) handleConnection() {
 			return
 		}
 
-		ss.process(data)
+		ssc.process(data)
 		return
+	}
+}
+
+type SyncServer struct {
+	listener net.Listener
+	conns    map[string]*SyncServerConnection
+	nodes    *SyncNodes
+}
+
+func (ss *SyncServer) close() {
+	for _, v := range ss.conns {
+		v.close()
 	}
 }
 
@@ -123,9 +132,8 @@ func (ss *SyncServer) GetOutOfSyncNodes(fingerprint string) map[string]string {
 }
 
 func (ss *SyncServer) SyncToNodes() {
-	time.Sleep(DELAY_SYNC_START)
+	time.Sleep(time.Duration(GetRandomInt(10, 60)) * time.Second)
 	for {
-		ss.busy = true
 		fp := SrvOSSH.Loot.Fingerprint()
 		fp = strings.TrimSpace(fp)
 		LogSyncServer.Debug("Starting sync: %s", colorHighlight(fp))
@@ -159,7 +167,6 @@ func (ss *SyncServer) SyncToNodes() {
 			}
 		}
 		LogSyncServer.Debug("Sync complete!")
-		ss.busy = false
 
 		time.Sleep(time.Duration(Conf.Sync.Interval) * time.Minute)
 	}
@@ -212,40 +219,39 @@ func (ss *SyncServer) Start() {
 			continue
 		}
 
-		if ss.busy {
-			_, _ = conn.Write([]byte(EmptyCommandResponse))
+		host, port, err := net.SplitHostPort(conn.RemoteAddr().String())
+		if err != nil {
+			LogSyncServer.Error("Could not process remote address: %s", colorError(err))
 			conn.Close()
 			continue
 		}
 
-		ss.conn = conn
+		sid := fmt.Sprintf("%s:%s", host, port)
 
-		host, _, err := net.SplitHostPort(ss.conn.RemoteAddr().String())
-		if err != nil {
-			LogSyncServer.Error("Could not process remote address: %s", colorError(err))
-			ss.close()
-			continue
+		if _, ok := ss.conns[sid]; !ok {
+			ss.conns[sid] = &SyncServerConnection{
+				conn: conn,
+			}
 		}
 
 		if !ss.nodes.IsAllowedHost(host) {
 			LogSyncServer.NotOK("%s is not a sync node, I'll give a bullshit response.", colorHost(host))
-			ss.write(GenerateGarbageString(1000))
-			ss.close()
+			ss.conns[sid].write(GenerateGarbageString(1000))
+			ss.conns[sid].close()
 			continue
 		}
 
-		ss.write(EmptyCommandResponse)
+		ss.conns[sid].write(EmptyCommandResponse)
 
-		go ss.handleConnection()
+		go ss.conns[sid].handleConnection()
 	}
 }
 
 func NewSyncServer() *SyncServer {
 	ss := &SyncServer{
 		listener: nil,
-		conn:     nil,
 		nodes:    NewSyncNodes(),
-		busy:     false,
+		conns:    map[string]*SyncServerConnection{},
 	}
 	return ss
 }

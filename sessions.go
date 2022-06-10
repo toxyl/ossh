@@ -10,15 +10,9 @@ import (
 	"github.com/gliderlabs/ssh"
 )
 
-type SessionLog struct {
-	time.Time
-	string
-}
-
 type Session struct {
 	CreatedAt    time.Time
 	LastActivity time.Time
-	ActivityLog  []*SessionLog
 	ID           string
 	Type         string
 	Shell        *FakeShell
@@ -33,28 +27,20 @@ type Session struct {
 	lock         *sync.Mutex
 }
 
-func (s *Session) UpdateActivity(action string) {
+func (s *Session) UpdateActivity() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	if !s.Orphan {
-		SrvOSSH.lock.Lock()
-		SrvOSSH.TimeWasted += int(time.Since(s.LastActivity).Seconds())
-		SrvOSSH.lock.Unlock()
+		SrvOSSH.addWastedTime(int(time.Since(s.LastActivity).Seconds()))
 	}
-
 	s.LastActivity = time.Now()
-	s.ActivityLog = append(s.ActivityLog, &SessionLog{s.LastActivity, action})
-	LogSessions.Debug("%s: %s", s.LogIDFull(), colorHighlight(action))
 }
 
 func (s *Session) RandomSleep(min, max int) {
 	if !s.Whitelisted {
 		wait := time.Duration(GetRandomInt(min, max)) * time.Millisecond
-		s.lock.Lock()
-		s.UpdateActivity("sleep start")
-		s.lock.Unlock()
 		time.Sleep(wait)
-		s.lock.Lock()
-		s.UpdateActivity("sleep end")
-		s.lock.Unlock()
+		s.UpdateActivity()
 	}
 }
 
@@ -83,67 +69,67 @@ func (s *Session) updateID() {
 
 func (s *Session) SetType(sessionType string) *Session {
 	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.Type = sessionType
-	s.UpdateActivity("set type")
+	s.lock.Unlock()
+	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) SetShell(shell *FakeShell) *Session {
 	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.Shell = shell
-	s.UpdateActivity("set shell")
+	s.lock.Unlock()
+	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) SetSSHSession(sshSession *ssh.Session) *Session {
 	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.SSHSession = sshSession
-	s.UpdateActivity("set session")
+	s.lock.Unlock()
+	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) SetTerm(term string) *Session {
 	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.Term = term
-	s.UpdateActivity("set term")
+	s.lock.Unlock()
+	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) SetUser(user string) *Session {
 	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.User = user
-	s.UpdateActivity("set user")
+	s.lock.Unlock()
+	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) SetPassword(password string) *Session {
 	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.Password = password
-	s.UpdateActivity("set password")
+	s.lock.Unlock()
+	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) SetHost(host string) *Session {
 	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.Host = host
 	s.updateID()
-	s.UpdateActivity("set host")
+	s.lock.Unlock()
+	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) SetPort(port int) *Session {
 	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.Port = port
 	s.updateID()
-	s.UpdateActivity("set port")
+	s.lock.Unlock()
+	s.UpdateActivity()
 	return s
 }
 
@@ -191,7 +177,6 @@ func NewSession() *Session {
 	s := &Session{
 		CreatedAt:    time.Now(),
 		LastActivity: time.Now(),
-		ActivityLog:  []*SessionLog{},
 		ID:           "",
 		Shell:        nil,
 		SSHSession:   nil,
@@ -237,9 +222,7 @@ func (ss *Sessions) Create(sessionID string) *Session {
 			return nil
 		}
 		ss.Add(s)
-		s.lock.Lock()
-		s.UpdateActivity("created")
-		s.lock.Unlock()
+		s.UpdateActivity()
 		LogSessions.OK("%s: New session started", s.LogID())
 	}
 	ss.lock.Lock()
@@ -260,9 +243,7 @@ func (ss *Sessions) Remove(sessionID, reason string) {
 		} else {
 			tw = int(s.Uptime().Seconds())
 		}
-		s.lock.Lock()
-		s.UpdateActivity("remove")
-		s.lock.Unlock()
+		s.UpdateActivity()
 
 		if reason == "" {
 			LogSessions.OK("%s: Session removed (was active for %s)", cid, colorDuration(uint(tw)))

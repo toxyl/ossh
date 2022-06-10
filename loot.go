@@ -73,6 +73,23 @@ func (l *Loot) AddUser(user string) bool {
 	return true
 }
 
+func (l *Loot) AddUsers(users []string) int {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	added := 0
+	for _, u := range users {
+		u = strings.TrimSpace(u)
+		if u == "" {
+			continue
+		}
+		if _, ok := l.users[u]; !ok {
+			l.users[u] = true
+			added++
+		}
+	}
+	return added
+}
+
 func (l *Loot) AddPassword(password string) bool {
 	password = strings.TrimSpace(password)
 	if password == "" {
@@ -86,6 +103,23 @@ func (l *Loot) AddPassword(password string) bool {
 	defer l.lock.Unlock()
 	l.passwords[password] = true
 	return true
+}
+
+func (l *Loot) AddPasswords(passwords []string) int {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	added := 0
+	for _, p := range passwords {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if _, ok := l.passwords[p]; !ok {
+			l.passwords[p] = true
+			added++
+		}
+	}
+	return added
 }
 
 func (l *Loot) AddHost(host string) bool {
@@ -104,6 +138,23 @@ func (l *Loot) AddHost(host string) bool {
 	defer l.lock.Unlock()
 	l.hosts[host] = true
 	return true
+}
+
+func (l *Loot) AddHosts(hosts []string) int {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	added := 0
+	for _, h := range hosts {
+		h = strings.TrimSpace(h)
+		if h == "" || isIPWhitelisted(h) {
+			continue
+		}
+		if _, ok := l.hosts[h]; !ok {
+			l.hosts[h] = true
+			added++
+		}
+	}
+	return added
 }
 
 func (l *Loot) AddPayload(fingerprint string) bool {

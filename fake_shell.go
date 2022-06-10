@@ -164,11 +164,11 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 	}
 	LogFakeShell.Info("%s @ %s: %s", colorConnID(data.User, data.IP, data.Port), colorDuration(uint(s.ActiveFor().Seconds())), cmd)
 	s.lock.Lock()
-	s.UpdateActivity("run command start")
+	s.UpdateActivity()
 	s.lock.Unlock()
 	defer func() {
 		s.lock.Lock()
-		s.UpdateActivity("run command end")
+		s.UpdateActivity()
 		s.lock.Unlock()
 	}()
 

@@ -6,13 +6,13 @@ import (
 	"strings"
 )
 
-type SyncCommand func(args []string) (string, error)
+type SyncCommand func(ssc *SyncServerConnection, args []string) (string, error)
 
 var SyncCommands = map[string]SyncCommand{
-	"NAME": func(args []string) (string, error) {
+	"NAME": func(ssc *SyncServerConnection, args []string) (string, error) {
 		return Conf.HostName, nil
 	},
-	"SYNC": func(args []string) (string, error) {
+	"SYNC": func(ssc *SyncServerConnection, args []string) (string, error) {
 		if len(args) < 1 {
 			return "", errors.New("need your fingerprint")
 		}
@@ -20,7 +20,7 @@ var SyncCommands = map[string]SyncCommand{
 		if fp == "" {
 			return "", errors.New("need your fingerprint")
 		}
-		host, _, _ := net.SplitHostPort(SrvSync.conn.RemoteAddr().String())
+		host, _, _ := net.SplitHostPort(ssc.conn.RemoteAddr().String())
 		fpsrv := SrvOSSH.Loot.Fingerprint()
 		if fp == fpsrv {
 			LogSyncCommands.Debug("Ignored SYNC request from %s: %s (we have: %s)", colorHost(host), colorHighlight(fp), colorHighlight(fpsrv))
@@ -59,70 +59,55 @@ var SyncCommands = map[string]SyncCommand{
 		sl := strings.Join(syncList, ",")
 		return sl, nil
 	},
-	"HOSTS": func(args []string) (string, error) {
+	"HOSTS": func(ssc *SyncServerConnection, args []string) (string, error) {
 		return ImplodeLines(SrvOSSH.Loot.GetHosts()), nil
 	},
-	"USERS": func(args []string) (string, error) {
+	"USERS": func(ssc *SyncServerConnection, args []string) (string, error) {
 		return ImplodeLines(SrvOSSH.Loot.GetUsers()), nil
 	},
-	"PASSWORDS": func(args []string) (string, error) {
+	"PASSWORDS": func(ssc *SyncServerConnection, args []string) (string, error) {
 		return ImplodeLines(SrvOSSH.Loot.GetPasswords()), nil
 	},
-	"PAYLOADS": func(args []string) (string, error) {
+	"PAYLOADS": func(ssc *SyncServerConnection, args []string) (string, error) {
 		return ImplodeLines(SrvOSSH.Loot.GetPayloads()), nil
 	},
-	"ADD-HOST": func(args []string) (string, error) {
+	"ADD-HOST": func(ssc *SyncServerConnection, args []string) (string, error) {
 		if len(args) < 1 {
 			return "", nil
 		}
-		added := 0
-		for _, h := range args {
-			if SrvOSSH.Loot.AddHost(h) {
-				added++
-			}
-		}
+		added := SrvOSSH.Loot.AddHosts(args)
 		if added > 0 {
-			host, _, _ := net.SplitHostPort(SrvSync.conn.RemoteAddr().String())
+			host, _, _ := net.SplitHostPort(ssc.conn.RemoteAddr().String())
 			LogSyncCommands.OK("%s donated %s host(s)", colorHost(host), colorInt(added))
 			SrvOSSH.SaveData()
 		}
 		return "", nil
 	},
-	"ADD-USER": func(args []string) (string, error) {
+	"ADD-USER": func(ssc *SyncServerConnection, args []string) (string, error) {
 		if len(args) < 1 {
 			return "", nil
 		}
-		added := 0
-		for _, u := range args {
-			if SrvOSSH.Loot.AddUser(u) {
-				added++
-			}
-		}
+		added := SrvOSSH.Loot.AddUsers(args)
 		if added > 0 {
-			host, _, _ := net.SplitHostPort(SrvSync.conn.RemoteAddr().String())
+			host, _, _ := net.SplitHostPort(ssc.conn.RemoteAddr().String())
 			LogSyncCommands.OK("%s donated %s user(s)", colorHost(host), colorInt(added))
 			SrvOSSH.SaveData()
 		}
 		return "", nil
 	},
-	"ADD-PASSWORD": func(args []string) (string, error) {
+	"ADD-PASSWORD": func(ssc *SyncServerConnection, args []string) (string, error) {
 		if len(args) < 1 {
 			return "", nil
 		}
-		added := 0
-		for _, p := range args {
-			if SrvOSSH.Loot.AddPassword(p) {
-				added++
-			}
-		}
+		added := SrvOSSH.Loot.AddPasswords(args)
 		if added > 0 {
-			host, _, _ := net.SplitHostPort(SrvSync.conn.RemoteAddr().String())
+			host, _, _ := net.SplitHostPort(ssc.conn.RemoteAddr().String())
 			LogSyncCommands.OK("%s donated %s password(s)", colorHost(host), colorInt(added))
 			SrvOSSH.SaveData()
 		}
 		return "", nil
 	},
-	"ADD-PAYLOAD": func(args []string) (string, error) {
+	"ADD-PAYLOAD": func(ssc *SyncServerConnection, args []string) (string, error) {
 		if len(args) < 2 {
 			return "", errors.New("need fingerprint and data")
 		}
@@ -135,7 +120,7 @@ var SyncCommands = map[string]SyncCommand{
 		pl.Save()
 		if pl.Exists() {
 			if SrvOSSH.Loot.AddPayload(hash) {
-				host, _, _ := net.SplitHostPort(SrvSync.conn.RemoteAddr().String())
+				host, _, _ := net.SplitHostPort(ssc.conn.RemoteAddr().String())
 				LogSyncCommands.OK("%s donated payload %s", colorHost(host), colorFile(pl.file))
 				SrvOSSH.SaveData()
 			}
@@ -143,11 +128,11 @@ var SyncCommands = map[string]SyncCommand{
 
 		return "", nil
 	},
-	"ADD-STATS": func(args []string) (string, error) {
+	"ADD-STATS": func(ssc *SyncServerConnection, args []string) (string, error) {
 		if len(args) < 1 {
 			return "", nil
 		}
-		host, _, _ := net.SplitHostPort(SrvSync.conn.RemoteAddr().String())
+		host, _, _ := net.SplitHostPort(ssc.conn.RemoteAddr().String())
 		stats := SrvOSSH.JSONToStats(strings.Join(args, " "))
 		SrvSync.nodes.AddStats(host, stats)
 		LogSyncCommands.Debug("%s reported stats", colorHost(host))

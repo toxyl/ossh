@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	INTERVAL_UI_STATS_UPATE    = 10 * time.Second
+	INTERVAL_UI_STATS_UPDATE   = 10 * time.Second
+	INTERVAL_STATS_BROADCAST   = 60 * time.Second
 	INTERVAL_OVERLAYFS_CLEANUP = 30 * time.Second
 	INTERVAL_SESSIONS_CLEANUP  = 1 * time.Minute
 	DELAY_OVERLAYFS_MKDIR      = 100 * time.Millisecond
-	DELAY_SYNC_START           = 10 * time.Second
 )
 
 //go:embed commands/*

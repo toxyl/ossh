@@ -73,8 +73,6 @@ func (sn *SyncNodes) AddStats(id string, stats *SyncNodeStats) {
 // GetStats returns a SyncNodeStats struct with
 // the total of all SyncNodes + this oSSH instance.
 func (sn *SyncNodes) GetStats() *SyncNodeStats {
-	sn.lock.Lock()
-	defer sn.lock.Unlock()
 	total := &SyncNodeStats{
 		Hosts:            0,
 		Passwords:        0,
@@ -87,7 +85,9 @@ func (sn *SyncNodes) GetStats() *SyncNodeStats {
 		TimeWasted:       0,
 		Uptime:           0,
 	}
+	sn.lock.Lock()
 	stats := sn.stats
+	sn.lock.Unlock()
 	stats["_"] = SrvOSSH.stats() // we should include ourselves
 	for _, s := range stats {
 		total.Hosts = MaxOfInts(total.Hosts, s.Hosts)

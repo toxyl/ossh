@@ -14,14 +14,30 @@ import (
 	"github.com/gliderlabs/ssh"
 )
 
+type TimeWastedCounter struct {
+	val  int
+	lock *sync.Mutex
+}
+
+func (twc *TimeWastedCounter) Value() int {
+	twc.lock.Lock()
+	defer twc.lock.Unlock()
+	return twc.val
+}
+
+func (twc *TimeWastedCounter) Add(n int) {
+	twc.lock.Lock()
+	defer twc.lock.Unlock()
+	twc.val += n
+}
+
 type OSSHServer struct {
 	Loot       *Loot
 	Logins     *Logins
 	Sessions   *Sessions
-	TimeWasted int
+	TimeWasted *TimeWastedCounter
 	server     *ssh.Server
 	fs         *OverlayFSManager
-	lock       *sync.Mutex
 }
 
 func (ossh *OSSHServer) stats() *SyncNodeStats {
@@ -34,9 +50,17 @@ func (ossh *OSSHServer) stats() *SyncNodeStats {
 		AttemptedLogins:  ossh.Logins.GetAttempts(),
 		SuccessfulLogins: ossh.Logins.GetSuccesses(),
 		FailedLogins:     ossh.Logins.GetFailures(),
-		TimeWasted:       time.Duration(ossh.TimeWasted * int(time.Second)).Seconds(),
+		TimeWasted:       ossh.getWastedTime(),
 		Uptime:           uptime().Round(1 * time.Second).Seconds(),
 	}
+}
+
+func (ossh *OSSHServer) addWastedTime(seconds int) {
+	ossh.TimeWasted.Add(seconds)
+}
+
+func (ossh *OSSHServer) getWastedTime() float64 {
+	return time.Duration(ossh.TimeWasted.Value() * int(time.Second)).Seconds()
 }
 
 func (ossh *OSSHServer) statsToJSON() string {
@@ -101,6 +125,7 @@ func (ossh *OSSHServer) SaveData() {
 }
 
 func (ossh *OSSHServer) addLoginFailure(s *Session, reason string) {
+	s.UpdateActivity()
 	if s.Password == "" {
 		s.Password = "(empty)"
 	}
@@ -134,6 +159,7 @@ func (ossh *OSSHServer) addLoginFailure(s *Session, reason string) {
 }
 
 func (ossh *OSSHServer) addLoginSuccess(s *Session, reason string) {
+	s.UpdateActivity()
 	if s.Password == "" {
 		s.Password = "(empty)"
 	}
@@ -306,14 +332,6 @@ func (ossh *OSSHServer) connectionFailedCallback(conn net.Conn, err error) {
 
 func (ossh *OSSHServer) authHandler(ctx ssh.Context, pwd string) bool {
 	s := ossh.Sessions.Create(ctx.RemoteAddr().String()).SetUser(ctx.User()).SetPassword(pwd)
-	s.lock.Lock()
-	s.UpdateActivity("auth handler start")
-	s.lock.Unlock()
-	defer func() {
-		s.lock.Lock()
-		s.UpdateActivity("auth handler end")
-		s.lock.Unlock()
-	}()
 
 	if s.Whitelisted {
 		ossh.addLoginSuccess(s, "host is whitelisted")
@@ -418,37 +436,45 @@ func (ossh *OSSHServer) Start() {
 
 func NewOSSHServer() *OSSHServer {
 	ossh := &OSSHServer{
-		Loot:       NewLoot(),
-		Logins:     NewLogins(),
-		server:     nil,
-		Sessions:   NewActiveSessions(Conf.MaxSessionAge),
-		TimeWasted: 0,
-		lock:       &sync.Mutex{},
+		Loot:     NewLoot(),
+		Logins:   NewLogins(),
+		server:   nil,
+		Sessions: NewActiveSessions(Conf.MaxSessionAge),
+		TimeWasted: &TimeWastedCounter{
+			val:  0,
+			lock: &sync.Mutex{},
+		},
 	}
 	ossh.init()
 	go func() {
 		for {
-			t := time.Now()
-			stats := SrvOSSH.stats()
-			totalStats := SrvSync.nodes.GetStats()
 			data := struct {
 				Node  *SyncNodeStats `json:"node"`
 				Total *SyncNodeStats `json:"total"`
 			}{
-				Node:  stats,
-				Total: totalStats,
+				Node:  SrvOSSH.stats(),
+				Total: SrvSync.nodes.GetStats(),
 			}
 
-			json, err := json.Marshal(data)
-			if err != nil {
-				LogOSSHServer.Error("Could not marshal stats data: %s", colorError(err))
-				continue
+			jsonStats, err := json.Marshal(data)
+			if err == nil {
+				SrvUI.PushStats(string(jsonStats))
 			}
 
-			SrvUI.PushStats(string(json))
-			_ = SrvSync.Broadcast(fmt.Sprintf("ADD-STATS %s", SrvOSSH.statsToJSON()))
+			time.Sleep(INTERVAL_UI_STATS_UPDATE)
+		}
+	}()
 
-			time.Sleep(INTERVAL_UI_STATS_UPATE - (time.Duration(time.Since(t).Seconds()) % time.Duration(INTERVAL_UI_STATS_UPATE.Seconds())))
+	go func() {
+		for {
+			stats := SrvOSSH.stats()
+
+			jsonStats, err := json.Marshal(stats)
+			if err == nil {
+				_ = SrvSync.Broadcast(fmt.Sprintf("ADD-STATS %s", string(jsonStats)))
+			}
+
+			time.Sleep(INTERVAL_STATS_BROADCAST)
 		}
 	}()
 	return ossh
