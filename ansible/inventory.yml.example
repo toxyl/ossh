@@ -10,13 +10,7 @@ all:
     # Directory where the oSSH sources can be found.
     data_dir: ../
 
-    # List of oSSH node IPs you want this playbook to join together in a cluster.
-    # Note that these DO NOT have to be oSSH nodes handled by this playbook.
-    # However, usually this list would match the hosts defined below.
-    sync_nodes:
-      - 1.2.3.1
-      - 1.2.3.2
-      - 1.2.3.3
+    sync_servers: "{{ groups['all'] }}"
 
     # This will be the SSH user used for connections to the oSSH instances
     # after the initial setup has been completed. The setup will use your current
@@ -32,7 +26,7 @@ all:
     # whilst oSSH is served on 22. After the initial setup the
     # SSH server will be restarted and is from then on available
     # at this port.
-    admin_port: 1984
+    admin_port: "1984"
 
     # These IPs are whitelisted for administrative use.
     # Any other IP that tries to connect to the web server

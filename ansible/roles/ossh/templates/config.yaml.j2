@@ -39,6 +39,16 @@ ip_whitelist:
 {% endfor %}
 {% endif %}
 
+hostnames:
+{% for host in sync_servers %}
+{% if hostvars[host].public_ip %}
+  - ip: {{ hostvars[host].public_ip }}
+{% else %}
+  - ip: {{ hostvars[host].ansible_host }}
+{% endif %}
+    name: {{ hostvars[host].inventory_hostname }}
+{% endfor %}
+
 # IP to serve on, usually 0.0.0.0 (public exposure) or 127.0.0.1 (local machine).
 host: 0.0.0.0
 
@@ -102,11 +112,20 @@ sync:
   # This is the list of nodes belonging to the cluster.
   # Managed by Ansible.
   nodes:
-{% for item in sync_nodes %}
-{% if (item != ansible_host) %}
-{% if (item != public_ip) %}
-    - host: {{ item }}
-      port: {{ sync_port }}
+{% for host in sync_servers %}
+{% if hostvars[host].public_ip %}
+{% if (hostvars[host].public_ip != ansible_host) %}
+{% if (hostvars[host].public_ip != public_ip) %}
+    - host: {{ hostvars[host].public_ip }}
+      port: {{ hostvars[host].sync_port }}
+{% endif %}
+{% endif %}
+{% else %}
+{% if (hostvars[host].ansible_host != ansible_host) %}
+{% if (hostvars[host].ansible_host != public_ip) %}
+    - host: {{ hostvars[host].ansible_host }}
+      port: {{ hostvars[host].sync_port }}
+{% endif %}
 {% endif %}
 {% endif %}
 {% endfor %}

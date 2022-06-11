@@ -39,6 +39,7 @@ func colorHost(host string) string {
 		f, _ := GetFloat(p)
 		pt += f
 	}
+	host = getHostname(host)
 	// 88 - 231 (143 total)
 	return colorWrap(host, uint(88.0+143.0*(pt/4.0/255.0)))
 }

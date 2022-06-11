@@ -48,13 +48,17 @@ type Config struct {
 	HostName         string   `mapstructure:"host_name"`
 	Version          string   `mapstructure:"version"`
 	IPWhitelist      []string `mapstructure:"ip_whitelist"`
-	Host             string   `mapstructure:"host"`
-	Port             uint     `mapstructure:"port"`
-	MaxIdleTimeout   uint     `mapstructure:"max_idle"`
-	MaxSessionAge    uint     `mapstructure:"max_session_age"`
-	InputDelay       uint     `mapstructure:"input_delay"`
-	Ratelimit        float64  `mapstructure:"ratelimit"`
-	Webinterface     struct {
+	Hostnames        []struct {
+		Name string `mapstructure:"name"`
+		IP   string `mapstructure:"ip"`
+	} `mapstructure:"hostnames"`
+	Host           string  `mapstructure:"host"`
+	Port           uint    `mapstructure:"port"`
+	MaxIdleTimeout uint    `mapstructure:"max_idle"`
+	MaxSessionAge  uint    `mapstructure:"max_session_age"`
+	InputDelay     uint    `mapstructure:"input_delay"`
+	Ratelimit      float64 `mapstructure:"ratelimit"`
+	Webinterface   struct {
 		Host     string `mapstructure:"host"`
 		Port     uint   `mapstructure:"port"`
 		CertFile string `mapstructure:"cert_file"`
@@ -91,6 +95,15 @@ func isIPWhitelisted(ip string) bool {
 		}
 	}
 	return false
+}
+
+func getHostname(ip string) string {
+	for _, h := range Conf.Hostnames {
+		if ip == h.IP {
+			return h.Name
+		}
+	}
+	return ip
 }
 
 func InitPaths() {
