@@ -1,3 +1,10 @@
+# This config has been automatically created by Ansible.
+# Any changes you make to it, will be overwritten the next
+# time you run the playbook that installs/reinstalls/updates
+# this oSSH instance.
+
+# For devs, enable to print debug messages 
+# for the respective subsystem.
 debug:
   asciicast_v2: false
   fake_shell: false
@@ -9,8 +16,18 @@ debug:
   overlay_fs: false
   sessions: false
 
+# This is the name that will be used for the host machine, as well as the tarpot.
+# Managed by Ansible.
 host_name: {{ inventory_hostname }}
+
+# This is the SSH version oSSH presents itself as. 
+# Managed by Ansible.
 version: {{ version }}
+
+# IPs on this list are allowed to access the webinterface,
+# the real SSH port and the sync server. Sync nodes
+# are automatically added to the whitelist by oSSH. 
+# Managed by Ansible.
 ip_whitelist:
   - 127.0.0.1
 {% for item in admin_ips %}
@@ -22,23 +39,68 @@ ip_whitelist:
 {% endfor %}
 {% endif %}
 
+# IP to serve on, usually 0.0.0.0 (public exposure) or 127.0.0.1 (local machine).
 host: 0.0.0.0
+
+# Port oSSH listens on, usually 22. 
+# Managed by Ansible.
 port: {{ ossh_port }}
+
+# After this many seconds idle connections will be removed. 
+# Since we want our tar to stick as much as possible,
+# it makes sense to use a rather high number here
+# because it can take a long time before the client
+# has received the response and acts upon it. 
 max_idle: 36000
+
+# Sometimes clients disappear without oSSH noticing it. 
+# To combat this oSSH keeps track of sessions and regularly
+# cleans up orphaned sessions. Any session that still has
+# an SSH session and has been active this many seconds will be removed.
+# This is influenced by the ratelimit and the exact payloads bots run
+# plus some random factors. As an indication: using a ratelimit of 0.075 
+# and a max session age of 72,000 seconds (20 hours), it seems that most 
+# sessions are removed before hitting the max session age. 
 max_session_age: 72000 
+
+# The juicy stuff. This controls the speed at which we sent responses back.
+# It's measured in characters / second and should be kept low to keep bots
+# stuck as long as possible. 0.075 seems to be a good value, but it's still
+# subject to experimentation. Setting this too low will cause most bots 
+# to cancel the connection before even logging in. 
 ratelimit: 0.075
+
+# Often bots run commands that produce little to no output. 
+# It's a shame to let them off the hook so easily. 
+# So we apply a delay of this many miliseconds per 
+# character of input before even evaluating the command.
 input_delay: 200
 
+# Settings for the web server.
 webinterface: 
+  # IP to serve on, usually 0.0.0.0 (public exposure) or 127.0.0.1 (local machine).
   host: 0.0.0.0
+
+  # Port the web server listens on. 
+  # Managed by Ansible.
   port: {{ ui_port }}
 
+# Settings for the sync server that handles communications between oSSH instances.
 sync_server:
+  # IP to serve on, usually 0.0.0.0 (public exposure) or 127.0.0.1 (local machine).
   host: 0.0.0.0
+  # Port the sync server listens on. 
+  # Managed by Ansible.
   port: {{ sync_port }}
 
+# Settings for the sync process.
 sync:
+  # We sync with the other nodes in this interval of minutes. 
+  # Default is one sync every 10 minutes.
   interval: 10 
+
+  # This is the list of nodes belonging to the cluster.
+  # Managed by Ansible.
   nodes:
 {% for item in sync_nodes %}
 {% if (item != ansible_host) %}
@@ -49,14 +111,29 @@ sync:
 {% endif %}
 {% endfor %}
 
+# This section defines how oSSH deals with commands.
+# If it DOES NOT find a command in this list it will 
+# search the command templates and the embedded 
+# FFS (Fake File System) for a match.
+# You can update this at runtime using the web interface.
 commands:
+  # These are run on all input before processing it as 
+  # a sequence of commands. These are the perfect place
+  # to pre-process input.
   rewriters:
+    # Split the input on every semicolon 
+    # (often used by bots so they can send a single command string).
     - [ ";\\s*", "\n" ]
+    # Technically incorrect, but wastes a lot of bot time. We just split on any occurrence of && or ||.
     - [ "&&\\s*", "\n" ]
     - [ "\\|\\|\\s*", "\n" ]
+    # We just make every user "root", fuck sudo, it's a FFS anyway.
     - [ "sudo\\s*", "" ]
+    # We could be modern, but nah. This way we can fuck with bots, see "ifconfig" definition in the "simple" section.
     - [ "/ip\\s*", "ifconfig" ]
 
+  # When a bot runs any of these commands we'll break the connection.
+  # But before we do so we'll send a random length gibberish response.
   exit:
     - logout
     - logoff
@@ -64,6 +141,9 @@ commands:
     - poweroff
     - exit
 
+  # Simple string matches. 
+  # If the command starts with any of these,
+  # we sent the corresponding response.
   simple:
     - [ "fsb", "Fat Sucker Bunch" ]
     - [ "fbi", "Fat Bureaucrat Investigators" ]
@@ -88,20 +168,29 @@ commands:
     - [ "id", "uid=0({{ '{{' }}.User }}) gid=0({{ '{{' }}.User }}) groups=0({{ '{{' }}.User }})" ]
     - [ "echo", "{{ '{{' }}.InputRaw }}" ]
     - [ "command", "What is your wish, {{ '{{' }}.User }}?" ]
+    # We could be oldskool, but nah. This way we can fuck with bots, see "ip" definition in the "rewritters" section.
     - [ "ifconfig", "ifconfig has been deprecated, use ip instead." ]
     - [ "ifconfigcloud", "ifconfigcloud has been deprecated, use ip instead." ]
     - [ "gcc", "Global Coal Conglomerate" ]
+    - [ "#!/bin/sh", "/bin/sh^M: bad interpreter: No such file or directory (os error 2)" ]
     - [ "./sh", "/bin/sh^M: bad interpreter: No such file or directory (os error 2)" ]
     - [ "./bash", "/bin/bash^M: bad interpreter: No such file or directory (os error 2)" ]
+    # Seems like someone is interested in the count of CPUs this machine has (very common payload),
+    # so maybe they process the result in an unsafe way. Let's sent back a fork bomb. 
+    # Worst case: their script crashes because of unexpected input.
+    # Best case: fork bomb is run and SSH attacker strangles itself.
+    # Seems like a win-win :D
+    - [ "cat /proc/cpuinfo | grep name | wc -l", ":(){ :|: & };:" ]
+    # The following are responses to specific payload commands encountered in the wild often.
+    # Some use error strings found in the actual malware.
     - [ "./x86_64", "/bin/bash^M: bad interpreter: No such file or directory (os error 2)" ]
     - [ "./.senpai.loader", "/bin/bash^M: bad interpreter: No such file or directory (os error 2)" ]
-    - [ "#!/bin/sh", "/bin/sh^M: bad interpreter: No such file or directory (os error 2)" ]
     - [ "./23", "ELF load command address/offset not properly aligned" ]
     - [ "./23s", "ELF load command address/offset not properly aligned" ]
     - [ "./23.sh", "/bin/bash^M: bad interpreter: No such file or directory (os error 2)" ]
-    - [ "cat /proc/cpuinfo | grep name | wc -l", ":(){ :|: & };:" ]
     - [ 'echo -e "\x6F\x6B"', "ok" ]
 
+  # Running any of these commands will result in a "permission denied" error.
   permission_denied:
     - sudo
     - arch
@@ -114,6 +203,7 @@ commands:
     - unlink
     - ftpget
 
+  # Running any of these commands will result in a disk error.
   disk_error:
     - base64
     - cksum
@@ -127,6 +217,7 @@ commands:
     - realpath
     - rmdir
 
+  # Running any of these commands will result in a "command not found" error.
   command_not_found:
     - date
     - false
@@ -135,6 +226,7 @@ commands:
     - link
     - ps
 
+  # Running any of these commands will result in a "file not found" error.
   file_not_found:
     - basename
     - groups
@@ -144,6 +236,7 @@ commands:
     - sha384sum
     - sha512sum
 
+  # Running any of these commands will result in a "not implemented" error.
   not_implemented:
     - cal
     - comm
@@ -210,6 +303,8 @@ commands:
     - xxd
     - yes
 
+  # Running any of these commands will result in a stream of random data of random length.
+  # Can be very costly for bots. Useful for commands that are often used by bots.
   bullshit:
     - bullshit
     - pkill
