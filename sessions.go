@@ -32,8 +32,8 @@ func (s *Session) UpdateActivity() {
 	defer s.lock.Unlock()
 	if !s.Orphan {
 		SrvOSSH.addWastedTime(int(time.Since(s.LastActivity).Seconds()))
+		s.LastActivity = time.Now()
 	}
-	s.LastActivity = time.Now()
 }
 
 func (s *Session) RandomSleep(min, max int) {
@@ -138,7 +138,7 @@ func (s *Session) LogID() string {
 }
 
 func (s *Session) LogIDFull() string {
-	return fmt.Sprintf("%s @ %s", s.LogID(), colorDuration(uint(s.ActiveFor().Seconds())))
+	return fmt.Sprintf("%s @ %s", s.LogID(), colorDuration(uint(s.Uptime().Seconds())))
 }
 
 func (s *Session) Uptime() time.Duration {
@@ -215,6 +215,18 @@ func (ss *Sessions) Add(session *Session) {
 	ss.sessions[session.ID] = session
 }
 
+func (ss *Sessions) CountActiveSessions(host string) int {
+	ss.lock.Lock()
+	defer ss.lock.Unlock()
+	active := 0
+	for _, v := range ss.sessions {
+		if v.Host == host {
+			active++
+		}
+	}
+	return active
+}
+
 func (ss *Sessions) Create(sessionID string) *Session {
 	if !ss.Has(sessionID) {
 		s := NewSession().SetID(sessionID)
@@ -223,7 +235,9 @@ func (ss *Sessions) Create(sessionID string) *Session {
 		}
 		ss.Add(s)
 		s.UpdateActivity()
-		LogSessions.OK("%s: New session started", s.LogID())
+		cnts := len(ss.sessions)
+		active := ss.CountActiveSessions(s.Host)
+		LogSessions.OK("%s: Session started, host now uses %s of %s.", s.LogID(), colorInt(active), colorIntAmount(cnts, "active session", "active sessions"))
 	}
 	ss.lock.Lock()
 	defer ss.lock.Unlock()
@@ -233,10 +247,10 @@ func (ss *Sessions) Create(sessionID string) *Session {
 func (ss *Sessions) Remove(sessionID, reason string) {
 	if ss.Has(sessionID) {
 		ss.lock.Lock()
-		defer ss.lock.Unlock()
 		s := ss.sessions[sessionID]
+		sh := s.Host
 		tw := 0
-		cid := colorConnID("", s.Host, s.Port)
+		cid := colorConnID("", sh, s.Port)
 		if s.Orphan {
 			tw = int(s.ActiveFor().Seconds())
 			cid += " (orphan)"
@@ -244,13 +258,20 @@ func (ss *Sessions) Remove(sessionID, reason string) {
 			tw = int(s.Uptime().Seconds())
 		}
 		s.UpdateActivity()
+		delete(ss.sessions, sessionID)
+		cnts := len(ss.sessions)
+		ss.lock.Unlock()
+		active := ss.CountActiveSessions(sh)
 
 		if reason == "" {
-			LogSessions.OK("%s: Session removed (was active for %s)", cid, colorDuration(uint(tw)))
+			LogSessions.OK(
+				"%s: Session removed (was active for %s), host now uses %s of %s.",
+				cid, colorDuration(uint(tw)), colorInt(active), colorIntAmount(cnts, "active session", "active sessions"))
 		} else {
-			LogSessions.OK("%s: Session removed because %s (was active for %s)", cid, colorReason(reason), colorDuration(uint(tw)))
+			LogSessions.OK(
+				"%s: Session removed because %s (was active for %s), host now uses %s of %s.",
+				cid, colorReason(reason), colorDuration(uint(tw)), colorInt(active), colorIntAmount(cnts, "active session", "active sessions"))
 		}
-		delete(ss.sessions, sessionID)
 	}
 }
 

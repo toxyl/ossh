@@ -14,6 +14,8 @@ const EmptyCommandResponse = ""
 
 type SyncServerConnection struct {
 	conn net.Conn
+	Host string
+	Port int
 }
 
 func (ssc *SyncServerConnection) close() {
@@ -231,6 +233,8 @@ func (ss *SyncServer) Start() {
 		if _, ok := ss.conns[sid]; !ok {
 			ss.conns[sid] = &SyncServerConnection{
 				conn: conn,
+				Host: host,
+				Port: StringToInt(port, 0),
 			}
 		}
 

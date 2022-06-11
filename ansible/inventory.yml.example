@@ -50,10 +50,10 @@ all:
     ossh_port: 22
 
     # The port of the HTTPS server. Usually 443.
-    ui_port: 443
+    ui_port: "443"
 
     # The port of the sync server. Usually 1337.
-    sync_port: 1337
+    sync_port: "1337"
 
     # No need to change here, needs to be defined per host
     # if you are on the same network and you want to use

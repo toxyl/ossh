@@ -162,10 +162,10 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 	if lSeq > 1 {
 		cmd = fmt.Sprintf("(%s/%s) %s", colorInt(iSeq), colorInt(lSeq), cmd)
 	}
-	LogFakeShell.Info("%s @ %s: %s", colorConnID(data.User, data.IP, data.Port), colorDuration(uint(s.ActiveFor().Seconds())), cmd)
 	s.lock.Lock()
 	s.UpdateActivity()
 	s.lock.Unlock()
+	LogFakeShell.Info("%s @ %s: %s", colorConnID(data.User, data.IP, data.Port), colorDuration(uint(s.Uptime().Seconds())), cmd)
 	defer func() {
 		s.lock.Lock()
 		s.UpdateActivity()

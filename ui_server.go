@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -23,6 +24,20 @@ var (
 	upgrader = websocket.Upgrader{} // use default options
 	newline  = []byte{'\n'}
 )
+
+// https://github.com/golang/go/issues/26918#issuecomment-974257205
+type serverErrorLogWriter struct{}
+
+func (*serverErrorLogWriter) Write(p []byte) (int, error) {
+	m := string(p)
+	// https://github.com/golang/go/issues/26918
+	if strings.HasPrefix(m, "http: TLS handshake error") {
+		return 0, nil // we don't care about these
+	} else {
+		LogUIServer.Error("%s", m)
+	}
+	return len(p), nil
+}
 
 type Client struct {
 	Hub  *Hub
@@ -249,7 +264,8 @@ func (ws *UIServer) Start() {
 	}
 
 	ws.server = &http.Server{
-		Addr: srv,
+		ErrorLog: log.New(&serverErrorLogWriter{}, "", 0),
+		Addr:     srv,
 		TLSConfig: &tls.Config{
 			MinVersion:               tls.VersionTLS12,
 			CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
@@ -267,7 +283,9 @@ func (ws *UIServer) Start() {
 		addr := RealAddr(req)
 
 		if !isIPWhitelisted(addr) && addr != Conf.Host {
-			http.Redirect(w, req, fmt.Sprintf("%s://%s/%s", req.Proto, addr, req.URL.Path), 307) // let's give them their request back
+			rt := fmt.Sprintf("https://%s%s", addr, req.URL.Path)
+			http.Redirect(w, req, rt, 307) // let's give them their request back
+			LogUIServer.OK("%s: Redirected request to source: %s", colorHost(addr), colorHighlight(rt))
 			return
 		}
 		mux.ServeHTTP(w, req)

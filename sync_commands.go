@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"net"
 	"strings"
 )
 
@@ -20,22 +19,21 @@ var SyncCommands = map[string]SyncCommand{
 		if fp == "" {
 			return "", errors.New("need your fingerprint")
 		}
-		host, _, _ := net.SplitHostPort(ssc.conn.RemoteAddr().String())
 		fpsrv := SrvOSSH.Loot.Fingerprint()
 		if fp == fpsrv {
-			LogSyncCommands.Debug("Ignored SYNC request from %s: %s (we have: %s)", colorHost(host), colorHighlight(fp), colorHighlight(fpsrv))
+			LogSyncCommands.Debug("Ignored SYNC request from %s: %s (we have: %s)", colorHost(ssc.Host), colorHighlight(fp), colorHighlight(fpsrv))
 			return "", nil
 		}
 		fpRemote := strings.Split(fp, ":")
 		fpLocal := strings.Split(fpsrv, ":")
 
 		if len(fpRemote) != len(fpLocal) {
-			LogSyncCommands.Debug("Ignored SYNC request from %s, fingerprints are not the same length: %s (we have: %s)", colorHost(host), colorHighlight(fp), colorHighlight(fpsrv))
+			LogSyncCommands.Debug("Ignored SYNC request from %s, fingerprints are not the same length: %s (we have: %s)", colorHost(ssc.Host), colorHighlight(fp), colorHighlight(fpsrv))
 			return "", nil
 		}
 
 		if len(fpRemote) == 0 || len(fpLocal) == 0 {
-			LogSyncCommands.Debug("Ignored SYNC request from %s, one of the fingerprints is empty: %s (we have: %s)", colorHost(host), colorHighlight(fp), colorHighlight(fpsrv))
+			LogSyncCommands.Debug("Ignored SYNC request from %s, one of the fingerprints is empty: %s (we have: %s)", colorHost(ssc.Host), colorHighlight(fp), colorHighlight(fpsrv))
 			return "", nil
 		}
 
@@ -77,8 +75,7 @@ var SyncCommands = map[string]SyncCommand{
 		}
 		added := SrvOSSH.Loot.AddHosts(args)
 		if added > 0 {
-			host, _, _ := net.SplitHostPort(ssc.conn.RemoteAddr().String())
-			LogSyncCommands.OK("%s donated %s host(s)", colorHost(host), colorInt(added))
+			LogSyncCommands.OK("%s donated %s", colorHost(ssc.Host), colorIntAmount(added, "host", "hosts"))
 			SrvOSSH.SaveData()
 		}
 		return "", nil
@@ -89,8 +86,7 @@ var SyncCommands = map[string]SyncCommand{
 		}
 		added := SrvOSSH.Loot.AddUsers(args)
 		if added > 0 {
-			host, _, _ := net.SplitHostPort(ssc.conn.RemoteAddr().String())
-			LogSyncCommands.OK("%s donated %s user(s)", colorHost(host), colorInt(added))
+			LogSyncCommands.OK("%s donated %s", colorHost(ssc.Host), colorIntAmount(added, "user", "users"))
 			SrvOSSH.SaveData()
 		}
 		return "", nil
@@ -101,8 +97,7 @@ var SyncCommands = map[string]SyncCommand{
 		}
 		added := SrvOSSH.Loot.AddPasswords(args)
 		if added > 0 {
-			host, _, _ := net.SplitHostPort(ssc.conn.RemoteAddr().String())
-			LogSyncCommands.OK("%s donated %s password(s)", colorHost(host), colorInt(added))
+			LogSyncCommands.OK("%s donated %s", colorHost(ssc.Host), colorIntAmount(added, "password", "passwords"))
 			SrvOSSH.SaveData()
 		}
 		return "", nil
@@ -120,8 +115,7 @@ var SyncCommands = map[string]SyncCommand{
 		pl.Save()
 		if pl.Exists() {
 			if SrvOSSH.Loot.AddPayload(hash) {
-				host, _, _ := net.SplitHostPort(ssc.conn.RemoteAddr().String())
-				LogSyncCommands.OK("%s donated payload %s", colorHost(host), colorFile(pl.file))
+				LogSyncCommands.OK("%s donated payload %s", colorHost(ssc.Host), colorFile(pl.file))
 				SrvOSSH.SaveData()
 			}
 		}
@@ -132,10 +126,9 @@ var SyncCommands = map[string]SyncCommand{
 		if len(args) < 1 {
 			return "", nil
 		}
-		host, _, _ := net.SplitHostPort(ssc.conn.RemoteAddr().String())
 		stats := SrvOSSH.JSONToStats(strings.Join(args, " "))
-		SrvSync.nodes.AddStats(host, stats)
-		LogSyncCommands.Debug("%s reported stats", colorHost(host))
+		SrvSync.nodes.AddStats(ssc.Host, stats)
+		LogSyncCommands.Debug("%s reported stats", colorHost(ssc.Host))
 		return "", nil
 	},
 }

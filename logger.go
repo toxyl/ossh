@@ -71,6 +71,22 @@ func colorInt(n int) string {
 	return colorWrap(fmt.Sprintf("%d", n), colorCyan)
 }
 
+// colorIntAmount colors n as int and appends either the
+// given singular (n == 1) or plural (n > 1).
+// If n == 0 the string "no" will be used for the output
+// rather than 0.
+func colorIntAmount(n int, singular, plural string) string {
+	unit := singular
+	if n > 1 {
+		unit = plural
+	}
+	amount := colorWrap(fmt.Sprintf("%d", n), colorCyan)
+	if n == 0 {
+		amount = colorWrap("no", colorCyan)
+	}
+	return fmt.Sprintf("%s %s", amount, unit)
+}
+
 const (
 	colorDarkBlue     = 17
 	colorBlue         = 21
