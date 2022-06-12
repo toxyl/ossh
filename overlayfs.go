@@ -124,8 +124,8 @@ func (ofsm *OverlayFSManager) Init(baseDir string) error {
 }
 
 func (ofsm *OverlayFSManager) NewSession(sandboxKey string) (*OverlayFS, error) {
-	LogOverlayFS.Debug("newsession %s", colorHighlight(sandboxKey))
 	sandboxPath := filepath.Join(ofsm.baseDir, "sandboxes", sandboxKey)
+	LogOverlayFS.Debug("Creating new session for %s at %s", colorHighlight(sandboxKey), colorFile(sandboxPath))
 	if !DirExists(sandboxPath) {
 		err := os.Mkdir(sandboxPath, 0755)
 		if err != nil {

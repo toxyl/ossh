@@ -73,9 +73,7 @@ func colorInt(n int) string {
 }
 
 // colorIntAmount colors n as int and appends either the
-// given singular (n == 1) or plural (n > 1).
-// If n == 0 the string "no" will be used for the output
-// rather than 0.
+// given singular (n == 1) or plural (n > 1 || n == 0).
 func colorIntAmount(n int, singular, plural string) string {
 	unit := singular
 	if n > 1 {
@@ -83,7 +81,8 @@ func colorIntAmount(n int, singular, plural string) string {
 	}
 	amount := colorWrap(fmt.Sprintf("%d", n), colorCyan)
 	if n == 0 {
-		amount = colorWrap("no", colorCyan)
+		amount = colorWrap("0", colorOrange)
+		unit = plural
 	}
 	return fmt.Sprintf("%s %s", amount, unit)
 }

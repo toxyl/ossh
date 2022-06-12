@@ -30,10 +30,7 @@ func (p *Payload) Save() {
 		return // no need to save an empty payload
 	}
 
-	err := os.WriteFile(p.file, []byte(p.payload), 0744)
-	if err == nil {
-		LogPayloads.Success("Payload saved: %s", colorFile(p.file))
-	}
+	_ = os.WriteFile(p.file, []byte(p.payload), 0744)
 }
 
 func (p *Payload) Read() (string, error) {

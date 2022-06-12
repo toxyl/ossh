@@ -75,7 +75,9 @@ var SyncCommands = map[string]SyncCommand{
 		}
 		added := SrvOSSH.Loot.AddHosts(args)
 		if added > 0 {
-			LogSyncCommands.OK("%s donated %s", colorHost(ssc.Host), colorIntAmount(added, "host", "hosts"))
+			if added > 1 || LogSyncCommands.debug { // to avoid log clutter
+				LogSyncCommands.OK("%s donated %s", colorHost(ssc.Host), colorIntAmount(added, "host", "hosts"))
+			}
 			SrvOSSH.SaveData()
 		}
 		return "", nil
@@ -86,7 +88,9 @@ var SyncCommands = map[string]SyncCommand{
 		}
 		added := SrvOSSH.Loot.AddUsers(args)
 		if added > 0 {
-			LogSyncCommands.OK("%s donated %s", colorHost(ssc.Host), colorIntAmount(added, "user", "users"))
+			if added > 1 || LogSyncCommands.debug { // to avoid log clutter
+				LogSyncCommands.OK("%s donated %s", colorHost(ssc.Host), colorIntAmount(added, "user", "users"))
+			}
 			SrvOSSH.SaveData()
 		}
 		return "", nil
@@ -97,7 +101,9 @@ var SyncCommands = map[string]SyncCommand{
 		}
 		added := SrvOSSH.Loot.AddPasswords(args)
 		if added > 0 {
-			LogSyncCommands.OK("%s donated %s", colorHost(ssc.Host), colorIntAmount(added, "password", "passwords"))
+			if added > 1 || LogSyncCommands.debug { // to avoid log clutter
+				LogSyncCommands.OK("%s donated %s", colorHost(ssc.Host), colorIntAmount(added, "password", "passwords"))
+			}
 			SrvOSSH.SaveData()
 		}
 		return "", nil

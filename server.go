@@ -216,7 +216,7 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 		return
 	}
 
-	overlayFS, err := ossh.fs.NewSession(fmt.Sprintf("%s:%d", s.Host, s.Port))
+	overlayFS, err := ossh.fs.NewSession(fmt.Sprintf("%s-%d", s.Host, s.Port))
 	if err != nil {
 		ossh.GracefulCloseOnError(err, s, s.SSHSession, overlayFS)
 		return
@@ -231,7 +231,7 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 		overlayFS.Close()
 	}()
 
-	s.SetShell(NewFakeShell((*s.SSHSession), overlayFS, !s.Whitelisted))
+	s.SetShell(overlayFS)
 	s.RandomSleep(1, 250)
 	stats := s.Shell.Process(s)
 
@@ -282,7 +282,7 @@ func (ossh *OSSHServer) reversePortForwardingCallback(ctx ssh.Context, bindHost 
 func (ossh *OSSHServer) ptyCallback(ctx ssh.Context, pty ssh.Pty) bool {
 	s := ossh.Sessions.Create(ctx.RemoteAddr().String()).SetTerm(pty.Term)
 	if !s.Whitelisted {
-		LogOSSHServer.OK("%s: Started %s PTY session",
+		LogOSSHServer.OK("%s: Requested %s PTY session",
 			s.LogIDFull(),
 			colorHighlight(s.Term),
 		)
@@ -322,7 +322,6 @@ func (ossh *OSSHServer) connectionFailedCallback(conn net.Conn, err error) {
 		// ok, that's fine, come back another time.
 	} else {
 		// ok, this might be relevant
-		LogOSSHServer.Warning("%s: Connection failed because %s", s.LogIDFull(), colorError(err))
 		ossh.Sessions.Remove(s.ID, e)
 		return
 	}

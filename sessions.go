@@ -38,8 +38,7 @@ func (s *Session) UpdateActivity() {
 
 func (s *Session) RandomSleep(min, max int) {
 	if !s.Whitelisted {
-		wait := time.Duration(GetRandomInt(min, max)) * time.Millisecond
-		time.Sleep(wait)
+		time.Sleep(time.Duration(GetRandomInt(min, max)) * time.Millisecond)
 		s.UpdateActivity()
 	}
 }
@@ -75,9 +74,9 @@ func (s *Session) SetType(sessionType string) *Session {
 	return s
 }
 
-func (s *Session) SetShell(shell *FakeShell) *Session {
+func (s *Session) SetShell(overlayFS *OverlayFS) *Session {
 	s.lock.Lock()
-	s.Shell = shell
+	s.Shell = NewFakeShell(s, overlayFS)
 	s.lock.Unlock()
 	s.UpdateActivity()
 	return s
@@ -237,7 +236,9 @@ func (ss *Sessions) Create(sessionID string) *Session {
 		s.UpdateActivity()
 		cnts := len(ss.sessions)
 		active := ss.CountActiveSessions(s.Host)
-		LogSessions.OK("%s: Session started, host now uses %s of %s.", s.LogID(), colorInt(active), colorIntAmount(cnts, "active session", "active sessions"))
+		LogSessions.OK(
+			"%s: Session started, host now uses %s of %s.",
+			s.LogID(), colorInt(active), colorIntAmount(cnts, "active session", "active sessions"))
 	}
 	ss.lock.Lock()
 	defer ss.lock.Unlock()
@@ -265,12 +266,12 @@ func (ss *Sessions) Remove(sessionID, reason string) {
 
 		if reason == "" {
 			LogSessions.OK(
-				"%s: Session removed (was active for %s), host now uses %s of %s.",
-				cid, colorDuration(uint(tw)), colorInt(active), colorIntAmount(cnts, "active session", "active sessions"))
+				"%s: Session removed, host now uses %s of %s. It was active for %s.",
+				cid, colorInt(active), colorIntAmount(cnts, "active session", "active sessions"), colorDuration(uint(tw)))
 		} else {
 			LogSessions.OK(
-				"%s: Session removed because %s (was active for %s), host now uses %s of %s.",
-				cid, colorReason(reason), colorDuration(uint(tw)), colorInt(active), colorIntAmount(cnts, "active session", "active sessions"))
+				"%s: Session removed, host now uses %s of %s. It was active for %s and removed because %s.",
+				cid, colorInt(active), colorIntAmount(cnts, "active session", "active sessions"), colorDuration(uint(tw)), colorReason(reason))
 		}
 	}
 }

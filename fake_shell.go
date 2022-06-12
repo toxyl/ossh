@@ -18,7 +18,7 @@ const (
 )
 
 type FakeShell struct {
-	session  ssh.Session
+	session  *ssh.Session
 	terminal *term.Terminal
 	writer   *SlowWriter
 	created  time.Time
@@ -30,23 +30,23 @@ type FakeShell struct {
 }
 
 func (fs *FakeShell) User() string {
-	return fs.session.User()
+	return (*fs.session).User()
 }
 func (fs *FakeShell) Host() string {
-	return strings.Split(fs.session.RemoteAddr().String(), ":")[0]
+	return strings.Split((*fs.session).RemoteAddr().String(), ":")[0]
 }
 
 func (fs *FakeShell) Close() {
 	_, err := fs.terminal.Write([]byte(""))
 	if err != nil {
 		if err == io.EOF {
-			fs.session.Close()
+			(*fs.session).Close()
 			return
 		} else {
 			panic(err)
 		}
 	}
-	fs.session.Close()
+	(*fs.session).Close()
 }
 
 func (fs *FakeShell) UpdatePrompt(path string) {
@@ -86,7 +86,7 @@ func (fs *FakeShell) WriteBinaryLn(val int) {
 // ReadBytes reads and returns a byte array with the given number of bytes from the SSH session.
 func (fs *FakeShell) ReadBytes(numBytes int) ([]byte, error) {
 	b := make([]byte, numBytes)
-	_, err := fs.session.Read(b)
+	_, err := (*fs.session).Read(b)
 	return b, err
 }
 
@@ -124,52 +124,28 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 	command := pieces[0]
 	args := pieces[1:]
 
-	rmt := strings.Split(fs.session.RemoteAddr().String(), ":")
-	lcl := strings.Split(fs.session.LocalAddr().String(), ":")
+	rmt := strings.Split((*fs.session).RemoteAddr().String(), ":")
 	rmtH := rmt[0]
-	lclH := lcl[0]
 	rmtP := 22
-	lclP := 22
 	if i, err := strconv.Atoi(rmt[1]); err == nil {
 		rmtP = i
 	}
+
+	lcl := strings.Split((*fs.session).LocalAddr().String(), ":")
+	lclH := lcl[0]
+	lclP := 22
 	if i, err := strconv.Atoi(lcl[1]); err == nil {
 		lclP = i
 	}
 
-	data := struct {
-		User      string
-		IP        string
-		IPLocal   string
-		Port      int
-		PortLocal int
-		HostName  string
-		InputRaw  string
-		Command   string
-		Arguments []string
-	}{
-		User:      fs.session.User(),
-		IP:        rmtH,
-		IPLocal:   lclH,
-		Port:      rmtP,
-		PortLocal: lclP,
-		HostName:  Conf.HostName,
-		InputRaw:  line,
-		Command:   command,
-		Arguments: args,
-	}
 	cmd := fmt.Sprintf("%s %s", colorReason(command), colorWrap(strings.Join(args, " "), colorLightBlue))
 	if lSeq > 1 {
 		cmd = fmt.Sprintf("(%s/%s) %s", colorInt(iSeq), colorInt(lSeq), cmd)
 	}
-	s.lock.Lock()
 	s.UpdateActivity()
-	s.lock.Unlock()
-	LogFakeShell.Info("%s @ %s: %s", colorConnID(data.User, data.IP, data.Port), colorDuration(uint(s.Uptime().Seconds())), cmd)
+	LogFakeShell.Info("%s: %s", s.LogIDFull(), cmd)
 	defer func() {
-		s.lock.Lock()
 		s.UpdateActivity()
-		s.lock.Unlock()
 	}()
 
 	if !s.Whitelisted {
@@ -190,6 +166,28 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 			fs.RecordExec(line, GeneratePseudoEmptyString(0)) // just to waste some more time ;)
 			return true
 		}
+	}
+
+	data := struct {
+		User      string
+		IP        string
+		IPLocal   string
+		Port      int
+		PortLocal int
+		HostName  string
+		InputRaw  string
+		Command   string
+		Arguments []string
+	}{
+		User:      s.User,
+		IP:        rmtH,
+		IPLocal:   lclH,
+		Port:      rmtP,
+		PortLocal: lclP,
+		HostName:  Conf.HostName,
+		InputRaw:  line,
+		Command:   command,
+		Arguments: args,
 	}
 
 	// 3) check if command matches a simple command
@@ -295,10 +293,10 @@ func (fs *FakeShell) HandleInput(s *Session) {
 }
 
 func (fs *FakeShell) Process(s *Session) *FakeShellStats {
-	if fs.session.RawCommand() != "" {
+	if (*fs.session).RawCommand() != "" {
 		// this means the client passed a command along (e.g. with -t/-tt param),
 		// let's run it and then close the connection.
-		raw := fs.session.RawCommand()
+		raw := (*fs.session).RawCommand()
 
 		// execute all rewriters
 		for _, rw := range Conf.Commands.Rewriters {
@@ -321,9 +319,9 @@ func (fs *FakeShell) Process(s *Session) *FakeShellStats {
 	return fs.stats
 }
 
-func NewFakeShell(s ssh.Session, overlay *OverlayFS, useSlowWriter bool) *FakeShell {
+func NewFakeShell(s *Session, overlay *OverlayFS) *FakeShell {
 	fs := &FakeShell{
-		session:  s,
+		session:  s.SSHSession,
 		terminal: nil,
 		writer:   nil,
 		created:  time.Now(),
@@ -331,30 +329,36 @@ func NewFakeShell(s ssh.Session, overlay *OverlayFS, useSlowWriter bool) *FakeSh
 			CommandsExecuted: 0,
 			CommandHistory:   []string{},
 			Host:             "",
-			User:             s.User(),
+			User:             (*s.SSHSession).User(),
 			recording:        NewASCIICastV2(fakeShellInitialWidth, fakeShellInitialHeight),
 		},
 		overlayFS: overlay,
 	}
 
-	fs.terminal = term.NewTerminal(s, "")
+	fs.terminal = term.NewTerminal(*s.SSHSession, "")
 	fs.writer = NewSlowWriter(fs.terminal)
-	if !useSlowWriter {
+	if s.Whitelisted {
 		fs.writer.ratelimit = 10000 // set ridicuously high to effectively disable rate limit
 	}
 	fs.stats.Host = fs.Host()
 
 	if overlay != nil {
 		if !overlay.DirExists("/home") {
-			_ = overlay.Mkdir("/home", 700)
+			err := overlay.Mkdir("/home", 700)
+			if err != nil {
+				LogOverlayFS.Error("mkdir failed: %s", colorError(err))
+			}
 		}
 
-		if !overlay.DirExists("/home/" + s.User()) {
-			_ = overlay.Mkdir("/home/"+s.User(), 700)
+		if !overlay.DirExists("/home/" + (*s.SSHSession).User()) {
+			err := overlay.Mkdir("/home/"+(*s.SSHSession).User(), 700)
+			if err != nil {
+				LogOverlayFS.Error("mkdir failed: %s", colorError(err))
+			}
 		}
 	}
-	fs.cwd = "/home/" + s.User()
-
+	fs.cwd = "/home/" + (*s.SSHSession).User()
 	fs.UpdatePrompt("~")
+	LogFakeShell.Debug("%s: Fake shell ready, current working directory: %s", s.LogIDFull(), colorFile(fs.cwd))
 	return fs
 }
