@@ -75,7 +75,7 @@ func (p *Payload) SetHash(hash string) {
 }
 
 func (p *Payload) Set(payload string) {
-	hash := StringToSha1(payload)
+	hash := PayloadToHash(payload)
 	p.SetHash(hash)
 	p.payload = payload
 }

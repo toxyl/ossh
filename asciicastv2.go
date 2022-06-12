@@ -179,9 +179,3 @@ func NewASCIICastV2(width int, height int) *ASCIICastV2 {
 	}
 	return ac2
 }
-
-func OpenASCIICastV2(file string) *ASCIICastV2 {
-	ac2 := NewASCIICastV2(fakeShellInitialWidth, fakeShellInitialHeight)
-	ac2.Load(file)
-	return ac2
-}

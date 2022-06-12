@@ -73,13 +73,14 @@ func cmdCd(fs *FakeShell, line string) (exit bool) {
 func cmdRm(fs *FakeShell, line string) (exit bool) {
 	parts := strings.Split(line, " ")
 
-	if len(parts) == 1 {
+	if len(parts) < 2 {
 		fs.RecordWriteLn("rm: missing operand")
 		fs.RecordWriteLn("Try 'rm --help' for more information.")
 		return
 	}
 
 	// TODO handle options
+	parts = RemoveCommandFlags(parts)
 
 	for _, pt := range parts[1:] {
 		if strings.HasPrefix(pt, "~") {
@@ -104,14 +105,15 @@ func cmdRm(fs *FakeShell, line string) (exit bool) {
 
 func cmdLs(fs *FakeShell, line string) (exit bool) {
 	parts := strings.Split(line, " ")
+	// TODO handle options
+	parts = RemoveCommandFlags(parts)
+
 	var dir string
 	if len(parts) < 2 {
 		dir = fs.cwd
 	} else {
 		dir = toAbs(fs, parts[1])
 	}
-
-	// TODO handle options
 
 	entries, err := fs.overlayFS.ReadDir(dir)
 	if err != nil {
@@ -143,6 +145,7 @@ func cmdPwd(fs *FakeShell, line string) (exit bool) {
 
 func cmdCat(fs *FakeShell, line string) (exit bool) {
 	parts := strings.Split(line, " ")
+
 	if len(parts) < 2 {
 		// TODO echo input, like the real `cat` command
 		fs.RecordWriteLn("cat: specify file")
@@ -150,6 +153,7 @@ func cmdCat(fs *FakeShell, line string) (exit bool) {
 	}
 
 	// TODO handle flags
+	parts = RemoveCommandFlags(parts)
 
 	path := toAbs(fs, parts[1])
 	file, err := fs.overlayFS.OpenFile(path, os.O_RDONLY, 0)
@@ -189,6 +193,7 @@ func cmdTouch(fs *FakeShell, line string) (exit bool) {
 	}
 
 	// TODO handle flags
+	parts = RemoveCommandFlags(parts)
 
 	path := toAbs(fs, parts[1])
 	file, err := fs.overlayFS.OpenFile(path, os.O_CREATE, 0)

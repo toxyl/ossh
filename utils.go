@@ -127,6 +127,46 @@ func GetFloat(val interface{}) (float64, error) {
 	}
 }
 
+func UintSliceToStringSlice(parts []uint) []string {
+	out := []string{}
+	for _, p := range parts {
+		out = append(out, fmt.Sprint(p))
+	}
+	return out
+}
+
+func Uint8SliceToStringSlice(parts []uint8) []string {
+	out := []string{}
+	for _, p := range parts {
+		out = append(out, fmt.Sprint(p))
+	}
+	return out
+}
+
+func Uint16SliceToStringSlice(parts []uint16) []string {
+	out := []string{}
+	for _, p := range parts {
+		out = append(out, fmt.Sprint(p))
+	}
+	return out
+}
+
+func Uint32SliceToStringSlice(parts []uint32) []string {
+	out := []string{}
+	for _, p := range parts {
+		out = append(out, fmt.Sprint(p))
+	}
+	return out
+}
+
+func Uint64SliceToStringSlice(parts []uint64) []string {
+	out := []string{}
+	for _, p := range parts {
+		out = append(out, fmt.Sprint(p))
+	}
+	return out
+}
+
 func StringToInt64(s string, defaultValue int64) int64 {
 	i, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
@@ -360,4 +400,14 @@ func CopyEmbeddedFSToDisk(embeddedFS embed.FS, dstPath, srcPrefix string) error 
 		return fmt.Errorf("can't walk embedded dir: %w", err)
 	}
 	return nil
+}
+
+func RemoveCommandFlags(parts []string) []string {
+	res := []string{}
+	for _, p := range parts {
+		if !strings.HasPrefix(p, "-") {
+			res = append(res, p)
+		}
+	}
+	return res
 }

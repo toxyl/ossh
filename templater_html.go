@@ -35,28 +35,6 @@ func parseTemplateDirHTML(dir string) (*template.Template, error) {
 	return template.New(dir).Funcs(templateFunctionsHTML).ParseFiles(paths...)
 }
 
-func parseTemplateStringHTML(templateString string, wr io.Writer, data interface{}) error {
-	t, err := template.New("tpl").Funcs(templateFunctionsHTML).Parse(templateString)
-	if err != nil {
-		if strings.Contains(err.Error(), "no template") {
-			LogHTMLTemplater.Error("Template '%s' not found", templateString)
-		} else {
-			LogHTMLTemplater.Error("Failed to parse template string %s: %s", templateString, err.Error())
-		}
-		return err
-	}
-	return t.Execute(wr, data)
-}
-
-func ParseTemplateFromStringHTML(templateString string, data interface{}) string {
-	var tpl bytes.Buffer
-	err := parseTemplateStringHTML(templateString, &tpl, data)
-	if err != nil {
-		return ""
-	}
-	return strings.Trim(tpl.String(), " \r\n")
-}
-
 func ParseTemplateHTML(name string, wr io.Writer, data interface{}) error {
 	dir := Conf.PathWebinterface
 	_, err := os.Stat(dir)
@@ -71,20 +49,6 @@ func ParseTemplateHTML(name string, wr io.Writer, data interface{}) error {
 	}
 
 	return t.ExecuteTemplate(wr, name, data)
-}
-
-func ParseTemplateToStringHTML(name string, data interface{}) string {
-	var tpl bytes.Buffer
-	err := ParseTemplateHTML(name, &tpl, data)
-	if err != nil {
-		if strings.Contains(err.Error(), "no template") {
-			LogHTMLTemplater.Error("Template '%s' not found", name)
-		} else {
-			LogHTMLTemplater.Error("Failed to parse template string %s: %s", name, err.Error())
-		}
-		return fmt.Sprintf("%s: command not found", name)
-	}
-	return strings.Trim(tpl.String(), " \r\n")
 }
 
 func InitTemplaterFunctionsHTML() {

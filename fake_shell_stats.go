@@ -17,11 +17,6 @@ func (fss *FakeShellStats) AddCommandToHistory(cmd string) {
 	fss.CommandsExecuted++
 }
 
-func (fss *FakeShellStats) ToSha1() string {
-	pl := strings.Join(fss.CommandHistory, "\n")
-	return StringToSha1(pl)
-}
-
 func (fss *FakeShellStats) ToPayload() *Payload {
 	pl := strings.Join(fss.CommandHistory, "\n")
 	p := NewPayload()
