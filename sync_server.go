@@ -316,7 +316,10 @@ func NewSyncServer() *SyncServer {
 	go func() {
 		for {
 			time.Sleep(30 * time.Second)
-			LogSyncServer.Info("Currently %s are open", colorIntAmount(ss.conns.Length(), "connection", "connections"))
+			l := ss.conns.Length()
+			if l > 0 {
+				LogSyncServer.Info("Currently %s open", colorIntAmount(ss.conns.Length(), "connection is", "connections are"))
+			}
 		}
 	}()
 	return ss
