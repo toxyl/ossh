@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -21,6 +22,7 @@ type SyncServerConnection struct {
 func (ssc *SyncServerConnection) close() {
 	if ssc.conn != nil {
 		ssc.conn.Close()
+		ssc.conn = nil
 	}
 }
 
@@ -81,16 +83,74 @@ func (ssc *SyncServerConnection) handleConnection() {
 	}
 }
 
+type SyncServerConnections struct {
+	conns map[string]*SyncServerConnection
+	lock  *sync.Mutex
+}
+
+func (sscs *SyncServerConnections) Length() int {
+	sscs.lock.Lock()
+	defer sscs.lock.Unlock()
+	return len(sscs.conns)
+}
+
+func (sscs *SyncServerConnections) Create(conn net.Conn, host string, port int) *SyncServerConnection {
+	sscs.lock.Lock()
+	defer sscs.lock.Unlock()
+	sid := fmt.Sprintf("%s:%d", host, port)
+	create := false
+	if _, ok := sscs.conns[sid]; !ok {
+		create = true
+	} else if sscs.conns[sid].conn == nil {
+		create = true
+	}
+
+	if create {
+		LogSyncServer.Debug("%s:%s: Creating connection, %s are currently open", colorHost(host), colorPort(port), colorIntAmount(len(sscs.conns), "connection", "connections"))
+		sscs.conns[sid] = &SyncServerConnection{
+			conn: conn,
+			Host: host,
+			Port: port,
+		}
+	}
+	return sscs.conns[sid]
+}
+
+func (sscs *SyncServerConnections) Remove(host string, port int) {
+	sscs.lock.Lock()
+	defer sscs.lock.Unlock()
+	sid := fmt.Sprintf("%s:%d", host, port)
+	if _, ok := sscs.conns[sid]; ok {
+		sscs.conns[sid].close()
+		delete(sscs.conns, sid)
+	}
+	LogSyncServer.Debug("%s:%s: Connection removed, %s still open", colorHost(host), colorPort(port), colorIntAmount(len(sscs.conns), "connection", "connections"))
+}
+
+func (sscs *SyncServerConnections) CloseAll() {
+	sscs.lock.Lock()
+	defer sscs.lock.Unlock()
+
+	for _, v := range sscs.conns {
+		v.close()
+	}
+}
+
+func NewSyncServerConnections() *SyncServerConnections {
+	return &SyncServerConnections{
+		conns: map[string]*SyncServerConnection{},
+		lock:  &sync.Mutex{},
+	}
+}
+
 type SyncServer struct {
 	listener net.Listener
-	conns    map[string]*SyncServerConnection
+	conns    *SyncServerConnections
 	nodes    *SyncNodes
 }
 
 func (ss *SyncServer) close() {
-	for _, v := range ss.conns {
-		v.close()
-	}
+	ss.conns.CloseAll()
 }
 
 func (ss *SyncServer) HasNode(host string) bool {
@@ -228,26 +288,21 @@ func (ss *SyncServer) Start() {
 			continue
 		}
 
-		sid := fmt.Sprintf("%s:%s", host, port)
-
-		if _, ok := ss.conns[sid]; !ok {
-			ss.conns[sid] = &SyncServerConnection{
-				conn: conn,
-				Host: host,
-				Port: StringToInt(port, 0),
-			}
-		}
+		ssc := ss.conns.Create(conn, host, StringToInt(port, 0))
 
 		if !ss.nodes.IsAllowedHost(host) {
 			LogSyncServer.NotOK("%s is not a sync node, I'll give a bullshit response.", colorHost(host))
-			ss.conns[sid].write(GenerateGarbageString(1000))
-			ss.conns[sid].close()
+			ssc.write(GenerateGarbageString(1000))
+			ss.conns.Remove(ssc.Host, ssc.Port)
 			continue
 		}
 
-		ss.conns[sid].write(EmptyCommandResponse)
+		ssc.write(EmptyCommandResponse)
 
-		go ss.conns[sid].handleConnection()
+		go func() {
+			ssc.handleConnection()
+			ss.conns.Remove(ssc.Host, ssc.Port)
+		}()
 	}
 }
 
@@ -255,7 +310,14 @@ func NewSyncServer() *SyncServer {
 	ss := &SyncServer{
 		listener: nil,
 		nodes:    NewSyncNodes(),
-		conns:    map[string]*SyncServerConnection{},
+		conns:    NewSyncServerConnections(),
 	}
+
+	go func() {
+		for {
+			time.Sleep(30 * time.Second)
+			LogSyncServer.Info("Currently %s are open", colorIntAmount(ss.conns.Length(), "connection", "connections"))
+		}
+	}()
 	return ss
 }
