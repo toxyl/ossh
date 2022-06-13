@@ -23,7 +23,6 @@ func PayloadToHash(payload string) string {
 		w = append(w, strings.Split(line, " ")...)
 	}
 
-	n := len(w) / 4
-	signature := Uint64SliceToStringSlice(hash(Uint64SliceToStringSlice(hash(w, n).Signature()), 1).Signature())[0]
+	signature := Uint64SliceToStringSlice(hash(w, 1).Signature())[0]
 	return signature + "_" + StringToSha1(payload)
 }
