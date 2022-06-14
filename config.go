@@ -16,6 +16,7 @@ const (
 	INTERVAL_OVERLAYFS_CLEANUP = 30 * time.Second
 	INTERVAL_SESSIONS_CLEANUP  = 1 * time.Minute
 	DELAY_OVERLAYFS_MKDIR      = 100 * time.Millisecond
+	CLEANUP_SYNC_MIN_AGE       = 60 * time.Second
 )
 
 //go:embed commands/*

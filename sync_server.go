@@ -14,9 +14,10 @@ const InvalidCommand = "Command not recognized"
 const EmptyCommandResponse = ""
 
 type SyncServerConnection struct {
-	conn net.Conn
-	Host string
-	Port int
+	conn      net.Conn
+	Host      string
+	Port      int
+	CreatedAt time.Time
 }
 
 func (ssc *SyncServerConnection) close() {
@@ -106,11 +107,12 @@ func (sscs *SyncServerConnections) Create(conn net.Conn, host string, port int) 
 	}
 
 	if create {
-		LogSyncServer.Debug("%s:%s: Creating connection, %s are currently open", colorHost(host), colorPort(port), colorIntAmount(len(sscs.conns), "connection", "connections"))
+		LogSyncServer.Debug("%s:%s: Creating connection, %s currently open", colorHost(host), colorPort(port), colorIntAmount(len(sscs.conns), "connection", "connections"))
 		sscs.conns[sid] = &SyncServerConnection{
-			conn: conn,
-			Host: host,
-			Port: port,
+			conn:      conn,
+			Host:      host,
+			Port:      port,
+			CreatedAt: time.Now(),
 		}
 	}
 	return sscs.conns[sid]
@@ -134,6 +136,22 @@ func (sscs *SyncServerConnections) CloseAll() {
 	for _, v := range sscs.conns {
 		v.close()
 	}
+}
+
+func (sscs *SyncServerConnections) CleanUp() int {
+	sscs.lock.Lock()
+	defer sscs.lock.Unlock()
+
+	removed := 0
+
+	for _, v := range sscs.conns {
+		if CLEANUP_SYNC_MIN_AGE < time.Since(v.CreatedAt) {
+			v.close()
+			removed++
+		}
+	}
+
+	return removed
 }
 
 func NewSyncServerConnections() *SyncServerConnections {
@@ -318,7 +336,13 @@ func NewSyncServer() *SyncServer {
 			time.Sleep(30 * time.Second)
 			l := ss.conns.Length()
 			if l > 0 {
-				LogSyncServer.Info("Currently %s open", colorIntAmount(ss.conns.Length(), "connection is", "connections are"))
+				removed := ss.conns.CleanUp()
+				l = ss.conns.Length()
+				if l == 0 {
+					LogSyncServer.Info("Removed %s, none left", colorIntAmount(removed, "connection", "connections"))
+					continue
+				}
+				LogSyncServer.Info("Removed %s, %s still open", colorIntAmount(removed, "connection", "connections"), colorIntAmount(l, "connection", "connections"))
 			}
 		}
 	}()
