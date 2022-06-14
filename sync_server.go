@@ -60,6 +60,9 @@ func (ssc *SyncServerConnection) process(cmd string) {
 
 func (ssc *SyncServerConnection) handleConnection() {
 	defer ssc.close()
+	if ssc.conn == nil {
+		return
+	}
 
 	s := bufio.NewScanner(ssc.conn)
 	for s.Scan() {

@@ -86,6 +86,7 @@
     }
 
     function filter_log(event, category) {
+        var is_ctrl = event.ctrlKey;
         var is_message_filter = $(event.currentTarget).hasClass("message-type") ||  $(event.currentTarget).hasClass("message-type-all");
         var is_subsytem_filter = $(event.currentTarget).hasClass("subsystem") || $(event.currentTarget).hasClass("subsystem-all");
 
@@ -100,6 +101,16 @@
                 clf_subsystems = log_filters_subsystems;
                 $(".subsystem").attr('selected','selected');
             }
+        } else if (!is_ctrl) {
+            if (is_message_filter) {
+                $(".message-type").removeAttr('selected');
+                clf_messages = [ category ];
+            }
+            if (is_subsytem_filter) {
+                $(".subsystem").removeAttr('selected');
+                clf_subsystems = [ category ];
+            }            
+            $(event.currentTarget).attr('selected','selected');
         } else {
             if (is_message_filter) {
                 clf_messages = toggle_filter(event.currentTarget, category, clf_messages);
@@ -161,9 +172,9 @@
         cs.prepend(`
         <tr class='log log-${txttype} log-${txtsubsys}'>
             <td class="w10 left monospace">${(new Date()).toLocaleString()}</td>
-            <td class="w5 left"><tag class='w3-button w3-text-black bg-color-${txtsubsys} w100 subsystem' selected>${txtsubsys}</tag></td>
-            <td class="w5 left"><tag class='w3-button w3-text-black bg-color-${txttype} w100 message-type' selected>${ct}</tag></td>
-            <td class="w80 left monospace">${msg}</td>
+            <td class="w10 left monospace color-${txtsubsys}">${txtsubsys}</td>
+            <td class="w5 left monospace color-${txttype}">${ct}</td>
+            <td class="w75 left monospace">${msg}</td>
         </tr>`);
 
         if (cs.children().length > 1500) {
@@ -189,7 +200,7 @@
                 <td><tag class="w3-button w3-text-black bg-color-info w100 message-type" selected onclick="filter_log(event, 'info')">info</tag></td>
                 <td><tag class="w3-button w3-text-black bg-color-warning w100 message-type" selected onclick="filter_log(event, 'warning')">warning</tag></td>
                 <td><tag class="w3-button w3-text-black bg-color-error w100 message-type" selected onclick="filter_log(event, 'error')">error</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-not-ok w100 message-type" selected onclick="filter_log(event, 'not ok')">not ok</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-not-ok w100 message-type" selected onclick="filter_log(event, 'not-ok')">not ok</tag></td>
                 <td><tag class="w3-button w3-text-black bg-color-ok w100 message-type" selected onclick="filter_log(event, 'ok')">ok</tag></td>
                 <td><tag class="w3-button w3-text-black bg-color-success w100 message-type" selected onclick="filter_log(event, 'success')">success</tag></td>
                 <td><tag class="w3-button w3-text-black bg-color-debug w100 message-type" selected onclick="filter_log(event, 'debug')">debug</tag></td>
@@ -212,7 +223,7 @@
             <tr>
                 <td></td>
                 <td class="center"><tag class="w3-button w3-text-black bg-color-other w100 message-type-all subsystem-all" onclick="filter_log(event, '*')">Reset</tag></td>
-                <td colspan="9"></td>
+                <td colspan="9" class="left">Click to select a single filter, CTRL+click to select multiple.</td>
             </tr>
         </table>
     </div>
