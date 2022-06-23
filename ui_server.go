@@ -238,20 +238,29 @@ func (w *UIServer) MakeHTMLHandler(template string, data interface{}) func(w htt
 }
 
 func (ws *UIServer) PushStats(msg string) {
-	if ws.Stats == nil {
+	if ws.Stats == nil || ws.Stats.Hub == nil {
 		return
 	}
 	ws.Stats.Hub.Broadcast(msg)
 }
 
 func (ws *UIServer) PushLog(msg string) {
-	if ws.Console == nil {
+	if ws.Console == nil || ws.Console.Hub == nil {
 		return
 	}
 	ws.Console.Hub.Broadcast(msg)
 }
 
+func (ws *UIServer) Serve() {
+	err := ws.server.ListenAndServeTLS(ws.CertFile, ws.KeyFile)
+	if !strings.Contains(err.Error(), "Server closed") {
+		LogUIServer.Error("Server stopped: %s", colorError(err))
+	}
+}
+
 func (ws *UIServer) Start() {
+	SleepSeconds(10)
+
 	mux := http.NewServeMux()
 	ws.init()
 	srv := fmt.Sprintf("%s:%d", ws.Host, ws.Port)
@@ -279,23 +288,21 @@ func (ws *UIServer) Start() {
 		},
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
 	}
+
 	ws.server.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		addr := RealAddr(req)
 
 		if !isIPWhitelisted(addr) && addr != Conf.Host {
 			rt := fmt.Sprintf("https://%s%s", addr, req.URL.Path)
 			http.Redirect(w, req, rt, 307) // let's give them their request back
-			LogUIServer.OK("%s: Redirected request to source: %s", colorHost(addr), colorHighlight(rt))
+			LogUIServer.OK("%s: Redirected request to source: %s", enrichAndColorHost(addr), colorHighlight(req.URL.Path))
 			return
 		}
 		mux.ServeHTTP(w, req)
 	})
 
 	LogUIServer.Default("Starting UI server on %s...", colorWrap("https://"+srv, colorBrightYellow))
-	err := ws.server.ListenAndServeTLS(ws.CertFile, ws.KeyFile)
-	if !strings.Contains(err.Error(), "Server closed") {
-		LogUIServer.Error("Server stopped: %s", colorError(err))
-	}
+	go ws.Serve()
 }
 
 func (ws *UIServer) Shutdown() {
@@ -315,9 +322,7 @@ func (ws *UIServer) Shutdown() {
 
 func (ws *UIServer) Reload() {
 	ws.Shutdown()
-	go func() {
-		ws.Start()
-	}()
+	go ws.Start()
 }
 
 func (ws *UIServer) init() {
@@ -386,5 +391,14 @@ func (ws *UIServer) init() {
 }
 
 func NewUIServer() *UIServer {
-	return &UIServer{}
+	return &UIServer{
+		Handlers: map[string]func(w http.ResponseWriter, r *http.Request){},
+		Host:     "",
+		Port:     0,
+		CertFile: "",
+		KeyFile:  "",
+		Stats:    nil,
+		Console:  nil,
+		server:   nil,
+	}
 }

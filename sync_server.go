@@ -8,19 +8,36 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/exp/maps"
 )
 
 const InvalidCommand = "Command not recognized"
 const EmptyCommandResponse = ""
+const ExitCommand = "exit"
+
+var SyncServerCommands = NewSyncCommands()
 
 type SyncServerConnection struct {
 	conn      net.Conn
 	Host      string
 	Port      int
 	CreatedAt time.Time
+	lock      *sync.Mutex
+}
+
+func (ssc *SyncServerConnection) LogID() string {
+	if ssc.conn != nil {
+		lhost, lport := SplitHostPortFromAddr(ssc.conn.LocalAddr())
+		rhost, rport := SplitHostPortFromAddr(ssc.conn.RemoteAddr())
+		return fmt.Sprintf("%s -> %s", colorConnID("", lhost, lport), colorConnID("", rhost, rport))
+	}
+	return colorConnID("", ssc.Host, ssc.Port)
 }
 
 func (ssc *SyncServerConnection) close() {
+	ssc.lock.Lock()
+	defer ssc.lock.Unlock()
 	if ssc.conn != nil {
 		ssc.conn.Close()
 		ssc.conn = nil
@@ -28,40 +45,37 @@ func (ssc *SyncServerConnection) close() {
 }
 
 func (ssc *SyncServerConnection) write(msg string) {
-	if ssc.conn != nil {
-		msg = strings.TrimSpace(msg)
-		if msg != "" {
-			msg = EncodeGzBase64String(msg)
-		}
-		_, _ = ssc.conn.Write([]byte(msg))
+	msg = strings.TrimSpace(msg)
+	if msg == "" || ssc.conn == nil {
+		return
 	}
+	_, _ = ssc.conn.Write([]byte(EncodeGzBase64String(msg)))
 }
 
-func (ssc *SyncServerConnection) process(cmd string) {
+func (ssc *SyncServerConnection) process(cmd string) error {
 	str := strings.Split(cmd, " ")
 
 	if len(str) <= 0 {
 		ssc.write(InvalidCommand)
-		return
+		return errors.New("invalid command")
 	}
 
-	command := str[0]
-
-	if _, ok := SyncCommands[command]; ok {
-		res, err := SyncCommands[command](ssc, str[1:])
-		if err != nil {
-			LogSyncServer.Error("Command %s failed: %s", colorHighlight(command), colorError(err))
-			ssc.write(EmptyCommandResponse)
-			return
-		}
-		ssc.write(res)
+	res, err := SyncServerCommands.Run(ssc, str[0], str[1:])
+	if err != nil {
+		LogSyncServer.Error("%s: Error running sync command %s: %s", ssc.LogID(), colorHighlight(str[0]), colorError(err))
+		ssc.write(EmptyCommandResponse)
+		return err
 	}
+	ssc.write(res)
+	return nil
 }
 
-func (ssc *SyncServerConnection) handleConnection() {
-	defer ssc.close()
+func (ssc *SyncServerConnection) handleConnection() error {
+	ssc.lock.Lock()
+	defer ssc.lock.Unlock()
+
 	if ssc.conn == nil {
-		return
+		return errors.New("not connected")
 	}
 
 	s := bufio.NewScanner(ssc.conn)
@@ -69,22 +83,20 @@ func (ssc *SyncServerConnection) handleConnection() {
 		data := s.Text()
 		data, err := DecodeGzBase64String(data)
 		if err != nil {
-			LogSyncServer.Error("Could not decode input: %s", colorError(err))
-			return
+			return fmt.Errorf("could not decode input: %s", colorError(err))
 		}
 
-		if data == EmptyCommandResponse {
-			ssc.write(EmptyCommandResponse)
-			continue
+		if data == EmptyCommandResponse || data == ExitCommand {
+			ssc.write(data)
+			return nil
 		}
 
-		if data == "exit" {
-			return
+		err = ssc.process(data)
+		if err != nil {
+			return fmt.Errorf("failed to process: %s", colorError(err))
 		}
-
-		ssc.process(data)
-		return
 	}
+	return nil
 }
 
 type SyncServerConnections struct {
@@ -98,6 +110,17 @@ func (sscs *SyncServerConnections) Length() int {
 	return len(sscs.conns)
 }
 
+func (sscs *SyncServerConnections) Hosts() []string {
+	sscs.lock.Lock()
+	defer sscs.lock.Unlock()
+	keys := maps.Keys(sscs.conns)
+	for i, k := range keys {
+		keys[i] = ExtractHost(k)
+	}
+
+	return keys
+}
+
 func (sscs *SyncServerConnections) Create(conn net.Conn, host string, port int) *SyncServerConnection {
 	sscs.lock.Lock()
 	defer sscs.lock.Unlock()
@@ -107,29 +130,34 @@ func (sscs *SyncServerConnections) Create(conn net.Conn, host string, port int) 
 		create = true
 	} else if sscs.conns[sid].conn == nil {
 		create = true
+	} else if CLEANUP_SYNC_MIN_AGE < time.Since(sscs.conns[sid].CreatedAt) {
+		sscs.conns[sid].close()
+		create = true
 	}
 
 	if create {
-		LogSyncServer.Debug("%s:%s: Creating connection, %s currently open", colorHost(host), colorPort(port), colorIntAmount(len(sscs.conns), "connection", "connections"))
 		sscs.conns[sid] = &SyncServerConnection{
 			conn:      conn,
 			Host:      host,
 			Port:      port,
 			CreatedAt: time.Now(),
+			lock:      &sync.Mutex{},
 		}
 	}
 	return sscs.conns[sid]
 }
 
-func (sscs *SyncServerConnections) Remove(host string, port int) {
+func (sscs *SyncServerConnections) Remove(host string, port int) error {
 	sscs.lock.Lock()
 	defer sscs.lock.Unlock()
 	sid := fmt.Sprintf("%s:%d", host, port)
 	if _, ok := sscs.conns[sid]; ok {
 		sscs.conns[sid].close()
+		sscs.conns[sid] = nil
 		delete(sscs.conns, sid)
+		return nil
 	}
-	LogSyncServer.Debug("%s:%s: Connection removed, %s still open", colorHost(host), colorPort(port), colorIntAmount(len(sscs.conns), "connection", "connections"))
+	return fmt.Errorf("connection %s was not found", colorConnID("", host, port))
 }
 
 func (sscs *SyncServerConnections) CloseAll() {
@@ -141,16 +169,16 @@ func (sscs *SyncServerConnections) CloseAll() {
 	}
 }
 
-func (sscs *SyncServerConnections) CleanUp() int {
+func (sscs *SyncServerConnections) CleanUp() []string {
 	sscs.lock.Lock()
 	defer sscs.lock.Unlock()
 
-	removed := 0
+	removed := []string{}
 
 	for _, v := range sscs.conns {
 		if CLEANUP_SYNC_MIN_AGE < time.Since(v.CreatedAt) {
 			v.close()
-			removed++
+			removed = append(removed, v.Host)
 		}
 	}
 
@@ -214,29 +242,28 @@ func (ss *SyncServer) GetOutOfSyncNodes(fingerprint string) map[string]string {
 	return res
 }
 
-func (ss *SyncServer) SyncToNodes() {
-	time.Sleep(time.Duration(GetRandomInt(10, 60)) * time.Second)
+func (ss *SyncServer) SyncWorker() {
+	RandomSleep(30, 60, time.Second)
 	for {
 		fp := SrvOSSH.Loot.Fingerprint()
 		fp = strings.TrimSpace(fp)
-		LogSyncServer.Debug("Starting sync: %s", colorHighlight(fp))
 
 		for k, v := range ss.GetOutOfSyncNodes(fp) {
 			v = strings.TrimSpace(v)
 			if v == "" {
 				continue // node is already in sync
 			}
-			LogSyncServer.Debug("Node %s needs update: %s", colorHost(k), colorHighlight(v))
 			sections := strings.Split(v, ",")
-			parts := strings.Split(k, ":")
-			client, err := ss.GetClient(parts[0], StringToInt(parts[1], 0))
+			host, port := SplitHostPort(k)
+			LogSyncServer.Debug("%s: %s are outdated", colorConnID("", host, port), colorHighlight(v))
+			client, err := ss.GetClient(host, port)
 			if err != nil {
-				LogSyncServer.Error("Failed to get client %s: %s", colorHost(k), colorError(err))
+				LogSyncServer.Error("%s: Failed to get client: %s", colorConnID("", host, port), colorError(err))
 				continue
 			}
 
 			for _, section := range sections {
-				LogSyncServer.Debug("Sending %s to %s", colorHighlight(section), colorHost(k))
+				LogSyncServer.Debug("%s: Sending %s", colorConnID("", host, port), colorHighlight(section))
 				switch section {
 				case "hosts":
 					client.SyncData("HOSTS", SrvOSSH.Loot.GetHosts, client.AddHosts)
@@ -279,8 +306,61 @@ func (ss *SyncServer) UpdateClients() {
 	for _, node := range Conf.Sync.Nodes {
 		if node.Host != Conf.SyncServer.Host || node.Port != int(Conf.SyncServer.Port) {
 			Conf.IPWhitelist = append(Conf.IPWhitelist, node.Host)
-			LogSyncServer.Debug("adding client: %s:%s", colorHost(node.Host), colorInt(node.Port))
+			LogSyncServer.Debug("%s: Client added", node.LogID())
 			ss.nodes.AddClient(NewSyncClient(node.Host, node.Port))
+		}
+	}
+}
+
+func (ss *SyncServer) ConnectionHandler(listener net.Listener) {
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			LogSyncServer.Error("Accept failed: %s", colorError(err))
+			conn.Close()
+			continue
+		}
+
+		host, port := SplitHostPortFromAddr(conn.RemoteAddr())
+		ssc := ss.conns.Create(conn, host, port)
+		lid := ssc.LogID()
+
+		if !ss.nodes.IsAllowedHost(host) {
+			LogSyncServer.NotOK("%s: Not a sync node, returning bullshit.", lid)
+			ssc.write(GenerateGarbageString(1000))
+			_ = ss.conns.Remove(host, port)
+			continue
+		}
+
+		go func(host string, port int) {
+			err := ssc.handleConnection()
+			if err != nil {
+				LogSyncServer.Error("%s: %s", lid, err)
+			}
+
+			err = ss.conns.Remove(host, port)
+			if err != nil {
+				LogSyncServer.Error("%s: Could not remove goroutine: %s", lid, err)
+			}
+		}(host, port)
+	}
+}
+
+func (ss *SyncServer) CleanUpWorker() {
+	RandomSleep(30, 60, time.Second)
+	for {
+		time.Sleep(INTERVAL_SYNC_CLEANUP)
+		removed := ss.conns.CleanUp()
+		lr := len(removed)
+		l := ss.conns.Length()
+		hs := colorHosts(ss.conns.Hosts())
+		hsr := colorHosts(removed)
+		if lr > 0 {
+			if l == 0 {
+				LogSyncServer.Info("Cleanup worker: Removed %s, none left", hsr)
+				continue
+			}
+			LogSyncServer.Info("Cleanup worker: Removed %s, still open: %s", hsr, hs)
 		}
 	}
 }
@@ -293,38 +373,9 @@ func (ss *SyncServer) Start() {
 	if err != nil {
 		panic(err)
 	}
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			LogSyncServer.Error("Accept failed: %s", colorError(err))
-			conn.Close()
-			continue
-		}
-
-		host, port, err := net.SplitHostPort(conn.RemoteAddr().String())
-		if err != nil {
-			LogSyncServer.Error("Could not process remote address: %s", colorError(err))
-			conn.Close()
-			continue
-		}
-
-		ssc := ss.conns.Create(conn, host, StringToInt(port, 0))
-
-		if !ss.nodes.IsAllowedHost(host) {
-			LogSyncServer.NotOK("%s is not a sync node, I'll give a bullshit response.", colorHost(host))
-			ssc.write(GenerateGarbageString(1000))
-			ss.conns.Remove(ssc.Host, ssc.Port)
-			continue
-		}
-
-		ssc.write(EmptyCommandResponse)
-
-		go func() {
-			ssc.handleConnection()
-			ss.conns.Remove(ssc.Host, ssc.Port)
-		}()
-	}
+	go ss.ConnectionHandler(listener)
+	go ss.SyncWorker()
+	go ss.CleanUpWorker()
 }
 
 func NewSyncServer() *SyncServer {
@@ -334,20 +385,5 @@ func NewSyncServer() *SyncServer {
 		conns:    NewSyncServerConnections(),
 	}
 
-	go func() {
-		for {
-			time.Sleep(30 * time.Second)
-			l := ss.conns.Length()
-			if l > 0 {
-				removed := ss.conns.CleanUp()
-				l = ss.conns.Length()
-				if l == 0 {
-					LogSyncServer.Info("Removed %s, none left", colorIntAmount(removed, "connection", "connections"))
-					continue
-				}
-				LogSyncServer.Info("Removed %s, %s still open", colorIntAmount(removed, "connection", "connections"), colorIntAmount(l, "connection", "connections"))
-			}
-		}
-	}()
 	return ss
 }

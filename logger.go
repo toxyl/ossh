@@ -7,12 +7,7 @@ import (
 )
 
 func colorConnID(user, host string, port int) string {
-	whitelisted := isIPWhitelisted(host)
-	host = colorHost(host)
-	if whitelisted {
-		host = fmt.Sprintf("(whitelisted) %s", host)
-	}
-
+	host = enrichAndColorHost(host)
 	if user == "" {
 		return fmt.Sprintf("%s:%s", host, colorPort(port))
 	}
@@ -32,16 +27,40 @@ func colorPort(port int) string {
 	return colorWrap(fmt.Sprint(port), uint(94.0+137.0*(float64(port)/65535.0)))
 }
 
-func colorHost(host string) string {
+func enrichAndColorHost(host string) string {
 	parts := strings.Split(host, ".")
 	pt := 0.0
 	for _, p := range parts {
 		f, _ := GetFloat(p)
 		pt += f
 	}
-	host = getHostname(host)
-	// 88 - 231 (143 total)
-	return colorWrap(host, uint(88.0+143.0*(pt/4.0/255.0)))
+	revDNS := ReverseDNS(host)
+	hostName := getHostname(host)
+	hostColor := uint(88.0 + 143.0*(pt/4.0/255.0)) // 88 - 231 (143 total)
+	whitelisted := isIPWhitelisted(host)
+
+	if hostName != host {
+		host = hostName
+	} else if revDNS != "N/A" {
+		host = fmt.Sprintf("%s (%s)", host, revDNS)
+	} else {
+		host = hostName
+	}
+	host = colorWrap(host, hostColor)
+
+	if whitelisted {
+		host = fmt.Sprintf("(whitelisted) %s", host)
+	}
+
+	return host
+}
+
+func colorHosts(hosts []string) string {
+	hs := []string{}
+	for _, h := range hosts {
+		hs = append(hs, enrichAndColorHost(h))
+	}
+	return strings.Join(hs, ", ")
 }
 
 func colorPassword(password string) string {

@@ -23,9 +23,8 @@ func main() {
 	SrvOSSH = NewOSSHServer()
 	SrvUI = NewUIServer()
 	SrvSync = NewSyncServer()
-	go SrvUI.Start()
-	go SrvSync.Start()
-	go SrvSync.SyncToNodes()
+	SrvSync.Start()
+	SrvUI.Start()
 	SrvOSSH.Start()
 }
 

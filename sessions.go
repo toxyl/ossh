@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net"
-	"strconv"
 	"sync"
 	"time"
 
@@ -27,9 +25,17 @@ type Session struct {
 	lock         *sync.Mutex
 }
 
-func (s *Session) UpdateActivity() {
+func (s *Session) Lock() {
 	s.lock.Lock()
-	defer s.lock.Unlock()
+}
+
+func (s *Session) Unlock() {
+	s.lock.Unlock()
+}
+
+func (s *Session) UpdateActivity() {
+	s.Lock()
+	defer s.Unlock()
 	if !s.Orphan {
 		SrvOSSH.addWastedTime(int(time.Since(s.LastActivity).Seconds()))
 		s.LastActivity = time.Now()
@@ -38,25 +44,21 @@ func (s *Session) UpdateActivity() {
 
 func (s *Session) RandomSleep(min, max int) {
 	if !s.Whitelisted {
-		time.Sleep(time.Duration(GetRandomInt(min, max)) * time.Millisecond)
+		RandomSleep(min, max, time.Millisecond)
 		s.UpdateActivity()
 	}
 }
 
 func (s *Session) SetID(id string) *Session {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	ip, port, err := net.SplitHostPort(id)
-	if err != nil {
-		LogSessions.Error("Invalid session ID %s: %s. Format must be 'host:port'!", colorReason(id), colorError(err))
+	s.Lock()
+	defer s.Unlock()
+	ip, port := SplitHostPort(id)
+	if ip == "" || port == 0 {
+		LogSessions.Error("Invalid session ID %s. Format must be 'host:port'!", colorReason(id))
 		return nil
 	}
-	p, err := strconv.Atoi(port)
-	if err != nil {
-		p = 0
-	}
 	s.Host = ip
-	s.Port = p
+	s.Port = port
 	s.updateID()
 	return s
 }
@@ -67,77 +69,73 @@ func (s *Session) updateID() {
 }
 
 func (s *Session) SetType(sessionType string) *Session {
-	s.lock.Lock()
+	s.Lock()
 	s.Type = sessionType
-	s.lock.Unlock()
+	s.Unlock()
 	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) SetShell(overlayFS *OverlayFS) *Session {
-	s.lock.Lock()
+	s.Lock()
 	s.Shell = NewFakeShell(s, overlayFS)
-	s.lock.Unlock()
+	s.Unlock()
 	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) SetSSHSession(sshSession *ssh.Session) *Session {
-	s.lock.Lock()
+	s.Lock()
 	s.SSHSession = sshSession
-	s.lock.Unlock()
+	s.Unlock()
 	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) SetTerm(term string) *Session {
-	s.lock.Lock()
+	s.Lock()
 	s.Term = term
-	s.lock.Unlock()
+	s.Unlock()
 	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) SetUser(user string) *Session {
-	s.lock.Lock()
+	s.Lock()
 	s.User = user
-	s.lock.Unlock()
+	s.Unlock()
 	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) SetPassword(password string) *Session {
-	s.lock.Lock()
+	s.Lock()
 	s.Password = password
-	s.lock.Unlock()
+	s.Unlock()
 	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) SetHost(host string) *Session {
-	s.lock.Lock()
+	s.Lock()
 	s.Host = host
 	s.updateID()
-	s.lock.Unlock()
+	s.Unlock()
 	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) SetPort(port int) *Session {
-	s.lock.Lock()
+	s.Lock()
 	s.Port = port
 	s.updateID()
-	s.lock.Unlock()
+	s.Unlock()
 	s.UpdateActivity()
 	return s
 }
 
 func (s *Session) LogID() string {
-	return colorConnID(s.User, s.Host, s.Port)
-}
-
-func (s *Session) LogIDFull() string {
-	return fmt.Sprintf("%s @ %s", s.LogID(), colorDuration(uint(s.Uptime().Seconds())))
+	return fmt.Sprintf("%s @ %s", colorConnID(s.User, s.Host, s.Port), colorDuration(uint(s.Uptime().Seconds())))
 }
 
 func (s *Session) Uptime() time.Duration {
@@ -152,16 +150,17 @@ func (s *Session) ActiveFor() time.Duration {
 	return s.LastActivity.Sub(s.CreatedAt)
 }
 
-// Expire checks if the session exists and is older than the given age.
+// expire checks if the session exists and is older than the given age.
 // It will then exit the session with code -1 and close the connection.
 // The function returns true if the session is expired, else false.
-func (s *Session) Expire(age uint) bool {
+func (s *Session) expire(age uint) bool {
+	s.Lock()
+	defer s.Unlock()
+
 	if s.SSHSession == nil && s.StaleSince().Seconds() > 600 {
 		// if 10 minutes have passed without establishing a connection,
 		// we consider this to be an orphan
-		s.lock.Lock()
 		s.Orphan = true
-		s.lock.Unlock()
 		return true
 	}
 	if s.StaleSince().Seconds() > float64(age) {
@@ -196,27 +195,29 @@ type Sessions struct {
 	lock     *sync.Mutex
 }
 
-func (ss *Sessions) Has(sessionID string) bool {
+func (ss *Sessions) Lock() {
 	ss.lock.Lock()
-	defer ss.lock.Unlock()
+}
+
+func (ss *Sessions) Unlock() {
+	ss.lock.Unlock()
+}
+
+func (ss *Sessions) has(sessionID string) bool {
 	if _, ok := ss.sessions[sessionID]; !ok {
 		return false
 	}
 	return true
 }
 
-func (ss *Sessions) Add(session *Session) {
-	if ss.Has(session.ID) {
+func (ss *Sessions) add(session *Session) {
+	if ss.has(session.ID) {
 		return
 	}
-	ss.lock.Lock()
-	defer ss.lock.Unlock()
 	ss.sessions[session.ID] = session
 }
 
-func (ss *Sessions) CountActiveSessions(host string) int {
-	ss.lock.Lock()
-	defer ss.lock.Unlock()
+func (ss *Sessions) countActiveSessions(host string) int {
 	active := 0
 	for _, v := range ss.sessions {
 		if v.Host == host {
@@ -227,28 +228,30 @@ func (ss *Sessions) CountActiveSessions(host string) int {
 }
 
 func (ss *Sessions) Create(sessionID string) *Session {
-	if !ss.Has(sessionID) {
+	ss.Lock()
+	defer ss.Unlock()
+
+	if !ss.has(sessionID) {
 		s := NewSession().SetID(sessionID)
 		if s == nil {
 			return nil
 		}
-		ss.Add(s)
+		ss.add(s)
 		s.UpdateActivity()
 		cnts := len(ss.sessions)
-		active := ss.CountActiveSessions(s.Host)
+		active := ss.countActiveSessions(s.Host)
 		LogSessions.OK(
 			"%s: Session started, host now uses %s of %s.",
 			s.LogID(), colorInt(active), colorIntAmount(cnts, "active session", "active sessions"))
 	}
-	ss.lock.Lock()
-	defer ss.lock.Unlock()
-	return ss.sessions[sessionID]
+	return ss.get(sessionID)
 }
 
 func (ss *Sessions) Remove(sessionID, reason string) {
-	if ss.Has(sessionID) {
-		ss.lock.Lock()
-		s := ss.sessions[sessionID]
+	ss.Lock()
+	defer ss.Unlock()
+	if ss.has(sessionID) {
+		s := ss.get(sessionID)
 		sh := s.Host
 		tw := 0
 		cid := colorConnID("", sh, s.Port)
@@ -259,10 +262,11 @@ func (ss *Sessions) Remove(sessionID, reason string) {
 			tw = int(s.Uptime().Seconds())
 		}
 		s.UpdateActivity()
-		delete(ss.sessions, sessionID)
-		cnts := len(ss.sessions)
-		ss.lock.Unlock()
-		active := ss.CountActiveSessions(sh)
+		ss.delete(sessionID)
+		ss.Unlock()
+		cnts := ss.Count()
+		ss.Lock()
+		active := ss.countActiveSessions(sh)
 
 		if reason == "" {
 			LogSessions.OK(
@@ -276,22 +280,39 @@ func (ss *Sessions) Remove(sessionID, reason string) {
 	}
 }
 
+func (ss *Sessions) get(sessionID string) *Session {
+	if _, ok := ss.sessions[sessionID]; ok {
+		return ss.sessions[sessionID]
+	}
+	return nil
+}
+
+func (ss *Sessions) delete(sessionID string) {
+	delete(ss.sessions, sessionID)
+}
+
 func (ss *Sessions) Count() int {
-	ss.lock.Lock()
-	defer ss.lock.Unlock()
+	ss.Lock()
+	defer ss.Unlock()
 	return len(ss.sessions)
 }
 
-func (ss *Sessions) CleanUp(age uint) {
-	ss.lock.Lock()
-	defer ss.lock.Unlock()
+func (ss *Sessions) cleanUp(age uint) {
+	ss.Lock()
+	defer ss.Unlock()
 
 	for sessionID, session := range ss.sessions {
-		if session.Expire(age) {
-			ss.lock.Unlock()
+		if session.expire(age) {
 			ss.Remove(sessionID, "session has expired")
-			ss.lock.Lock()
 		}
+	}
+}
+
+func (ss *Sessions) cleanUpWorker(maxAge uint) {
+	RandomSleep(30, 60, time.Second)
+	for {
+		time.Sleep(INTERVAL_SESSIONS_CLEANUP)
+		ss.cleanUp(maxAge)
 	}
 }
 
@@ -300,11 +321,6 @@ func NewActiveSessions(maxAge uint) *Sessions {
 		sessions: map[string]*Session{},
 		lock:     &sync.Mutex{},
 	}
-	go func(maxAge uint) {
-		for {
-			time.Sleep(INTERVAL_SESSIONS_CLEANUP)
-			ss.CleanUp(maxAge)
-		}
-	}(maxAge)
+	go ss.cleanUpWorker(maxAge)
 	return ss
 }

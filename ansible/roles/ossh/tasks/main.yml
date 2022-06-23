@@ -17,16 +17,10 @@
     mode: '0644'
     force: yes
 
-- name: Stop oSSH service
-  service:
-    name: ossh
-    state: stopped
-  tags: update
-
-- name: Install oSSH binary
+- name: Upload oSSH binary
   copy:
     src: "files/ossh"
-    dest: /etc/ossh/
+    dest: /tmp/
     owner: "{{ admin_username }}"
     group: "{{ admin_username }}"
     mode: '0744'
@@ -48,6 +42,22 @@
     name: ossh
     enabled: yes
   tags: install
+
+- name: Stop oSSH service
+  service:
+    name: ossh
+    state: stopped
+  tags: update
+
+- name: Install oSSH binary
+  copy:
+    src: /tmp/ossh
+    dest: /etc/ossh/
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"
+    mode: '0744'
+    force: yes
+    remote_src: yes
 
 - name: Reload oSSH service
   service:

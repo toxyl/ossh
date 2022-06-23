@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -33,7 +32,7 @@ func (fs *FakeShell) User() string {
 	return (*fs.session).User()
 }
 func (fs *FakeShell) Host() string {
-	return strings.Split((*fs.session).RemoteAddr().String(), ":")[0]
+	return ExtractHostFromAddr((*fs.session).RemoteAddr())
 }
 
 func (fs *FakeShell) Close() {
@@ -124,26 +123,15 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 	command := pieces[0]
 	args := pieces[1:]
 
-	rmt := strings.Split((*fs.session).RemoteAddr().String(), ":")
-	rmtH := rmt[0]
-	rmtP := 22
-	if i, err := strconv.Atoi(rmt[1]); err == nil {
-		rmtP = i
-	}
-
-	lcl := strings.Split((*fs.session).LocalAddr().String(), ":")
-	lclH := lcl[0]
-	lclP := 22
-	if i, err := strconv.Atoi(lcl[1]); err == nil {
-		lclP = i
-	}
+	rmtH, rmtP := SplitHostPortFromAddr((*fs.session).RemoteAddr())
+	lclH, lclP := SplitHostPortFromAddr((*fs.session).LocalAddr())
 
 	cmd := fmt.Sprintf("%s %s", colorReason(command), colorWrap(strings.Join(args, " "), colorLightBlue))
 	if lSeq > 1 {
 		cmd = fmt.Sprintf("(%s/%s) %s", colorInt(iSeq), colorInt(lSeq), cmd)
 	}
 	s.UpdateActivity()
-	LogFakeShell.Info("%s: %s", s.LogIDFull(), cmd)
+	LogFakeShell.Info("%s: %s", s.LogID(), cmd)
 	defer func() {
 		s.UpdateActivity()
 	}()
@@ -151,8 +139,8 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 	if !s.Whitelisted {
 		// 1) make sure the client waits some time at least,
 		//    the more input the more wait time, hehe
-		dly := time.Duration(len(line) * int(Conf.InputDelay))
-		time.Sleep(dly * time.Millisecond)
+		dly := len(line) * int(Conf.InputDelay)
+		RandomSleep(dly, dly*2, time.Millisecond)
 	}
 
 	// Ignore just pressing enter with whitespace
@@ -346,19 +334,19 @@ func NewFakeShell(s *Session, overlay *OverlayFS) *FakeShell {
 		if !overlay.DirExists("/home") {
 			err := overlay.Mkdir("/home", 700)
 			if err != nil {
-				LogOverlayFS.Error("mkdir failed: %s", colorError(err))
+				LogOverlayFS.Error("%s: mkdir failed: %s", s.LogID(), colorError(err))
 			}
 		}
 
 		if !overlay.DirExists("/home/" + (*s.SSHSession).User()) {
 			err := overlay.Mkdir("/home/"+(*s.SSHSession).User(), 700)
 			if err != nil {
-				LogOverlayFS.Error("mkdir failed: %s", colorError(err))
+				LogOverlayFS.Error("%s: mkdir failed: %s", s.LogID(), colorError(err))
 			}
 		}
 	}
 	fs.cwd = "/home/" + (*s.SSHSession).User()
 	fs.UpdatePrompt("~")
-	LogFakeShell.Debug("%s: Fake shell ready, current working directory: %s", s.LogIDFull(), colorFile(fs.cwd))
+	LogFakeShell.Debug("%s: Fake shell ready, current working directory: %s", s.LogID(), colorFile(fs.cwd))
 	return fs
 }

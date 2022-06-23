@@ -23,6 +23,10 @@ type SyncNode struct {
 	Port int    `mapstructure:"port"`
 }
 
+func (sn *SyncNode) LogID() string {
+	return colorConnID("", sn.Host, sn.Port)
+}
+
 type SyncNodes struct {
 	nodes   map[string]*SyncNode
 	stats   map[string]*SyncNodeStats
@@ -72,7 +76,10 @@ func (sn *SyncNodes) AddStats(id string, stats *SyncNodeStats) {
 
 // GetStats returns a SyncNodeStats struct with
 // the total of all SyncNodes + this oSSH instance.
-func (sn *SyncNodes) GetStats() *SyncNodeStats {
+func (sn *SyncNodes) GetStats(hostStats *SyncNodeStats) *SyncNodeStats {
+	sn.lock.Lock()
+	defer sn.lock.Unlock()
+
 	total := &SyncNodeStats{
 		Hosts:            0,
 		Passwords:        0,
@@ -85,10 +92,9 @@ func (sn *SyncNodes) GetStats() *SyncNodeStats {
 		TimeWasted:       0,
 		Uptime:           0,
 	}
-	sn.lock.Lock()
 	stats := sn.stats
-	sn.lock.Unlock()
-	stats["_"] = SrvOSSH.stats() // we should include ourselves
+	stats["_"] = hostStats // we should include ourselves
+
 	for _, s := range stats {
 		total.Hosts = MaxOfInts(total.Hosts, s.Hosts)
 		total.Passwords = MaxOfInts(total.Passwords, s.Passwords)
@@ -146,12 +152,10 @@ func (sn *SyncNodes) Get(host string) (*SyncNode, error) {
 // ExecBroadcast runs the command on all known nodes and returns
 // a map with the results indexed on node IDs ("ip:port").
 func (sn *SyncNodes) ExecBroadcast(command string) map[string]string {
-	sn.lock.Lock()
-	defer sn.lock.Unlock()
 	res := map[string]string{}
 	for _, c := range sn.clients {
 		r, err := c.Exec(command)
-		if err == nil && r != "" {
+		if err == nil && strings.TrimSpace(r) != "" {
 			res[c.ID()] = r
 		}
 	}
@@ -163,15 +167,13 @@ func (sn *SyncNodes) ExecBroadcast(command string) map[string]string {
 // from a node. If all nodes have been tried without
 // success the return will be an empty string.
 func (sn *SyncNodes) Exec(command string) string {
-	sn.lock.Lock()
-	defer sn.lock.Unlock()
 	for _, c := range sn.clients {
 		r, err := c.Exec(command)
 		if err == nil && strings.TrimSpace(r) != "" {
 			return r
 		}
 		if err != nil {
-			LogSyncServer.Error("Failed to exec command %s on node %s: %s", colorHighlight(command), colorHost(c.ID()), colorError(err))
+			LogSyncServer.Error("%s: Failed to exec command %s: %s", c.LogID(), colorHighlight(command), colorError(err))
 		}
 	}
 	return ""

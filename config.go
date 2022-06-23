@@ -15,6 +15,7 @@ const (
 	INTERVAL_STATS_BROADCAST   = 60 * time.Second
 	INTERVAL_OVERLAYFS_CLEANUP = 30 * time.Second
 	INTERVAL_SESSIONS_CLEANUP  = 1 * time.Minute
+	INTERVAL_SYNC_CLEANUP      = 25 * time.Second
 	DELAY_OVERLAYFS_MKDIR      = 100 * time.Millisecond
 	CLEANUP_SYNC_MIN_AGE       = 60 * time.Second
 )

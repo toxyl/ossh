@@ -124,6 +124,12 @@ func (ossh *OSSHServer) SaveData() {
 	LogOSSHServer.Debug("Saved data files")
 }
 
+func (ossh *OSSHServer) syncCredentials(user, password, host string) {
+	SrvSync.Broadcast(fmt.Sprintf("ADD-USER %s", user))
+	SrvSync.Broadcast(fmt.Sprintf("ADD-PASSWORD %s", password))
+	SrvSync.Broadcast(fmt.Sprintf("ADD-HOST %s", host))
+}
+
 func (ossh *OSSHServer) addLoginFailure(s *Session, reason string) {
 	s.UpdateActivity()
 	if s.Password == "" {
@@ -131,17 +137,11 @@ func (ossh *OSSHServer) addLoginFailure(s *Session, reason string) {
 	}
 
 	if isIPWhitelisted(s.Host) {
-		LogOSSHServer.NotOK(
-			"%s failed to login: %s.",
-			s.LogID(),
-			colorReason(reason),
-		)
+		LogOSSHServer.NotOK("%s failed to login: %s.", s.LogID(), colorReason(reason))
 		return // we don't want stats for whitelisted IPs
 	}
 
-	SrvSync.Broadcast(fmt.Sprintf("ADD-USER %s", s.User))
-	SrvSync.Broadcast(fmt.Sprintf("ADD-PASSWORD %s", s.Password))
-	SrvSync.Broadcast(fmt.Sprintf("ADD-HOST %s", s.Host))
+	go ossh.syncCredentials(s.User, s.Password, s.Host)
 
 	ossh.Loot.AddUser(s.User)
 	ossh.Loot.AddPassword(s.Password)
@@ -149,7 +149,7 @@ func (ossh *OSSHServer) addLoginFailure(s *Session, reason string) {
 	ossh.Logins.Get(s.Host).AddFailure()
 	LogOSSHServer.NotOK(
 		"%s: Failed to login with password %s: %s. (%d attempts; %d failed; %d success)",
-		s.LogIDFull(),
+		s.LogID(),
 		colorPassword(s.Password),
 		colorReason(reason),
 		ossh.Logins.Get(s.Host).GetAttempts(),
@@ -165,16 +165,11 @@ func (ossh *OSSHServer) addLoginSuccess(s *Session, reason string) {
 	}
 
 	if isIPWhitelisted(s.Host) {
-		LogOSSHServer.OK(
-			"%s logged in.",
-			s.LogID(),
-		)
+		LogOSSHServer.OK("Elvis (disguised as %s) logged in.", s.LogID())
 		return // we don't want stats for whitelisted IPs
 	}
 
-	SrvSync.Broadcast(fmt.Sprintf("ADD-USER %s", s.User))
-	SrvSync.Broadcast(fmt.Sprintf("ADD-PASSWORD %s", s.Password))
-	SrvSync.Broadcast(fmt.Sprintf("ADD-HOST %s", s.Host))
+	go ossh.syncCredentials(s.User, s.Password, s.Host)
 
 	ossh.Loot.AddUser(s.User)
 	ossh.Loot.AddPassword(s.Password)
@@ -182,7 +177,7 @@ func (ossh *OSSHServer) addLoginSuccess(s *Session, reason string) {
 	ossh.Logins.Get(s.Host).AddSuccess()
 	LogOSSHServer.OK(
 		"%s: Logged in with password %s: %s. (%d attempts; %d failed; %d success)",
-		s.LogIDFull(),
+		s.LogID(),
 		colorPassword(s.Password),
 		colorReason(reason),
 		ossh.Logins.Get(s.Host).GetAttempts(),
@@ -237,7 +232,7 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 
 	if !s.Whitelisted {
 		LogOSSHServer.Success("%s: Finished running %s command(s)",
-			s.LogIDFull(),
+			s.LogID(),
 			colorInt(int(stats.CommandsExecuted)),
 		)
 	} else {
@@ -260,8 +255,8 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 func (ossh *OSSHServer) localPortForwardingCallback(ctx ssh.Context, bindHost string, bindPort uint32) bool {
 	s := ossh.Sessions.Create(ctx.RemoteAddr().String())
 	LogOSSHServer.Warning("%s: Tried to locally port forward to %s:%s. Request denied!",
-		s.LogIDFull(),
-		colorHost(bindHost),
+		s.LogID(),
+		enrichAndColorHost(bindHost),
 		colorInt(int(bindPort)),
 	)
 	ossh.Sessions.Remove(s.ID, "local port forwarding denied")
@@ -271,8 +266,8 @@ func (ossh *OSSHServer) localPortForwardingCallback(ctx ssh.Context, bindHost st
 func (ossh *OSSHServer) reversePortForwardingCallback(ctx ssh.Context, bindHost string, bindPort uint32) bool {
 	s := ossh.Sessions.Create(ctx.RemoteAddr().String())
 	LogOSSHServer.Warning("%s: Tried to reverse port forward to %s:%s. Request denied!",
-		s.LogIDFull(),
-		colorHost(bindHost),
+		s.LogID(),
+		enrichAndColorHost(bindHost),
 		colorInt(int(bindPort)),
 	)
 	ossh.Sessions.Remove(s.ID, "reverse port forwarding denied")
@@ -283,7 +278,7 @@ func (ossh *OSSHServer) ptyCallback(ctx ssh.Context, pty ssh.Pty) bool {
 	s := ossh.Sessions.Create(ctx.RemoteAddr().String()).SetTerm(pty.Term)
 	if !s.Whitelisted {
 		LogOSSHServer.OK("%s: Requested %s PTY session",
-			s.LogIDFull(),
+			s.LogID(),
 			colorHighlight(s.Term),
 		)
 	}
@@ -295,7 +290,7 @@ func (ossh *OSSHServer) sessionRequestCallback(sess ssh.Session, requestType str
 	s := ossh.Sessions.Create(sess.RemoteAddr().String()).SetType(requestType)
 	if !s.Whitelisted {
 		LogOSSHServer.OK("%s: Requested %s session",
-			s.LogIDFull(),
+			s.LogID(),
 			colorHighlight(s.Type),
 		)
 	}
@@ -378,12 +373,18 @@ func (ossh *OSSHServer) connectionCallback(ctx ssh.Context, conn net.Conn) net.C
 
 func (ossh *OSSHServer) publicKeyHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 	s := ossh.Sessions.Create(ctx.RemoteAddr().String()).SetUser(ctx.User())
+	if isIPWhitelisted(s.Host) {
+		ossh.addLoginSuccess(s, "Elvis entered the building with a key")
+		return true
+	}
+
 	kb := key.Marshal()
 	sha1 := StringToSha1(string(kb))
 	fpath := fmt.Sprintf("%s/%s/%s.pub", Conf.PathCaptures, "ssh-keys", sha1)
+
 	if !FileExists(fpath) {
 		_ = os.WriteFile(fpath, kb, 0400)
-		LogOSSHServer.OK("SSH key saved to: %s", colorFile(fpath))
+		LogOSSHServer.OK("%s: SSH key saved to %s", s.LogID(), colorFile(fpath))
 		ossh.addLoginSuccess(s, "host gave us a public key")
 		return true
 	}
@@ -396,6 +397,53 @@ func (ossh *OSSHServer) publicKeyHandler(ctx ssh.Context, key ssh.PublicKey) boo
 
 	ossh.addLoginSuccess(s, "host gave us a known public key")
 	return true
+}
+
+func (ossh *OSSHServer) updateStatsWorker() {
+	RandomSleep(30, 60, time.Second)
+
+	for {
+		hs := ossh.stats()
+		data := struct {
+			Node *SyncNodeStats `json:"node"`
+		}{
+			Node: hs,
+		}
+
+		jsonStats, err := json.Marshal(data)
+		if err == nil {
+			SrvUI.PushStats(string(jsonStats))
+		}
+
+		time.Sleep(INTERVAL_UI_STATS_UPDATE)
+	}
+}
+
+func (ossh *OSSHServer) broadcastStatsWorker() {
+	RandomSleep(30, 60, time.Second)
+
+	for {
+		LogOSSHServer.Info("Executing stats broadcast...")
+		hs := ossh.stats()
+		ts := SrvSync.nodes.GetStats(hs)
+		data := struct {
+			Total *SyncNodeStats `json:"total"`
+		}{
+			Total: ts,
+		}
+
+		jsonStats, err := json.Marshal(data)
+		if err == nil {
+			SrvUI.PushStats(string(jsonStats))
+		}
+
+		jsonStats, err = json.Marshal(hs)
+		if err == nil {
+			_ = SrvSync.Broadcast(fmt.Sprintf("ADD-STATS %s", string(jsonStats)))
+		}
+
+		time.Sleep(INTERVAL_STATS_BROADCAST)
+	}
 }
 
 func (ossh *OSSHServer) init() {
@@ -429,6 +477,9 @@ func (ossh *OSSHServer) init() {
 }
 
 func (ossh *OSSHServer) Start() {
+	go ossh.updateStatsWorker()
+	go ossh.broadcastStatsWorker()
+
 	LogOSSHServer.Default("Starting oSSH server on %s...", colorWrap("ssh://"+ossh.server.Addr, colorBrightYellow))
 	LogOSSHServer.Error("%s", colorError(ossh.server.ListenAndServe()))
 }
@@ -444,44 +495,8 @@ func NewOSSHServer() *OSSHServer {
 			lock: &sync.Mutex{},
 		},
 	}
+
 	ossh.init()
-	go func() {
-		for {
-			data := struct {
-				Node *SyncNodeStats `json:"node"`
-			}{
-				Node: SrvOSSH.stats(),
-			}
 
-			jsonStats, err := json.Marshal(data)
-			if err == nil {
-				SrvUI.PushStats(string(jsonStats))
-			}
-
-			time.Sleep(INTERVAL_UI_STATS_UPDATE)
-		}
-	}()
-
-	go func() {
-		for {
-			data := struct {
-				Total *SyncNodeStats `json:"total"`
-			}{
-				Total: SrvSync.nodes.GetStats(),
-			}
-
-			jsonStats, err := json.Marshal(data)
-			if err == nil {
-				SrvUI.PushStats(string(jsonStats))
-			}
-
-			jsonStats, err = json.Marshal(SrvOSSH.stats())
-			if err == nil {
-				_ = SrvSync.Broadcast(fmt.Sprintf("ADD-STATS %s", string(jsonStats)))
-			}
-
-			time.Sleep(INTERVAL_STATS_BROADCAST)
-		}
-	}()
 	return ossh
 }

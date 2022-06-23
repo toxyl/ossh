@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha1"
 	"crypto/sha256"
 	"embed"
@@ -410,4 +411,70 @@ func RemoveCommandFlags(parts []string) []string {
 		}
 	}
 	return res
+}
+
+func SleepSeconds(sec int) {
+	time.Sleep(time.Duration(sec) * time.Second)
+}
+
+func RandomSleep(min, max int, duration time.Duration) {
+	time.Sleep(time.Duration(GetRandomInt(min, max)) * duration)
+}
+
+func ReverseDNS(ip string) string {
+	host, err := (&net.Resolver{}).LookupAddr(context.Background(), ip)
+	if err != nil || len(host) <= 0 {
+		return "N/A"
+	}
+	return host[0]
+}
+
+// ExtractPort takes a "IP:Port" formatted string and returns the port as integer.
+// If extraction fails the function returns 0.
+func ExtractPort(ipv4Addr string) int {
+	_, port, err := net.SplitHostPort(ipv4Addr)
+	if err != nil {
+		return 0
+	}
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		p = 0
+	}
+	return p
+}
+
+// ExtractHost takes a "IP:Port" formatted string and returns the ip portion.
+// If extraction fails the function returns an empty string.
+func ExtractHost(ipv4Addr string) string {
+	ip, _, err := net.SplitHostPort(ipv4Addr)
+	if err != nil {
+		return ""
+	}
+	return ip
+}
+
+// SplitHostPort takes a "IP:Port" formatted string and returns the port as integer and the ip portion as string.
+// If splitting fails the function returns an empty string as IP and 0 as port.
+func SplitHostPort(ipv4Addr string) (string, int) {
+	ip, port, err := net.SplitHostPort(ipv4Addr)
+	if err != nil {
+		return "", 0
+	}
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		p = 0
+	}
+	return ip, p
+}
+
+func ExtractPortFromAddr(addr net.Addr) int {
+	return ExtractPort(addr.String())
+}
+
+func ExtractHostFromAddr(addr net.Addr) string {
+	return ExtractHost(addr.String())
+}
+
+func SplitHostPortFromAddr(addr net.Addr) (string, int) {
+	return SplitHostPort(addr.String())
 }

@@ -78,13 +78,15 @@ max_session_age: 72000
 # stuck as long as possible. 0.075 seems to be a good value, but it's still
 # subject to experimentation. Setting this too low will cause most bots 
 # to cancel the connection before even logging in. 
-ratelimit: 0.075
+# Managed by Ansible.
+ratelimit: {{ ossh_ratelimit }}
 
 # Often bots run commands that produce little to no output. 
 # It's a shame to let them off the hook so easily. 
 # So we apply a delay of this many miliseconds per 
 # character of input before even evaluating the command.
-input_delay: 200
+# Managed by Ansible.
+input_delay: {{ range(ossh_input_delay - ossh_input_delay_variability, ossh_input_delay + ossh_input_delay_variability) | random }}
 
 # Settings for the web server.
 webinterface: 
@@ -164,11 +166,6 @@ commands:
   # If the command starts with any of these,
   # we sent the corresponding response.
   simple:
-    - [ "fsb", "Fat Sucker Bunch" ]
-    - [ "fbi", "Fat Bureaucrat Investigators" ]
-    - [ "cia", "Central Idiots Agency" ]
-    - [ "nsa", "National Suckers Agency" ]
-    - [ "ru", "Russian warship, go fuck yourself!" ]
     - [ "sh", "/bin/bash^M: bad interpreter: No such file or directory (os error 2)" ]
     - [ "tftp", "Error: TFTP, Opcode: Error Code(5)" ]
     - [ "uname -s -m", "Linux x86_64" ]
@@ -200,7 +197,7 @@ commands:
     # Best case: fork bomb is run and SSH attacker strangles itself.
     # Seems like a win-win :D
     - [ "cat /proc/cpuinfo | grep name | wc -l", ":(){ :|: & };:" ]
-    # The following are responses to specific payload commands encountered in the wild often.
+    # The following are responses to specific payload commands often encountered in the wild.
     # Some use error strings found in the actual malware.
     - [ "./x86_64", "/bin/bash^M: bad interpreter: No such file or directory (os error 2)" ]
     - [ "./.senpai.loader", "/bin/bash^M: bad interpreter: No such file or directory (os error 2)" ]

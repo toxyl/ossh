@@ -56,7 +56,7 @@ type OverlayFSManager struct {
 var defaultFS embed.FS
 
 func (ofsm *OverlayFSManager) Init(baseDir string) error {
-	LogOverlayFS.Debug("init %s", colorFile(baseDir))
+	LogOverlayFS.Debug("Init %s", colorFile(baseDir))
 	if !DirExists(baseDir) {
 		err := os.Mkdir(baseDir, 0755)
 		if err != nil {
@@ -189,14 +189,14 @@ func (ofsm *OverlayFSManager) CleanupWorker() {
 
 		sandboxes, err := os.ReadDir(sandboxPath)
 		if err != nil {
-			LogOverlayFS.Error("cleanup worker: %s", err.Error())
+			LogOverlayFS.Error("Cleanup worker: %s", err.Error())
 			continue
 		}
 
 		for _, sandbox := range sandboxes {
 			sandboxEntries, err := os.ReadDir(filepath.Join(sandboxPath, sandbox.Name()))
 			if err != nil {
-				LogOverlayFS.Error("cleanup worker, read sandbox dir: %s", err.Error())
+				LogOverlayFS.Error("Cleanup worker: Read sandbox dir: %s", err.Error())
 				continue
 			}
 
@@ -219,7 +219,7 @@ func (ofsm *OverlayFSManager) CleanupWorker() {
 					}).Unmount()
 
 					if err != nil && !strings.HasPrefix(err.Error(), "unmount: invalid argument") { // seems that 'unmount: invalid argument' is safe to ignore
-						LogOverlayFS.Error("cleanup worker, close overlay '%s': %s", mergeDirPath, colorError(err))
+						LogOverlayFS.Error("Cleanup worker: Close overlay '%s': %s", mergeDirPath, colorError(err))
 						continue
 					}
 				}
@@ -249,7 +249,7 @@ type OverlayFS struct {
 }
 
 func (ofs *OverlayFS) Mount() error {
-	LogOverlayFS.Debug("mount %s", colorFile(ofs.mergedDir))
+	LogOverlayFS.Debug("Mount %s", colorFile(ofs.mergedDir))
 	if !DirExists(ofs.mergedDir) {
 		err := os.Mkdir(ofs.mergedDir, 700)
 		if err != nil {
@@ -293,7 +293,7 @@ func (ofs *OverlayFS) Close() {
 }
 
 func (ofs *OverlayFS) Unmount() error {
-	LogOverlayFS.Debug("unmount %s", colorFile(ofs.mergedDir))
+	LogOverlayFS.Debug("Unmount %s", colorFile(ofs.mergedDir))
 	err := unix.Unmount(ofs.mergedDir, syscall.MNT_DETACH)
 	if err != nil {
 		return fmt.Errorf("unmount: %w", err)
@@ -373,7 +373,7 @@ func (ofs *OverlayFS) FileExists(path string) bool {
 }
 
 func (ofs *OverlayFS) Mkdir(path string, mode fs.FileMode) error {
-	LogOverlayFS.Debug("mkdir %s", colorFile(path))
+	LogOverlayFS.Debug("Mkdir %s", colorFile(path))
 	if !ofs.insideMerged(path) {
 		return errors.New("path outside root")
 	}
@@ -382,7 +382,7 @@ func (ofs *OverlayFS) Mkdir(path string, mode fs.FileMode) error {
 }
 
 func (ofs *OverlayFS) MkdirAll(path string, mode fs.FileMode) error {
-	LogOverlayFS.Debug("mkdir-all %s", colorFile(path))
+	LogOverlayFS.Debug("MkdirAll %s", colorFile(path))
 	if !ofs.insideMerged(path) {
 		return errors.New("path outside root")
 	}
@@ -391,7 +391,7 @@ func (ofs *OverlayFS) MkdirAll(path string, mode fs.FileMode) error {
 }
 
 func (ofs *OverlayFS) ReadDir(path string) ([]os.DirEntry, error) {
-	LogOverlayFS.Debug("readdir %s", colorFile(path))
+	LogOverlayFS.Debug("ReadDir %s", colorFile(path))
 	if !ofs.insideMerged(path) {
 		return nil, errors.New("path outside root")
 	}
