@@ -7,10 +7,10 @@ all:
     ansible_python_interpreter: /usr/bin/python3
     ansible_ssh_extra_args: -C -o ControlMaster=auto -o ControlPersist=120s -o StrictHostKeyChecking=no 
 
+    sync_servers: "{{ groups['all'] }}"
+
     # Directory where the oSSH sources can be found.
     data_dir: ../
-
-    sync_servers: "{{ groups['all'] }}"
 
     # This will be the SSH user used for connections to the oSSH instances
     # after the initial setup has been completed. The setup will use your current
@@ -42,6 +42,15 @@ all:
 
     # The port of the oSSH server. Usually 22. Only change if strictly necessary.
     ossh_port: 22
+
+    # The speed to send responses with (characters / second).
+    ossh_ratelimit: 0.075 
+
+    # The delay per character of input (milliseconds).
+    # The actual value used will be +/- ossh_input_delay_variability milliseconds.
+    # This is done to avoid bots being able to detect oSSH instances because of their timing. 
+    # See ossh_input_delay_variability.
+    ossh_input_delay: 200
 
     # The port of the HTTPS server. Usually 443.
     ui_port: "443"
