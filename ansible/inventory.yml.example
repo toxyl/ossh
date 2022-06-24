@@ -51,6 +51,9 @@ all:
     # This is done to avoid bots being able to detect oSSH instances because of their timing. 
     # See ossh_input_delay_variability.
     ossh_input_delay: 200
+    
+    # The amount of milliseconds that the input delay is allowed to be offset ny the playbook.
+    ossh_input_delay_variability: 10
 
     # The port of the HTTPS server. Usually 443.
     ui_port: "443"
