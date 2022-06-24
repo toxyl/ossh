@@ -423,7 +423,7 @@ func (ossh *OSSHServer) broadcastStatsWorker() {
 	RandomSleep(30, 60, time.Second)
 
 	for {
-		LogOSSHServer.Info("Executing stats broadcast...")
+		LogOSSHServer.Debug("Executing stats broadcast...")
 		hs := ossh.stats()
 		ts := SrvSync.nodes.GetStats(hs)
 		data := struct {

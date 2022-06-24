@@ -289,6 +289,9 @@ func (ss *Sessions) get(sessionID string) *Session {
 
 func (ss *Sessions) delete(sessionID string) {
 	delete(ss.sessions, sessionID)
+	ss.Unlock()
+	defer ss.Lock()
+	ss.Remove(sessionID, "session has been deleted")
 }
 
 func (ss *Sessions) Count() int {
@@ -303,7 +306,9 @@ func (ss *Sessions) cleanUp(age uint) {
 
 	for sessionID, session := range ss.sessions {
 		if session.expire(age) {
+			ss.Unlock()
 			ss.Remove(sessionID, "session has expired")
+			ss.Lock()
 		}
 	}
 }

@@ -1,8 +1,7 @@
 [defaults]
-inventory = hosts.ini
+inventory = inventory.yml
 display_skipped_hosts = no
 interpreter_python = auto_silent
 remote_user = root
 [ssh_connection]
-ssh_args = -C -o ControlMaster=auto -o ControlPersist=120s -o StrictHostKeyChecking=accept-new 
 retries = 2
