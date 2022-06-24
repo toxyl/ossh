@@ -75,6 +75,11 @@ all:
     # if you need additional admin IPs for it.
     additional_admin_ips: 
 
+    # You can use this property under a host
+    # if you need it to communicate with nodes
+    # not managed by this Ansible.
+    additional_sync_servers:
+    
   # The oSSH instances you want to deploy,
   # all above options defined above can be
   # overwritten on a per host basis to

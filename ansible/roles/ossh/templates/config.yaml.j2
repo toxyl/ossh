@@ -48,6 +48,10 @@ hostnames:
 {% endif %}
     name: {{ hostvars[host].inventory_hostname }}
 {% endfor %}
+{% for host in additional_sync_servers %}
+  - ip: {{ host.host }}
+    name: {{ host.name }}
+{% endfor %}
 
 # IP to serve on, usually 0.0.0.0 (public exposure) or 127.0.0.1 (local machine).
 host: 0.0.0.0
@@ -130,6 +134,10 @@ sync:
 {% endif %}
 {% endif %}
 {% endif %}
+{% endfor %}
+{% for host in additional_sync_servers %}
+    - host: {{ host.host }}
+      port: {{ host.port }}
 {% endfor %}
 
 # This section defines how oSSH deals with commands.
