@@ -1,7 +1,6 @@
 ---
 packages:
   - acl
-  - git
   - gnupg
   - sudo
   - nano
