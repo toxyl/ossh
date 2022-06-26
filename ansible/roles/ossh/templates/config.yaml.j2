@@ -48,10 +48,12 @@ hostnames:
 {% endif %}
     name: {{ hostvars[host].inventory_hostname }}
 {% endfor %}
+{% if additional_sync_servers %}
 {% for host in additional_sync_servers %}
   - ip: {{ host.host }}
     name: {{ host.name }}
 {% endfor %}
+{% endif %}
 
 # IP to serve on, usually 0.0.0.0 (public exposure) or 127.0.0.1 (local machine).
 host: 0.0.0.0
@@ -135,10 +137,12 @@ sync:
 {% endif %}
 {% endif %}
 {% endfor %}
+{% if additional_sync_servers %}
 {% for host in additional_sync_servers %}
     - host: {{ host.host }}
       port: {{ host.port }}
 {% endfor %}
+{% endif %}
 
 # This section defines how oSSH deals with commands.
 # If it DOES NOT find a command in this list it will 
@@ -191,6 +195,7 @@ commands:
     - [ "whoami", "{{ '{{' }}.User }}" ]
     - [ "id", "uid=0({{ '{{' }}.User }}) gid=0({{ '{{' }}.User }}) groups=0({{ '{{' }}.User }})" ]
     - [ "echo", "{{ '{{' }}.InputRaw }}" ]
+    - [ "nc localhost 1234", "localhost [127.0.0.1] 1234 (?) : Connection refused" ]
     - [ "command", "What is your wish, {{ '{{' }}.User }}?" ]
     # We could be oldskool, but nah. This way we can fuck with bots, see "ip" definition in the "rewritters" section.
     - [ "ifconfig", "ifconfig has been deprecated, use ip instead." ]
@@ -330,7 +335,6 @@ commands:
   # Running any of these commands will result in a stream of random data of random length.
   # Can be very costly for bots. Useful for commands that are often used by bots.
   bullshit:
-    - bullshit
     - pkill
     - hive-passwd
     - history

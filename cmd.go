@@ -226,8 +226,8 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 	if isSink {
 		// someone wants to donate a file
 		fs.WriteBinary(0b0) // ready to receive
-
-		dirs := []string{parts[len(parts)-1]}
+		dname := strings.Trim(parts[len(parts)-1], "\"'")
+		dirs := []string{dname}
 
 		// read all messages
 		for {
@@ -261,19 +261,26 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 					LogOverlayFS.Error("Could not read file name: %s", colorError(err))
 					break
 				}
-				msgFileNameFull := fmt.Sprintf("%s/%s", strings.Join(dirs, "/"), string(msgFileName))
+				msgFileNameStr := string(msgFileName)
+				msgFileNameStr = strings.Trim(msgFileNameStr, "'\"")
+				msgFileNameFull := fmt.Sprintf("%s/%s", strings.Join(dirs, "/"), msgFileNameStr)
 
 				fs.WriteBinary(0b0) // ready to receive
 
 				path := toAbs(fs, msgFileNameFull)
+				if fs.overlayFS == nil {
+					LogOverlayFS.Error("scp: %s: %s", msgFileNameStr, colorReason("no OverlayFS available!"))
+					return
+				}
+
 				file, err := fs.overlayFS.OpenFile(path, os.O_RDWR|os.O_CREATE, fso.FileMode(StringToInt(string(msgMode), 0777)))
 				if err != nil && GetLastError(err) != "is a directory" {
-					LogOverlayFS.Error("scp: %s: %s", string(msgFileName), GetLastError(err))
+					LogOverlayFS.Error("scp: %s: %s", msgFileNameStr, GetLastError(err))
 					return
 				}
 				defer file.Close()
 
-				msgFileData, err := fs.ReadBytes(msgLengthInt)
+				msgFileData, err := fs.ReadBytesUntilEOF(msgLengthInt)
 				if err != nil && err.Error() != "EOF" {
 					LogOverlayFS.Error("Could not read file data: %s", colorError(err))
 					break
@@ -314,7 +321,15 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 					break
 				}
 
-				dirs = append(dirs, string(msgDirName))
+				msgDirNameStr := string(msgDirName)
+				msgDirNameStr = strings.Trim(msgDirNameStr, "'\"")
+
+				if fs.overlayFS == nil {
+					LogOverlayFS.Error("scp: %s: %s", msgDirNameStr, colorReason("no OverlayFS available!"))
+					return
+				}
+
+				dirs = append(dirs, msgDirNameStr)
 				_ = fs.overlayFS.MkdirAll(strings.Join(dirs, "/"), fso.FileMode(StringToInt(string(msgMode), 0777)))
 
 				fs.WriteBinary(0b0) // data read

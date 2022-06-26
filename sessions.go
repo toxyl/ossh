@@ -76,9 +76,9 @@ func (s *Session) SetType(sessionType string) *Session {
 	return s
 }
 
-func (s *Session) SetShell(overlayFS *OverlayFS) *Session {
+func (s *Session) SetShell() *Session {
 	s.Lock()
-	s.Shell = NewFakeShell(s, overlayFS)
+	s.Shell = NewFakeShell(s)
 	s.Unlock()
 	s.UpdateActivity()
 	return s
@@ -252,6 +252,11 @@ func (ss *Sessions) Remove(sessionID, reason string) {
 	defer ss.Unlock()
 	if ss.has(sessionID) {
 		s := ss.get(sessionID)
+
+		if s.Shell != nil && s.Shell.overlayFS != nil {
+			s.Shell.overlayFS.Close()
+		}
+
 		sh := s.Host
 		tw := 0
 		cid := colorConnID("", sh, s.Port)

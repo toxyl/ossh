@@ -8,8 +8,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -50,6 +48,7 @@ type OverlayFSManager struct {
 
 	mu             sync.Mutex
 	activeOverlays map[string]bool
+	overlays       map[string]*OverlayFS
 }
 
 //go:embed ffs
@@ -118,6 +117,7 @@ func (ofsm *OverlayFSManager) Init(baseDir string) error {
 
 	ofsm.baseDir = baseDir
 	ofsm.activeOverlays = make(map[string]bool)
+	ofsm.overlays = make(map[string]*OverlayFS)
 	go ofsm.CleanupWorker()
 
 	return nil
@@ -125,9 +125,9 @@ func (ofsm *OverlayFSManager) Init(baseDir string) error {
 
 func (ofsm *OverlayFSManager) NewSession(sandboxKey string) (*OverlayFS, error) {
 	sandboxPath := filepath.Join(ofsm.baseDir, "sandboxes", sandboxKey)
-	LogOverlayFS.Debug("Creating new session for %s at %s", colorHighlight(sandboxKey), colorFile(sandboxPath))
+
 	if !DirExists(sandboxPath) {
-		err := os.Mkdir(sandboxPath, 0755)
+		err := os.MkdirAll(sandboxPath, 0755)
 		if err != nil {
 			return nil, fmt.Errorf("make sandbox dir: %w", err)
 		}
@@ -135,50 +135,47 @@ func (ofsm *OverlayFSManager) NewSession(sandboxKey string) (*OverlayFS, error) 
 
 	sandboxLayersPath := filepath.Join(sandboxPath, "layers")
 	if !DirExists(sandboxLayersPath) {
-		err := os.Mkdir(sandboxLayersPath, 0755)
+		err := os.MkdirAll(sandboxLayersPath, 0755)
 		if err != nil {
 			return nil, fmt.Errorf("make sandbox dir: %w", err)
 		}
 	}
 
-	timeKey := strconv.FormatInt(time.Now().UnixNano(), 10)
-
-	mergeLayerPath := filepath.Join(sandboxPath, fmt.Sprintf("merge-%s", timeKey))
-	workLayerPath := filepath.Join(sandboxPath, fmt.Sprintf("work-%s", timeKey))
-	upperLayerPath := filepath.Join(sandboxPath, "layers", timeKey)
+	mergeLayerPath := filepath.Join(sandboxPath, "merge-data")
+	workLayerPath := filepath.Join(sandboxPath, "work-data")
+	upperLayerPath := filepath.Join(sandboxPath, "layers", "data")
 	var lowerLayers []string
 
-	entries, err := os.ReadDir(sandboxLayersPath)
-	if err != nil {
-		return nil, fmt.Errorf("read layers dir: %w", err)
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
+	ofsm.mu.Lock()
+	if _, ok := ofsm.activeOverlays[mergeLayerPath]; ok {
+		if ofsm.activeOverlays[mergeLayerPath] {
+			if v, ok := ofsm.overlays[mergeLayerPath]; ok {
+				ofsm.mu.Unlock()
+				LogOverlayFS.Debug("Returning existing session for %s at %s", colorHighlight(sandboxKey), colorFile(sandboxPath))
+				return v, nil
+			}
 		}
-
-		lowerLayers = append(lowerLayers, filepath.Join(sandboxPath, "layers", entry.Name()))
 	}
+	ofsm.mu.Unlock()
 
-	sort.Slice(lowerLayers, func(i, j int) bool {
-		numA, _ := strconv.Atoi(lowerLayers[i])
-		numB, _ := strconv.Atoi(lowerLayers[j])
-		return numA < numB
-	})
+	LogOverlayFS.Debug("Creating new session for %s at %s", colorHighlight(sandboxKey), colorFile(sandboxPath))
 
 	lowerLayers = append(lowerLayers, filepath.Join(ofsm.baseDir, "defaultfs"))
 
-	ofsm.mu.Lock()
-	ofsm.activeOverlays[mergeLayerPath] = true
-	ofsm.mu.Unlock()
-
-	return &OverlayFS{
+	ofs := &OverlayFS{
 		manager:   ofsm,
 		mergedDir: mergeLayerPath,
 		upperDir:  upperLayerPath,
 		workDir:   workLayerPath,
 		lowerDirs: lowerLayers,
-	}, nil
+	}
+
+	ofsm.mu.Lock()
+	ofsm.activeOverlays[mergeLayerPath] = true
+	ofsm.overlays[mergeLayerPath] = ofs
+	ofsm.mu.Unlock()
+
+	return ofs, nil
 }
 
 func (ofsm *OverlayFSManager) CleanupWorker() {
@@ -219,6 +216,10 @@ func (ofsm *OverlayFSManager) CleanupWorker() {
 					}).Unmount()
 
 					if err != nil && !strings.HasPrefix(err.Error(), "unmount: invalid argument") { // seems that 'unmount: invalid argument' is safe to ignore
+						if strings.Contains(err.Error(), "device or resource busy") {
+							LogOverlayFS.Debug("Mount %s probably still in use", colorFile(mergeDirPath))
+							continue // this can happen when a client has multiple connections open
+						}
 						LogOverlayFS.Error("Cleanup worker: Close overlay '%s': %s", mergeDirPath, colorError(err))
 						continue
 					}
@@ -232,6 +233,7 @@ func (ofsm *OverlayFSManager) DeactivateOverlay(fs *OverlayFS) {
 	ofsm.mu.Lock()
 	defer ofsm.mu.Unlock()
 	delete(ofsm.activeOverlays, fs.mergedDir)
+	delete(ofsm.overlays, fs.mergedDir)
 }
 
 // https://windsock.io/the-overlay-filesystem/
@@ -251,7 +253,7 @@ type OverlayFS struct {
 func (ofs *OverlayFS) Mount() error {
 	LogOverlayFS.Debug("Mount %s", colorFile(ofs.mergedDir))
 	if !DirExists(ofs.mergedDir) {
-		err := os.Mkdir(ofs.mergedDir, 700)
+		err := os.MkdirAll(ofs.mergedDir, 700)
 		if err != nil {
 			return fmt.Errorf("mkdir merged (%s): %w", ofs.mergedDir, err)
 		}
@@ -259,7 +261,7 @@ func (ofs *OverlayFS) Mount() error {
 	}
 
 	if !DirExists(ofs.workDir) {
-		err := os.Mkdir(ofs.workDir, 700)
+		err := os.MkdirAll(ofs.workDir, 700)
 		if err != nil {
 			return fmt.Errorf("mkdir workdir (%s): %w", ofs.workDir, err)
 		}
@@ -267,7 +269,7 @@ func (ofs *OverlayFS) Mount() error {
 	}
 
 	if !DirExists(ofs.upperDir) {
-		err := os.Mkdir(ofs.upperDir, 700)
+		err := os.MkdirAll(ofs.upperDir, 700)
 		if err != nil {
 			return fmt.Errorf("mkdir upper (%s): %w", ofs.upperDir, err)
 		}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/spf13/viper"
@@ -18,6 +19,10 @@ const (
 	INTERVAL_SYNC_CLEANUP      = 25 * time.Second
 	DELAY_OVERLAYFS_MKDIR      = 100 * time.Millisecond
 	CLEANUP_SYNC_MIN_AGE       = 60 * time.Second
+)
+
+var (
+	regexEnvVarPrefixes = regexp.MustCompile(`[A-Z_\-0-9]+=.*?\s+(.*)`)
 )
 
 //go:embed commands/*

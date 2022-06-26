@@ -198,6 +198,41 @@ func (ossh *OSSHServer) GracefulCloseOnError(err error, s *Session, sess *ssh.Se
 	}
 }
 
+func (ossh *OSSHServer) initOverlayFS(fs *FakeShell, s *Session) {
+	if fs == nil {
+		LogOSSHServer.Error("Can't create OverlayFS without FakeShell!")
+		return
+	}
+	overlayFS, err := ossh.fs.NewSession(s.Host)
+	if err != nil {
+		ossh.GracefulCloseOnError(err, s, s.SSHSession, overlayFS)
+		return
+	}
+
+	err = overlayFS.Mount()
+	if err != nil {
+		ossh.GracefulCloseOnError(err, s, s.SSHSession, overlayFS)
+		return
+	}
+
+	if overlayFS != nil {
+		if !overlayFS.DirExists("/home") {
+			err := overlayFS.Mkdir("/home", 700)
+			if err != nil {
+				LogOverlayFS.Error("%s: mkdir failed: %s", s.LogID(), colorError(err))
+			}
+		}
+
+		if !overlayFS.DirExists("/home/" + (*s.SSHSession).User()) {
+			err := overlayFS.Mkdir("/home/"+(*s.SSHSession).User(), 700)
+			if err != nil {
+				LogOverlayFS.Error("%s: mkdir failed: %s", s.LogID(), colorError(err))
+			}
+		}
+		fs.SetOverlayFS(overlayFS)
+	}
+}
+
 func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 	// Catch panics, so a bug triggered in a SSH session doesn't crash the whole service
 	defer func() {
@@ -211,23 +246,8 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 		return
 	}
 
-	overlayFS, err := ossh.fs.NewSession(fmt.Sprintf("%s-%d", s.Host, s.Port))
-	if err != nil {
-		ossh.GracefulCloseOnError(err, s, s.SSHSession, overlayFS)
-		return
-	}
-
-	err = overlayFS.Mount()
-	if err != nil {
-		ossh.GracefulCloseOnError(err, s, s.SSHSession, overlayFS)
-		return
-	}
-	defer func() {
-		overlayFS.Close()
-	}()
-
-	s.SetShell(overlayFS)
 	s.RandomSleep(1, 250)
+	s.SetShell()
 	stats := s.Shell.Process(s)
 
 	if !s.Whitelisted {

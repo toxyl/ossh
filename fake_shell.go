@@ -28,6 +28,10 @@ type FakeShell struct {
 	overlayFS *OverlayFS
 }
 
+func (fs *FakeShell) SetOverlayFS(ofs *OverlayFS) {
+	fs.overlayFS = ofs
+}
+
 func (fs *FakeShell) User() string {
 	return (*fs.session).User()
 }
@@ -116,8 +120,33 @@ func (fs *FakeShell) ReadBytesUntil(sep byte) ([]byte, error) {
 	return bytes, nil
 }
 
+// ReadBytesUntilEOF reads from the SSH session until it encounters an error or EOF.
+// It will not read more bytes than the given maxBytes.
+// The read bytes will be returned as byte array.
+func (fs *FakeShell) ReadBytesUntilEOF(maxBytes int) ([]byte, error) {
+	bytes := []byte{}
+	i := 0
+	for {
+		if i >= maxBytes {
+			break
+		}
+		b, err := fs.ReadBytes(1)
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			return nil, err
+		}
+		bytes = append(bytes, b[0])
+		i++
+	}
+	return bytes, nil
+}
+
 func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 	fs.stats.AddCommandToHistory(line)
+
+	line = string(regexEnvVarPrefixes.ReplaceAll([]byte(line), []byte("$1")))
 
 	pieces := strings.Split(line, " ")
 	command := pieces[0]
@@ -239,6 +268,7 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 
 	// 10) check if there is a go-implemented command for this
 	if goCmd, found := CmdLookup[instrCmd]; found {
+		SrvOSSH.initOverlayFS(fs, s)
 		return goCmd(fs, instr)
 	}
 
@@ -307,7 +337,7 @@ func (fs *FakeShell) Process(s *Session) *FakeShellStats {
 	return fs.stats
 }
 
-func NewFakeShell(s *Session, overlay *OverlayFS) *FakeShell {
+func NewFakeShell(s *Session) *FakeShell {
 	fs := &FakeShell{
 		session:  s.SSHSession,
 		terminal: nil,
@@ -320,7 +350,7 @@ func NewFakeShell(s *Session, overlay *OverlayFS) *FakeShell {
 			User:             (*s.SSHSession).User(),
 			recording:        NewASCIICastV2(fakeShellInitialWidth, fakeShellInitialHeight),
 		},
-		overlayFS: overlay,
+		overlayFS: nil,
 	}
 
 	fs.terminal = term.NewTerminal(*s.SSHSession, "")
@@ -329,22 +359,6 @@ func NewFakeShell(s *Session, overlay *OverlayFS) *FakeShell {
 		fs.writer.ratelimit = 10000 // set ridicuously high to effectively disable rate limit
 	}
 	fs.stats.Host = fs.Host()
-
-	if overlay != nil {
-		if !overlay.DirExists("/home") {
-			err := overlay.Mkdir("/home", 700)
-			if err != nil {
-				LogOverlayFS.Error("%s: mkdir failed: %s", s.LogID(), colorError(err))
-			}
-		}
-
-		if !overlay.DirExists("/home/" + (*s.SSHSession).User()) {
-			err := overlay.Mkdir("/home/"+(*s.SSHSession).User(), 700)
-			if err != nil {
-				LogOverlayFS.Error("%s: mkdir failed: %s", s.LogID(), colorError(err))
-			}
-		}
-	}
 	fs.cwd = "/home/" + (*s.SSHSession).User()
 	fs.UpdatePrompt("~")
 	LogFakeShell.Debug("%s: Fake shell ready, current working directory: %s", s.LogID(), colorFile(fs.cwd))
