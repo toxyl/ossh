@@ -27,7 +27,7 @@ oSSH can also sync with other oSSH nodes to share hosts, user names, passwords a
     - [File not found](#file_not_found-config)
     - [Not implemented](#not_implemented-config)
   - [Templates](#command-templates) (more sosphisticated responses using Golang templates)
-  - [Built-inimplemented commands](#built-in-commands) that mimic the behavior of real commands like `cd`, `ls`, `rm`, ...
+  - [Built-in commands](#built-in-commands) that mimic the behavior of real commands like `cd`, `ls`, `rm`, ...
 - [Rate limited I/O](#sluggishness) 
 - [Data sync](#syncing) between cluster nodes (user names, host IPs, passwords and payloads) using custom TCP server
 - [Ansible playbook](#ansible) to make deployment/update of a cluster easy
