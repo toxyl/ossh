@@ -143,7 +143,8 @@ If there is no matching command template oSSH will check if there is a built-in 
 If there is still no match oSSH will simply return `{{ .Command }}: command not found`.
 
 ## Syncing
-oSSH provices its own TCP sync server to you can connect multiple nodes together and have them to share their knowledge. Assuming you have nodes running on `192.168.0.10`, `192.168.0.20` and `192.168.0.30`, the config could look like this (remember to restart the oSSH nodes after adjusting the config):
+oSSH nodes can only sync if both nodes added the other to their config. Each instance will report its stats/data to all nodes it is allowed to sync with. As a consequence each node only knows of itself and its defined neighbors, and you can setup any network topology you like (each with their own pros and cons).
+Data sync between nodes is handled by a custom TCP sync server. Assuming you have nodes running on `192.168.0.10`, `192.168.0.20` and `192.168.0.30`, the config could look like this (remember to restart the oSSH nodes after adjusting the config):
 
 ### Node 1 (`192.168.0.10`)
 ```yaml
