@@ -13,12 +13,15 @@ How oSSH behaves can be configured via a YAML config file, a fake file system an
 oSSH can also sync with other oSSH nodes to share hosts, user names, passwords and payloads. 
 
 ## Features
+- Low memory and CPU footprint (runs perfectly fine on a $5 DigitalOcean droplet)
 - [Fake SSH server](#fake-ssh-server) with support for:
   - [Password auth](#password-auth)
   - [Public key auth](#public-key-auth)
   - [SCP file uploads](#scp-support)
+  - [Randomized wait times](#randomized-wait-times) 
 - [Fake File System](#fake-file-system-ffs) (FFS) using an OverlayFS
 - [Fake command responses](#command-responses) in multiple categories:
+  - Regular expression [rewriters](#rewriters-config) to transform input before processing 
   - [Simple](#simple-config) (exact string match to response, via [config](#configuration))
   - [OS error respones](#os-error-responses) (command match to error, via [config](#configuration)):
     - [Permission denied](#permission_denied-config)
@@ -31,16 +34,13 @@ oSSH can also sync with other oSSH nodes to share hosts, user names, passwords a
 - [Rate limited I/O](#sluggishness) 
 - [Data sync](#syncing) between cluster nodes (user names, host IPs, passwords and payloads) using custom TCP server
 - [Ansible playbook](#ansible) to make deployment/update of a cluster easy
-- [Randomized wait times](#randomized-wait-times) 
-- Low memory and CPU footprint (runs perfectly fine on a $5 DigitalOcean droplet)
-- Dashboard with node & cluster stats, console, config editor and payload viewer via HTTPS server 
-- IP whitelisting (automatically setup when using the [Ansible playbook](#ansible))
-  - Whitelisted IPs are excluded from most rate limiting and data (such as user names, passwords, public keys) will not be collected, access to dashboard and sync server is allowed
-  - Not whitelisted IPs will receive [bullshit data](#bullshit-config) (sync server) or will be redirected to themselves (dashboard)
-- Regular expression [rewriters](#rewriters-config) to transform input before processing 
-
-- Payload grouping using locality sensitive hashing (not great, but better than pure SHA hashing)
-- 
+- [Dashboard](#dashboard) with:
+  - [Node & cluster stats](#node--cluster-stats)
+  - [Console](#console-viewer)
+  - [Config editor](#config-editor) 
+  - [Payload viewer](#payloads-viewer) via HTTPS server 
+- [IP whitelisting](#ip-whitelisting) (automatically setup when using the [Ansible playbook](#ansible))
+- [Data collection](#data-collection) for analysis, blacklisting, and so on
 
 ## Installation
 The following assumes that you will use `/etc/ossh` as [data directory](#data-directory). If you want something else you need to substitute accordingly and set `path_data` in the config.
@@ -178,7 +178,7 @@ sync:
       port: 1337
 ```
 
-## Data directory
+## Data Directory
 If you don't want to keep data in the default location (`/etc/ossh`), you can define an alternate location in the config like this:
 ```yaml
 path_data: /usr/share/ossh
@@ -218,3 +218,25 @@ The subdirectory `ffs/defaultfs` contains the files and directories bots can bro
 
 ### Sandboxes
 The subdirectory `ffs/sandboxes` contains OverlayFS sandboxes per host IP. This is where a bot's file system changes end up. 
+
+## IP Whitelisting
+Whitelisted IPs are excluded from most rate limiting, data (such as user names, passwords, public keys) will not be collected and access to dashboard and sync server is granted. All other IPs will receive [bullshit data](#bullshit-config) (if they try to connect to oSSH's sync server) or will be redirected to themselves (if they send HTTPS requests).
+
+## Data Collection
+- Payload grouping using locality sensitive hashing (not great, but better than pure SHA hashing)
+
+## Dashboard
+oSSH comes with a dashboard that allows you to watch and filter the console output, check node & cluster stats, edit the config or view recorded payloads.
+
+### Node & Cluster Stats
+At the bottom of the dashboard you can find a black bar with stats for this node (top line) and this node + neighbors (bottom line).
+
+### Console Viewer
+Shows the logs of the oSSH instance. The output can be filtered by subsystem and message type. Single click on a filter selects it and deselects all others of the same type. Use CTRL+Click to toggle filters.
+
+### Config Editor
+You can edit the entire config via the dashboard. The reload functionality provided by it, however, will not restart the [Fake SSH Server](#fake-ssh-server) nor the sync server. It is most useful to update command responses on the fly with having to restart the oSSH service.
+
+### Payloads Viewer
+Here you can review the latest payloads. The overview is sortest newest first. Select a payload to view the recording (input & output) of it. Sometimes payloads can get damaged (e.g. transfer error, out of disk space), the player then shows a blinking cursor in the upper right.
+
