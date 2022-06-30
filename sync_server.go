@@ -86,8 +86,12 @@ func (ssc *SyncServerConnection) handleConnection() error {
 			return fmt.Errorf("could not decode input: %s", colorError(err))
 		}
 
-		if data == EmptyCommandResponse || data == ExitCommand {
-			ssc.write(data)
+		if data == EmptyCommandResponse {
+			ssc.write(EmptyCommandResponse)
+			continue
+		}
+
+		if data == ExitCommand {
 			return nil
 		}
 
@@ -95,6 +99,7 @@ func (ssc *SyncServerConnection) handleConnection() error {
 		if err != nil {
 			return fmt.Errorf("failed to process: %s", colorError(err))
 		}
+		return nil
 	}
 	return nil
 }
@@ -255,7 +260,7 @@ func (ss *SyncServer) SyncWorker() {
 			}
 			sections := strings.Split(v, ",")
 			host, port := SplitHostPort(k)
-			LogSyncServer.Debug("%s: %s are outdated", colorConnID("", host, port), colorHighlight(v))
+
 			client, err := ss.GetClient(host, port)
 			if err != nil {
 				LogSyncServer.Error("%s: Failed to get client: %s", colorConnID("", host, port), colorError(err))
@@ -263,7 +268,6 @@ func (ss *SyncServer) SyncWorker() {
 			}
 
 			for _, section := range sections {
-				LogSyncServer.Debug("%s: Sending %s", colorConnID("", host, port), colorHighlight(section))
 				switch section {
 				case "hosts":
 					client.SyncData("HOSTS", SrvOSSH.Loot.GetHosts, client.AddHosts)
@@ -276,7 +280,6 @@ func (ss *SyncServer) SyncWorker() {
 				}
 			}
 		}
-		LogSyncServer.Debug("Sync complete!")
 
 		time.Sleep(time.Duration(Conf.Sync.Interval) * time.Minute)
 	}
