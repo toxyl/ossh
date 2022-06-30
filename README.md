@@ -13,17 +13,24 @@ How oSSH behaves can be configured via a YAML config file, a fake file system an
 oSSH can also sync with other oSSH nodes to share hosts, user names, passwords and payloads. 
 
 ## Features
-- Fake SSH server with support for [password auth](#password-auth) and [public key auth](#public-key-auth) 
-- FFS ([Fake File System](#fake-file-system-ffs)) using an OverlayFS
-- Fake commands in multiple categories:
-  - [Simple](#simple-config) (exact string match to response)
+- [Fake SSH server](#fake-ssh-server) with support for:
+  - [Password auth](#password-auth)
+  - [Public key auth](#public-key-auth)
+  - [SCP file uploads](#scp-support)
+- [Fake File System](#fake-file-system-ffs) (FFS) using an OverlayFS
+- [Fake command responses](#command-responses) in multiple categories:
+  - [Simple](#simple-config) (exact string match to response, via [config](#configuration))
+  - [OS error respones](#os-error-responses) (command match to error, via [config](#configuration)):
+    - [Permission denied](#permission_denied-config)
+    - [Disk error](#disk_error-config)
+    - [Commmand not found](#command_not_found-config)
+    - [File not found](#file_not_found-config)
+    - [Not implemented](#not_implemented-config)
   - [Templates](#command-templates) (more sosphisticated responses using Golang templates)
-  - [Golang implemented commands](#golang-implemented-commands) that mimic the behavior of real commands like `cd`, `ls`, `rm`, ...
-- Support for [SCP uploads](#scp-support)
-- Configurable [sluggishness](#sluggishness) 
-- Configurable [command responses](#command-responses)
-- [Ansible playbook](#ansible) to make deployment/update of a cluster easy
+  - [Built-inimplemented commands](#built-in-commands) that mimic the behavior of real commands like `cd`, `ls`, `rm`, ...
+- [Rate limited I/O](#sluggishness) 
 - [Data sync](#syncing) between cluster nodes (user names, host IPs, passwords and payloads) using custom TCP server
+- [Ansible playbook](#ansible) to make deployment/update of a cluster easy
 - [Randomized wait times](#randomized-wait-times) 
 - Low memory and CPU footprint (runs perfectly fine on a $5 DigitalOcean droplet)
 - Dashboard with node & cluster stats, console, config editor and payload viewer via HTTPS server 
@@ -31,7 +38,7 @@ oSSH can also sync with other oSSH nodes to share hosts, user names, passwords a
   - Whitelisted IPs are excluded from most rate limiting and data (such as user names, passwords, public keys) will not be collected, access to dashboard and sync server is allowed
   - Not whitelisted IPs will receive [bullshit data](#bullshit-config) (sync server) or will be redirected to themselves (dashboard)
 - Regular expression [rewriters](#rewriters-config) to transform input before processing 
-- OS error respones ([permission denied](#permission_denied-config), [disk error](#disk_error-config), [commmand not found](#command_not_found-config), [file not found](#file_not_found-config), [not implemented](#not_implemented-config)) to [configurable commands](#command-responses)
+
 - Payload grouping using locality sensitive hashing (not great, but better than pure SHA hashing)
 - 
 
@@ -106,19 +113,20 @@ These are pairs with a command to match and a response. Responses can use some t
 | `{{ .Command }}` | Command that matched |
 | `{{ .Arguments }}` | Array with the arguments |
 
-#### `permission_denied` (config)
+#### OS error responses 
+##### `permission_denied` (config)
 If a command matches this list oSSH will respond with `{{ .Command }}: permission denied`.
 
-#### `disk_error` (config)
+##### `disk_error` (config)
 If a command matches this list oSSH will respond with a string of [random garbage characters](#bullshit-config), followed by `end_request: I/O error`.
 
-#### `command_not_found` (config)
+##### `command_not_found` (config)
 If a command matches this list oSSH will respond with `{{ .Command }}: command not found`.
 
-#### `file_not_found` (config)
+##### `file_not_found` (config)
 If a command matches this list oSSH will respond with `"{{ .Command }}": No such file or directory (os error 2)`.
 
-#### `not_implemented` (config)
+##### `not_implemented` (config)
 If a command matches this list oSSH will respond with `{{ .Command }}: Function not implemented`.
 
 #### `bullshit` (config)
@@ -128,14 +136,14 @@ If a command matches this list oSSH will respond with random garbage bytes. Some
 If none of the above steps matched, oSSH will look for a response template matching the command and parse that. 
 You can also create your own response templates using Golang templating, but it does require that you build oSSH yourself or use the [Ansible playbook](#ansible) because all templates are baked into the executable. You can, however, add new templates to the [commands directory](#commands-directory) of your instace and restart it. But, until you remove the files, these will be used, even if oSSH ships a newer version!
 
-#### Golang-implemented commands
-If there is no matching command template oSSH will check if there is a Golang-implemented command to handle the input and if so, generate the response using that command.  
+#### Built-in commands
+If there is no matching command template oSSH will check if there is a built-in command to handle the input and if so, generate the response using that command.  
 
 #### Nothing defined anywhere
 If there is still no match oSSH will simply return `{{ .Command }}: command not found`.
 
 ## Syncing
-If you run multiple instances of oSSH, you might want them to share their knowledge. To do so you can create credentials, store them in the config of each instance and then restart the instances. Once done they will regularly sync up with all nodes defined in their config. Assuming you have nodes running on `192.168.0.10`, `192.168.0.20` and `192.168.0.30`, the config could look like this:
+oSSH provices its own TCP sync server to you can connect multiple nodes together and have them to share their knowledge. Assuming you have nodes running on `192.168.0.10`, `192.168.0.20` and `192.168.0.30`, the config could look like this (remember to restart the oSSH nodes after adjusting the config):
 
 ### Node 1 (`192.168.0.10`)
 ```yaml
@@ -143,13 +151,9 @@ sync:
   interval: 1 # in minutes
   nodes:
     - host: 192.168.0.20
-      port: 22
-      user: 078e5067ec45f123a11b0845b5ddba3fea63e243118454ce07f85d7639eb4ec4
-      password: 91ca82fc115605a4e21de7f9fc005b450ef6baa69fef56dbfbaf64375c21fd4f
+      port: 1337
     - host: 192.168.0.30
-      port: 22
-      user: 8fe36196f2c4bb5a63f390c3e2e1152a3ababcd3f41c1295b86f773c9c53c632
-      password: ea5f6f80595c72c5e1ee8198a651f7584a3b293afbefcf228dd8b1659b6864c9
+      port: 1337
 ```
 
 ### Node 2 (`192.168.0.20`)
@@ -158,13 +162,9 @@ sync:
   interval: 1 # in minutes
   nodes:
     - host: 192.168.0.10
-      port: 22
-      user: 42ba9f2b9b6e44a1b2744a243201d3147d174232de467899ab7e20df374101df
-      password: 8dd88f838d80197836c59ccdd8fbde1feed27688a443132be5c0cb0e999b603f
+      port: 1337
     - host: 192.168.0.30
-      port: 22
-      user: 8fe36196f2c4bb5a63f390c3e2e1152a3ababcd3f41c1295b86f773c9c53c632
-      password: ea5f6f80595c72c5e1ee8198a651f7584a3b293afbefcf228dd8b1659b6864c9
+      port: 1337
 ```
 
 ### Node 3 (`192.168.0.30`)
@@ -173,13 +173,9 @@ sync:
   interval: 1 # in minutes
   nodes:
     - host: 192.168.0.10
-      port: 22
-      user: 42ba9f2b9b6e44a1b2744a243201d3147d174232de467899ab7e20df374101df
-      password: 8dd88f838d80197836c59ccdd8fbde1feed27688a443132be5c0cb0e999b603f
+      port: 1337
     - host: 192.168.0.20
-      port: 22
-      user: 078e5067ec45f123a11b0845b5ddba3fea63e243118454ce07f85d7639eb4ec4
-      password: 91ca82fc115605a4e21de7f9fc005b450ef6baa69fef56dbfbaf64375c21fd4f
+      port: 1337
 ```
 
 ## Data directory
@@ -197,13 +193,10 @@ Within that directory you will find bind a bunch of files with data collected by
 | `payloads.txt` | List of payload fingerprints |
 
 ### Captures directory
-The subdirectory `captures` is the collection of payloads received from bots. Whenever a bot connects oSSH will record what it's doing and then save that recording as an ASCIICast v2 (you can use [`asciinema`](https://asciinema.org/) to play them back). Captures are saved per host, so you can, e.g., identify especially aggressive bots. The last part of the file name is the fingerprint of the sequence. Existing files will not be overwritten. 
-
-### Fake File System (FFS) 
-The subdirectory `ffs` contains the files and directories bots can browse. You can modify the directory content at runtime to react to new payloads. For example: if bots commonly `cat` a specific file, you can create a very lengthy fake version of that file in the `ffs` directory. Next time a bot `cat`s it, it will be waiting for a long time :D 
+The subdirectory `captures` is the collection of payloads, public SSH keys and SCP file uploads received from bots. Whenever a bot connects oSSH will record what it's doing and then save that recording as an ASCIICast v2 file which you can play back with [`asciinema`](https://asciinema.org/) or the dashboard. oSSH will attempt to categorize payloads by prefixing the SHA fingerprint of the payload with locality sensitive hash. This approach is far from perfect (PRs for better solutions are welcome!), but it does work better than pure SHA fingerprints.
 
 ### Commands directory
-The subdirectory `commands` contains templates for commands that need more elaborate behavior. Like the `ffs` directory it can be modified at runtime. These files are Golang templates, see [this](https://pkg.go.dev/text/template) for more information in regards to the templating language.
+The subdirectory `commands` contains templates for commands that need more elaborate behavior. These commands are baked into the executable and extracted when the executable is run, existing files will **NOT** be overwritten. These [Golang templates](https://pkg.go.dev/text/template) can be modified at runtime.
 
 ## Fake SSH Server
 ### SCP support
@@ -218,3 +211,10 @@ Some bots prefer to hand over public keys rather than passwords, but we gladly r
 
 ### Randomized wait times
 In theory a bot could identify an oSSH instance by measuring the timing of responses. To prevent this kind of fingerprinting, oSSH will insert randomized wait times during different stages of the SSH connection. 
+
+## Fake File System (FFS) 
+### Default FS
+The subdirectory `ffs/defaultfs` contains the files and directories bots can browse. The FFS is baked into the executable and extracted when the executable is run, existing files will **NOT** be overwritten. You can modify the extracted contents at runtime to react to new payloads. For example: if bots commonly `cat` a specific file, you can create a very lengthy fake version of that file in the `ffs/defaultfs` directory of the oSSH instance. Next time a bot `cat`s it, it will be waiting for a long time :D 
+
+### Sandboxes
+The subdirectory `ffs/sandboxes` contains OverlayFS sandboxes per host IP. This is where a bot's file system changes end up. 
