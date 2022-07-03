@@ -14,6 +14,8 @@ oSSH can also sync with other oSSH nodes to share hosts, user names, passwords a
 
 ## Features
 - Low memory and CPU footprint (runs perfectly fine on a $5 DigitalOcean droplet)
+- [Ansible Playbook](#ansible-playbook) to make deployment/update of a cluster easy
+- [Data Collection](#data-collection) for analysis, blacklisting, and so on
 - [Fake SSH Server](#fake-ssh-server) with support for:
   - [Password auth](#password-auth)
   - [Public key auth](#public-key-auth)
@@ -33,16 +35,14 @@ oSSH can also sync with other oSSH nodes to share hosts, user names, passwords a
     - [Not implemented](#not_implemented-config)
   - [Templates](#command-templates) (more sosphisticated responses using Golang templates)
   - [Built-in commands](#built-in-commands) that mimic the behavior of real commands like `cd`, `ls`, `rm`, ...
-- [Sync Server](#syncing) between cluster nodes (user names, host IPs, passwords and payloads) using custom TCP server
+- [Sync Server](#sync-server) to distribute user names, host IPs, passwords and payloads between cluster nodes
   - [IP whitelist](#ip-whitelist-1)
-- [Ansible Playbook](#ansible-playbook) to make deployment/update of a cluster easy
 - [Dashboard](#dashboard) with:
   - [Node & cluster stats](#node--cluster-stats)
   - [Console](#console-viewer)
   - [Config editor](#config-editor) 
   - [Payload viewer](#payloads-viewer) via HTTPS server 
   - [IP whitelist](#ip-whitelist-2)
-- [Data Collection](#data-collection) for analysis, blacklisting, and so on
 
 ## Installation
 It is strongly recommended that you install oSSH on a machine that is only used for that purpose to minimize the impact should an attacker manage to break out of oSSH. DigitalOcean's $5 droplets, for example, work perfectly fine for this task.
