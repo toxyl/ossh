@@ -2,21 +2,13 @@
 
 ... is a dirty mix of honey and tar, delivered by a fake SSH server. 
 
-Once running it will patiently wait for bots going after that sweet honey. When a bot tries to connect for the first time oSSH will check if the username and password are already recorded. In that case, it will kick the bot and wait for it to come back. If the bot has something new (either username or password), oSSH will gladly let the bot in and record the credentials. For bots that offer a username and a password that oSSH doesn't know, oSSH will roll dice to decide whether to let the bot in. This applies to new hosts, known hosts will be let it most of the time. Some bots prefer to hand over public keys, we gladly record those, too. Unless we already have that key, that's a good reason to roll dice again.
-
-Once inside, oSSH will add some tar to the mix. The bot can run commands and access a filesystem, but it will be painfully slow (unless configured differently) and all data returned will be fake. Meanwhile, oSSH will record what the bot is doing, fingerprint it and store it in an ASCIICast file for manual inspection.
-
-In addition to being painfully slow, the bot will connect to a pretty broken system where many commands result in errors reminiscent of failing hardware, bad configuration and alike. 
-
-How oSSH behaves can be configured via a YAML config file, a fake file system and command templates. 
-
-oSSH can also sync with other oSSH nodes to share hosts, user names, passwords and payloads. 
+It is inspired by [Endlessh](https://github.com/skeeto/endlessh) which was a lot of fun, but I wanted more than just slowing down bots, I was also curious what they would do once they've gotten in. The result is a combination of the characteristics of a honeypot and a tarpot, that uses few resources and can run as a cluster. Unlike a classical honeypot, it presents itself as a pretty broken system where many commands result in errors reminiscent of failing hardware, bad configuration and alike. Naturally, everything bots do is collected for further analysis. Host IPs, user names, passwords and payloads are shared with all nodes in a cluster. Many aspects of oSSH, such as the amount of tar added and the responses to commands, can be edited via a YAML configuration file or the Dashboard. 
 
 ## Features
 - Low memory and CPU footprint (runs perfectly fine on a $5 DigitalOcean droplet)
 - [Ansible Playbook](#ansible-playbook) to make deployment/update of a cluster easy
 - [Data Collection](#data-collection) for analysis, blacklisting, and so on
-- [Fake SSH Server](#fake-ssh-server) with support for:
+- [Fake SSH Server](#fake-ssh-server) with:
   - [Password auth](#password-auth)
   - [Public key auth](#public-key-auth)
   - [SCP file uploads](#scp-support)
@@ -35,17 +27,17 @@ oSSH can also sync with other oSSH nodes to share hosts, user names, passwords a
     - [Not implemented](#not_implemented-config)
   - [Templates](#command-templates) (more sophisticated responses using Golang templates)
   - [Built-in commands](#built-in-commands) that mimic the behavior of real commands like `cd`, `ls`, `rm`, ...
-- [Sync Server](#sync-server) to distribute user names, host IPs, passwords and payloads between cluster nodes
+- [Sync Server](#sync-server) 
   - [IP whitelist](#ip-whitelist-1)
 - [Dashboard](#dashboard) with:
   - [Node & cluster stats](#node--cluster-stats)
   - [Console](#console-viewer)
   - [Config editor](#config-editor) 
-  - [Payload viewer](#payloads-viewer) via HTTPS server 
+  - [Payload viewer](#payloads-viewer)
   - [IP whitelist](#ip-whitelist-2)
 
 ## Installation
-It is strongly recommended that you install oSSH on a machine that is only used for that purpose to minimize the impact should an attacker manage to break out of oSSH. DigitalOcean's $5 droplets, for example, work perfectly fine for this task.
+It is **strongly recommended** that you install oSSH on a machine that is only used for that purpose to minimize the impact should an attacker manage to break out of oSSH. DigitalOcean's $5 droplets, for example, work perfectly fine for this task.
 
 ### Ansible Playbook
 If you have Ansible installed, this is the route to take.  
@@ -228,6 +220,8 @@ If there is no matching command template oSSH will check if there is a built-in 
 If there is still no match oSSH will simply return `{{ .Command }}: command not found`.
 
 ## Sync Server
+This TCP server is used to share user names, host IPs, passwords and payloads between cluster nodes.  
+
 oSSH nodes can only sync if both nodes added the other to their config. Each instance will report its stats/data to all nodes it is allowed to sync with. As a consequence, each node only knows of itself and its defined neighbors. Data sync between nodes is handled by a custom TCP sync server. Assuming you have nodes running on `192.168.0.10`, `192.168.0.20` and `192.168.0.30`, the config could look like this (remember to restart the oSSH nodes after adjusting the config):
 
 ### Node 1 (`192.168.0.10`)
