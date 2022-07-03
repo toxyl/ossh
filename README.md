@@ -2,9 +2,9 @@
 
 ... is a dirty mix of honey and tar, delivered by a fake SSH server. 
 
-Once running it will patiently wait for bots going after that sweet honey. When a bot tries to connect for the first time oSSH will check if username and password are already recorded. In that case it will kick the bot and wait for it to come back. If the bot has something new (either username or password), oSSH will gladly let the bot in and record the credentials. For bots that offer a username and a password that oSSH doesn't know, oSSH will roll dice to decide whether to let the bot in. This applies to new hosts, known hosts will be let it most of the time. Some bots prefer to hand over public keys, we gladly record those, too. Unless we already have that key, that's a good reason to roll dice again.
+Once running it will patiently wait for bots going after that sweet honey. When a bot tries to connect for the first time oSSH will check if the username and password are already recorded. In that case, it will kick the bot and wait for it to come back. If the bot has something new (either username or password), oSSH will gladly let the bot in and record the credentials. For bots that offer a username and a password that oSSH doesn't know, oSSH will roll dice to decide whether to let the bot in. This applies to new hosts, known hosts will be let it most of the time. Some bots prefer to hand over public keys, we gladly record those, too. Unless we already have that key, that's a good reason to roll dice again.
 
-Once inside, oSSH will add some tar to the mix. The bot can run commands and access a filesystem, but it will be painfully slow (unless configured differently) and all data returned will be fake. Meanwhile oSSH will record what the bot is doing, fingerprint it and store it in an ASCIICast file for manual inspection.
+Once inside, oSSH will add some tar to the mix. The bot can run commands and access a filesystem, but it will be painfully slow (unless configured differently) and all data returned will be fake. Meanwhile, oSSH will record what the bot is doing, fingerprint it and store it in an ASCIICast file for manual inspection.
 
 In addition to being painfully slow, the bot will connect to a pretty broken system where many commands result in errors reminiscent of failing hardware, bad configuration and alike. 
 
@@ -25,15 +25,15 @@ oSSH can also sync with other oSSH nodes to share hosts, user names, passwords a
   - [IP whitelist](#ip-whitelist)
 - [Fake File System](#fake-file-system-ffs) (FFS) using an OverlayFS
 - [Fake Shell](#fake-shell) command processing in multiple categories:
-  - Regular expression [rewriters](#rewriters-config) to transform input before processing 
-  - [Simple](#simple-config) (exact string match to response, via [config](#configuration))
-  - [OS error respones](#os-error-responses) (command match to error, via [config](#configuration)):
+  - Regular expression [rewriters](#rewriters-config) transform input before processing 
+  - [Simple](#simple-config) (exact string match to response)
+  - [OS error responses](#os-error-responses) (command match to error):
     - [Permission denied](#permission_denied-config)
     - [Disk error](#disk_error-config)
-    - [Commmand not found](#command_not_found-config)
+    - [Command not found](#command_not_found-config)
     - [File not found](#file_not_found-config)
     - [Not implemented](#not_implemented-config)
-  - [Templates](#command-templates) (more sosphisticated responses using Golang templates)
+  - [Templates](#command-templates) (more sophisticated responses using Golang templates)
   - [Built-in commands](#built-in-commands) that mimic the behavior of real commands like `cd`, `ls`, `rm`, ...
 - [Sync Server](#sync-server) to distribute user names, host IPs, passwords and payloads between cluster nodes
   - [IP whitelist](#ip-whitelist-1)
@@ -53,9 +53,9 @@ If you don't have Ansible yet, this is a good moment to install it: `apt install
 You can find all further instructions [here](ansible/README.md).
 
 ### Manual
-The following assumes that you will use `/etc/ossh` as [data directory](#data-directory). If you want something else you need to substitute accordingly and set `path_data` in the config.
+The following assumes that you will use `/etc/ossh` as [data directory](#data-directory). If you want something else you need to substitute accordingly and set `path_data` in the config.  
 
-First of all you need to become root (or run everything with `sudo`). Then get the repo and build the executable:
+First of all, you need to become root (or run everything with `sudo`). Then get the repo and build the executable:
 ```bash
 git clone https://github.com/Toxyl/ossh.git
 cd ossh
@@ -100,7 +100,7 @@ If you don't want to keep data in the default location (`/etc/ossh`), you can de
 path_data: /usr/share/ossh
 ```
 
-Within that directory you will find bind a bunch of files with data collected by oSSH:
+Within that directory, you will find bind a bunch of files with data collected by oSSH:
 | File | Description |
 | --- | --- |
 | `hosts.txt` | List of attacker IPs |
@@ -109,7 +109,7 @@ Within that directory you will find bind a bunch of files with data collected by
 | `payloads.txt` | List of payload fingerprints |
 
 ### Captures Subdirectory
-The subdirectory `captures` is the collection of payloads, public SSH keys and SCP file uploads received from bots. Whenever a bot connects oSSH will record what it's doing and then save that recording as an ASCIICast v2 file which you can play back with [`asciinema`](https://asciinema.org/) or the dashboard. oSSH will attempt to categorize payloads by prefixing the SHA fingerprint of the payload with locality sensitive hash. This approach is far from perfect (PRs for better solutions are welcome!), but it does work better than pure SHA fingerprints.  
+The subdirectory `captures` is the collection of payloads, public SSH keys and SCP file uploads received from bots. Whenever a bot connects oSSH will record what it's doing and then save that recording as an ASCIICast v2 file which you can play back with [`asciinema`](https://asciinema.org/) or the dashboard. oSSH will attempt to categorize payloads by prefixing the SHA fingerprint of the payload with a locality-sensitive hash. This approach is far from perfect (PRs for better solutions are welcome!), but it does work better than pure SHA fingerprints.  
 Only the payloads from the `captures` directory are synced with other nodes at the moment, but that might change in the future.
 
 ### Commands Subdirectory
@@ -138,7 +138,7 @@ Keys used by whitelisted IPs are excluded from data collection.
 ### Payloads
 Everything run after logging into the [Fake SSH Server](#fake-ssh-server) will be recorded and collected in the directory `captures` in the installation directory.  
 When an SSH session ends all of its input will be compared to already recorded payloads. Existing payloads will not be overwritten. New payloads will be stored and then send to all known nodes.  
-The file name used to store a payload contains a locality sensitive hash followed by a SHA1 hash in an attempt to group similar payloads.  
+The file name used to store a payload contains a locality-sensitive hash followed by a SHA1 hash in an attempt to group similar payloads.  
 Sessions by whitelisted IPs are excluded from data collection.
 
 ### SCP Uploads
@@ -147,26 +147,26 @@ Be aware that SCP file uploads by whitelisted IPs will **not** be excluded from 
 
 ## Fake SSH Server
 ### Password Auth
-When a bot tries to connect for the first time oSSH will check if username and password are already recorded. In that case it will kick the bot and wait for it to come back. If the bot has something new (either username or password), oSSH will gladly let the bot in and record the credentials. For bots that offer a username and a password that oSSH doesn't know, oSSH will let it in if the current second is divisable by 3. This applies to new hosts, known hosts will be let it most of the time, unless the current second is divisable by 7. 
+When a bot tries to connect for the first time oSSH will check if the username and password are already recorded. In that case, it will kick the bot and wait for it to come back. If the bot has something new (either username or password), oSSH will gladly let the bot in and record the credentials. For bots that offer a username and a password that oSSH doesn't know, oSSH will let it in if the current second is divisible by 3. This applies to new hosts, known hosts will be let it most of the time unless the current second is divisible by 7. 
 
 ### Public Key Auth
-Some bots prefer to hand over public keys rather than passwords, but we gladly record those, too. Unless we already have the given key, that's a good reason to roll dice - whenever the current second is divisable by 3 the bot will be rejected.  
+Some bots prefer to hand over public keys rather than passwords, but we gladly record those, too. Unless we already have the given key, that's a good reason to roll dice - whenever the current second is divisible by 3 the bot will be rejected.  
 
 ### Rate Limited I/O
-oSSH slows down responses to simulate a slow machine and to waste the bots time. This rate limit can be defined in the config (`ratelimit`). Sometimes bots run commands with little output, so oSSH will add some penalty for every input character to slow things down a bit more for them. This can be defined in the config as well (`input_delay`).  
+oSSH slows down responses to simulate a slow machine and to waste the bots' time. This rate limit can be defined in the config (`ratelimit`). Sometimes bots run commands with little output, so oSSH will add some penalty for every input character to slow things down a bit more for them. This can be defined in the config as well (`input_delay`).  
 You can also use these config variables to configure a fast oSSH instance that is intended for data collection instead of trapping bots in tar. You could, for example, use a 2:7 ratio of fast nodes in your cluster, so most slow down bots, while some collect data (such as user names, passwords, etc.) and share it with the cluster.
 
 Sync operations between nodes run via their own TCP connections and are exempt from these restrictions.
 
 ### Randomized Wait Times
-In theory a bot could identify an oSSH instance by measuring the timing of responses. To prevent this kind of fingerprinting, oSSH will insert randomized wait times during different stages of the SSH connection. 
+In theory, a bot could identify an oSSH instance by measuring the timing of responses. To prevent this kind of fingerprinting, oSSH will insert randomized wait times during different stages of the SSH connection. 
 
 ### SCP Support
 oSSH supports file uploads using SCP. Downloading files via SCP is not supported yet.  
-The uploaded files will be stored in the OverlayFS of the uploader's session and, if we don't have them yet, in the `scp-uploads` directory within the [captures directory](#captures-directory) of oSSH. *Unlike other data this is not synced between nodes at the moment.* 
+The uploaded files will be stored in the OverlayFS of the uploaders' session and if we don't have them yet, in the `scp-uploads` directory within the [captures directory](#captures-directory) of oSSH. *Unlike other data, this is not synced between nodes at the moment.* 
 
 ### IP Whitelist
-Whitelisted IPs are excluded from most rate limiting and data (such as user names, passwords, public keys) will not be collected. 
+Whitelisted IPs are excluded from most rate-limiting and data (such as user names, passwords and public keys) will not be collected. 
 
 ## Fake File System (FFS) 
 ### Default FS
@@ -176,13 +176,13 @@ The subdirectory `ffs/defaultfs` contains the files and directories bots can bro
 The subdirectory `ffs/sandboxes` contains OverlayFS sandboxes per host IP. This is where a bot's file system changes end up. 
 
 ## Fake Shell
-Once a bot connects to oSSH and requests a shell, it will interact with the Fake Shell. That parses the bots input into instructions and tries to evaluate them. To do so it extracts the command and executes a series of steps to generate a response. The `commands` section of the config allows you to customize oSSHs responses to commands. They are evaluated in the following order:
+Once a bot connects to oSSH and requests a shell, it will interact with the Fake Shell. That parses the bots' input into instructions and tries to evaluate them. To do so it extracts the command and executes a series of steps to generate a response. The `commands` section of the config allows you to customize oSSHs responses to commands. They are evaluated in the following order:
 
 ### `rewriters` (config)
-These are pairs of regular expressions and replacements which will be executed in the given order on any user/bot input. Be aware that recordings are made after rewriters have been applied, i.e. your recorded payloads may not reflect the payload as given by the bot.
+These are pairs of regular expressions and replacements that will be executed in the given order on any user/bot input. Be aware that recordings are made after rewriters have been applied, i.e. your recorded payloads may not reflect the payload as given by the bot.
 
 ### `exit` (config)
-If a command matches this list the connection will be terminated with a time-wasting response that consists of a repeated sequence of a space followed by a backspace which makes it look empty but potentially take a long time to process. How often that sequence is repeated is random, at least one will be send, at most one thousand.
+If a command matches this list the connection will be terminated with a time-wasting response that consists of a repeated sequence of a space followed by a backspace which makes it look empty but potentially takes a long time to process. How often that sequence is repeated is random, at least one will be sent, at most one thousand.
 
 ### `simple` (config)
 These are pairs with a command to match and a response. Responses can use some template variables so one can, e.g., simulate the `whoami` command. Available variables are:  
@@ -228,7 +228,7 @@ If there is no matching command template oSSH will check if there is a built-in 
 If there is still no match oSSH will simply return `{{ .Command }}: command not found`.
 
 ## Sync Server
-oSSH nodes can only sync if both nodes added the other to their config. Each instance will report its stats/data to all nodes it is allowed to sync with. As a consequence each node only knows of itself and its defined neighbors. Data sync between nodes is handled by a custom TCP sync server. Assuming you have nodes running on `192.168.0.10`, `192.168.0.20` and `192.168.0.30`, the config could look like this (remember to restart the oSSH nodes after adjusting the config):
+oSSH nodes can only sync if both nodes added the other to their config. Each instance will report its stats/data to all nodes it is allowed to sync with. As a consequence, each node only knows of itself and its defined neighbors. Data sync between nodes is handled by a custom TCP sync server. Assuming you have nodes running on `192.168.0.10`, `192.168.0.20` and `192.168.0.30`, the config could look like this (remember to restart the oSSH nodes after adjusting the config):
 
 ### Node 1 (`192.168.0.10`)
 ```yaml
@@ -270,16 +270,16 @@ Whitelisted IPs are allowed to communicate with the sync server. All other IPs w
 oSSH comes with a dashboard that allows you to watch and filter the console output, check node & cluster stats, edit the config or view recorded payloads.
 
 ### Node & Cluster Stats
-At the bottom of the dashboard you can find a black bar with stats for this node (top line) and this node + neighbors (bottom line).
+At the bottom of the dashboard, you can find a black bar with stats for this node (top line) and this node + neighbors (bottom line).
 
 ### Console Viewer
-Shows the logs of the oSSH instance. The output can be filtered by subsystem and message type. Single click on a filter selects it and deselects all others of the same type. Use CTRL+Click to toggle filters.
+Shows the logs of the oSSH instance. The output can be filtered by subsystem and message type. A single click on a filter selects it and deselects all others of the same type. Use CTRL+Click to toggle filters.
 
 ### Config Editor
-You can edit the entire config via the dashboard. The reload functionality provided by it, however, will not restart the [Fake SSH Server](#fake-ssh-server) nor the sync server. It is most useful to update command responses on the fly with having to restart the oSSH service.
+You can edit the entire config via the dashboard. The reload functionality provided by it, however, will not restart the [Fake [SSH Server](#fake-ssh-server) or the [Sync Server](#sync-server). It is most useful to update command responses on the fly without having to restart the oSSH service.
 
 ### Payloads Viewer
-Here you can review the latest payloads. The overview is sortest newest first. Select a payload to view the recording (input & output) of it. Sometimes payloads can get damaged (e.g. transfer error, out of disk space), the player then shows a blinking cursor in the upper right.
+Here you can review the latest payloads. The overview is sorted newest first. Select a payload to view the recording (input & output) of it. Sometimes payloads can get damaged (e.g. transfer error, out of disk space), the player then shows a blinking cursor in the upper right.
 
 ### IP Whitelist
 Whitelisted IPs are allowed to access the dashboard. HTTP requests from all other IPs will be redirected to themselves.
