@@ -61,6 +61,9 @@ all:
     # The port of the sync server. Usually 1337.
     sync_port: "1337"
 
+    # The port of the metrics server. Usually 2112.
+    metrics_port: "2112"
+    
     # No need to change here, needs to be defined per host
     # if you are on the same network and you want to use
     # local IP addresses. This happens, for example,

@@ -240,6 +240,7 @@ func (ss *Sessions) Create(sessionID string) *Session {
 		s.UpdateActivity()
 		cnts := len(ss.sessions)
 		active := ss.countActiveSessions(s.Host)
+		SrvMetrics.IncrementSessions()
 		LogSessions.OK(
 			"%s: Session started, host now uses %s of %s.",
 			s.LogID(), colorInt(active), colorIntAmount(cnts, "active session", "active sessions"))
@@ -269,6 +270,7 @@ func (ss *Sessions) Remove(sessionID, reason string) {
 		s.UpdateActivity()
 		ss.delete(sessionID)
 		ss.Unlock()
+		SrvMetrics.DecrementSessions()
 		cnts := ss.Count()
 		ss.Lock()
 		active := ss.countActiveSessions(sh)

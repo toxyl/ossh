@@ -41,6 +41,8 @@ type OSSHServer struct {
 }
 
 func (ossh *OSSHServer) stats() *SyncNodeStats {
+	uptime := uptime().Round(1 * time.Second).Seconds()
+	SrvMetrics.SetTimeOnline(uptime)
 	return &SyncNodeStats{
 		Hosts:            ossh.Loot.CountHosts(),
 		Passwords:        ossh.Loot.CountPasswords(),
@@ -51,11 +53,12 @@ func (ossh *OSSHServer) stats() *SyncNodeStats {
 		SuccessfulLogins: ossh.Logins.GetSuccesses(),
 		FailedLogins:     ossh.Logins.GetFailures(),
 		TimeWasted:       ossh.getWastedTime(),
-		Uptime:           uptime().Round(1 * time.Second).Seconds(),
+		Uptime:           uptime,
 	}
 }
 
 func (ossh *OSSHServer) addWastedTime(seconds int) {
+	SrvMetrics.AddTimeWasted(float64(seconds))
 	ossh.TimeWasted.Add(seconds)
 }
 

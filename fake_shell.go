@@ -185,6 +185,8 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 		}
 	}
 
+	SrvMetrics.IncrementExecutedCommands()
+
 	data := struct {
 		User      string
 		IP        string

@@ -11,12 +11,16 @@ type Login struct {
 func (ls *Login) AddFailure() {
 	ls.lock.Lock()
 	defer ls.lock.Unlock()
+	SrvMetrics.IncrementLogins()
+	SrvMetrics.IncrementFailedLogins()
 	ls.failure++
 }
 
 func (ls *Login) AddSuccess() {
 	ls.lock.Lock()
 	defer ls.lock.Unlock()
+	SrvMetrics.IncrementLogins()
+	SrvMetrics.IncrementSuccessfulLogins()
 	ls.success++
 }
 

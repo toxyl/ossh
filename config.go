@@ -71,6 +71,10 @@ type Config struct {
 		CertFile string `mapstructure:"cert_file"`
 		KeyFile  string `mapstructure:"key_file"`
 	} `mapstructure:"webinterface"`
+	MetricsServer struct {
+		Host string `mapstructure:"host"`
+		Port uint   `mapstructure:"port"`
+	} `mapstructure:"metrics_server"`
 	SyncServer struct {
 		Host string `mapstructure:"host"`
 		Port uint   `mapstructure:"port"`

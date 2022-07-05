@@ -19,6 +19,25 @@
   with_items:
     - '{{ additional_admin_ips }}'
 
+# Next we expose the metrics server to whitelisted IPs
+- name: Whitelist IPs for metrics access
+  ufw:
+    rule: allow
+    proto: tcp
+    port: "{{ metrics_port }}"
+    src: '{{ item }}'
+  with_items:
+    - '{{ admin_ips }}'
+
+- name: Whitelist additional IPs metrics access
+  ufw:
+    rule: allow
+    proto: tcp
+    port: "{{ metrics_port }}"
+    src: '{{ item }}'
+  with_items:
+    - '{{ additional_admin_ips }}'
+
 # Now we open all ports oSSH needs.
 # Note that oSSH does whitelist validatation,
 # DO NOT apply whitelists to these ports.

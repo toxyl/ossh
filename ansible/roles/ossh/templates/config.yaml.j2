@@ -103,6 +103,14 @@ webinterface:
   # Managed by Ansible.
   port: {{ ui_port }}
 
+# Settings for the metrics server that exposes Prometheus metrics of this oSSH instance.
+metrics_server:
+  # IP to serve on, usually 0.0.0.0 (public exposure) or 127.0.0.1 (local machine).
+  host: 0.0.0.0
+  # Port the metrics server listens on. 
+  # Managed by Ansible.
+  port: {{ metrics_port }}
+
 # Settings for the sync server that handles communications between oSSH instances.
 sync_server:
   # IP to serve on, usually 0.0.0.0 (public exposure) or 127.0.0.1 (local machine).

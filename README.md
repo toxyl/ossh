@@ -29,6 +29,7 @@ It is inspired by [Endlessh](https://github.com/skeeto/endlessh) which was a lot
   - [Built-in commands](#built-in-commands) that mimic the behavior of real commands like `cd`, `ls`, `rm`, ...
 - [Sync Server](#sync-server) 
   - [IP whitelist](#ip-whitelist-1)
+- [Metrics Server](#metrics-server) (Prometheus endpoint)
 - [Dashboard](#dashboard) with:
   - [Node & cluster stats](#node--cluster-stats)
   - [Console](#console-viewer)
@@ -74,7 +75,7 @@ And then enable the service:
 systemctl enable ossh
 ```
 
-Finally you can start trapping bots in that sweet tar:
+Finally, you can start trapping bots in that sweet tar:
 ```bash
 service ossh start
 ```
@@ -259,6 +260,9 @@ sync:
 
 ### IP Whitelist
 Whitelisted IPs are allowed to communicate with the sync server. All other IPs will receive [bullshit data](#bullshit-config).
+
+## Metrics Server
+A Prometheus endpoint providing metrics for the oSSH instance. WIP.
 
 ## Dashboard
 oSSH comes with a dashboard that allows you to watch and filter the console output, check node & cluster stats, edit the config or view recorded payloads.
