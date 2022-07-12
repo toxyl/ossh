@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/toxyl/gutils"
 )
 
 var templateFunctions template.FuncMap = template.FuncMap{}
@@ -98,8 +99,8 @@ func InitTemplaterFunctions() {
 			return a - b
 		},
 		"add": func(a, b interface{}) float64 {
-			af, _ := GetFloat(a)
-			bf, _ := GetFloat(b)
+			af, _ := gutils.GetFloat(a)
+			bf, _ := gutils.GetFloat(b)
 			return af + bf
 		},
 		"div": func(a, b float64) float64 {
@@ -109,10 +110,10 @@ func InitTemplaterFunctions() {
 			return a * b
 		},
 		"sha1": func(s string) string {
-			return StringToSha1(s)
+			return gutils.StringToSha1(s)
 		},
 		"sha256": func(s string) string {
-			return StringToSha256(s)
+			return gutils.StringToSha256(s)
 		},
 		"replace": func(s, re, repl string) string {
 			rx := regexp.MustCompile(re)

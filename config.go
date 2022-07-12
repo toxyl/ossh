@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+	"github.com/toxyl/glog"
+	"github.com/toxyl/gutils"
 )
 
 const (
@@ -108,15 +110,6 @@ func isIPWhitelisted(ip string) bool {
 	return false
 }
 
-func getHostname(ip string) string {
-	for _, h := range Conf.Hostnames {
-		if ip == h.IP {
-			return h.Name
-		}
-	}
-	return ip
-}
-
 func InitPaths() {
 	if Conf.PathData == "" {
 		Conf.PathData = "/etc/ossh"
@@ -162,7 +155,7 @@ func InitPaths() {
 		Conf.Webinterface.KeyFile = fmt.Sprintf("%s/ossh.key", Conf.PathData)
 	}
 
-	err := MkDirs(Conf.PathCommands, Conf.PathCaptures, fmt.Sprintf("%s/%s", Conf.PathCaptures, "scp-uploads"), fmt.Sprintf("%s/%s", Conf.PathCaptures, "ssh-keys"), Conf.PathFFS, Conf.PathWebinterface)
+	err := gutils.MkDirs(Conf.PathCommands, Conf.PathCaptures, fmt.Sprintf("%s/%s", Conf.PathCaptures, "scp-uploads"), fmt.Sprintf("%s/%s", Conf.PathCaptures, "ssh-keys"), Conf.PathFFS, Conf.PathWebinterface)
 	if err != nil {
 		panic(err)
 	}
@@ -231,11 +224,11 @@ func initConfig() {
 	InitPaths()
 	InitDebug()
 
-	err = CopyEmbeddedFSToDisk(fsCommandTemplates, Conf.PathCommands, "commands")
+	err = gutils.CopyEmbeddedFSToDisk(fsCommandTemplates, Conf.PathCommands, "commands")
 	if err != nil {
 		log.Panicf("[Config] Unable to copy command templates to disk, %v", err)
 	}
-	err = CopyEmbeddedFSToDisk(fsWebinterfaceTemplates, Conf.PathWebinterface, "webinterface")
+	err = gutils.CopyEmbeddedFSToDisk(fsWebinterfaceTemplates, Conf.PathWebinterface, "webinterface")
 	if err != nil {
 		log.Panicf("[Config] Unable to copy webinterface templates to disk, %v", err)
 	}
@@ -243,7 +236,7 @@ func initConfig() {
 	InitTemplaterFunctions()
 	InitTemplaterFunctionsHTML()
 
-	LogGlobal.OK("Config loaded from %s", colorWrap(cfgFile, colorOrange))
+	LogGlobal.OK("Config loaded from %s", glog.Wrap(cfgFile, glog.Orange))
 }
 
 func getConfig() string {
@@ -251,8 +244,8 @@ func getConfig() string {
 	if err != nil {
 		LogGlobal.Error(
 			"Could not read config from '%s': %s",
-			colorFile(cfgFile),
-			colorError(err),
+			glog.File(cfgFile),
+			glog.Error(err),
 		)
 	}
 	return string(cfg)
@@ -261,7 +254,7 @@ func getConfig() string {
 func updateConfig(config []byte) error {
 	pathSrc := viper.ConfigFileUsed()
 	pathBak := fmt.Sprintf("%s.bak", pathSrc)
-	err := CopyFile(pathSrc, pathBak)
+	err := gutils.CopyFile(pathSrc, pathBak)
 	if err != nil {
 		LogGlobal.Error("Failed to backup config from %s to %s!", pathSrc, pathBak)
 		return err

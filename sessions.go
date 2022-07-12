@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/gliderlabs/ssh"
+	"github.com/toxyl/glog"
+	"github.com/toxyl/gutils"
 )
 
 type Session struct {
@@ -44,7 +46,7 @@ func (s *Session) UpdateActivity() {
 
 func (s *Session) RandomSleep(min, max int) {
 	if !s.Whitelisted {
-		RandomSleep(min, max, time.Millisecond)
+		gutils.RandomSleep(min, max, time.Millisecond)
 		s.UpdateActivity()
 	}
 }
@@ -52,9 +54,9 @@ func (s *Session) RandomSleep(min, max int) {
 func (s *Session) SetID(id string) *Session {
 	s.Lock()
 	defer s.Unlock()
-	ip, port := SplitHostPort(id)
+	ip, port := gutils.SplitHostPort(id)
 	if ip == "" || port == 0 {
-		LogSessions.Error("Invalid session ID %s. Format must be 'host:port'!", colorReason(id))
+		LogSessions.Error("Invalid session ID %s. Format must be 'host:port'!", glog.Reason(id))
 		return nil
 	}
 	s.Host = ip
@@ -135,7 +137,7 @@ func (s *Session) SetPort(port int) *Session {
 }
 
 func (s *Session) LogID() string {
-	return fmt.Sprintf("%s @ %s", colorConnID(s.User, s.Host, s.Port), colorDuration(uint(s.Uptime().Seconds())))
+	return fmt.Sprintf("%s @ %s", colorConnID(s.User, s.Host, s.Port), glog.Duration(uint(s.Uptime().Seconds())))
 }
 
 func (s *Session) Uptime() time.Duration {
@@ -243,7 +245,7 @@ func (ss *Sessions) Create(sessionID string) *Session {
 		SrvMetrics.IncrementSessions()
 		LogSessions.OK(
 			"%s: Session started, host now uses %s of %s.",
-			s.LogID(), colorInt(active), colorIntAmount(cnts, "active session", "active sessions"))
+			s.LogID(), glog.Int(active), glog.IntAmount(cnts, "active session", "active sessions"))
 	}
 	return ss.get(sessionID)
 }
@@ -278,11 +280,11 @@ func (ss *Sessions) Remove(sessionID, reason string) {
 		if reason == "" {
 			LogSessions.OK(
 				"%s: Session removed, host now uses %s of %s. It was active for %s.",
-				cid, colorInt(active), colorIntAmount(cnts, "active session", "active sessions"), colorDuration(uint(tw)))
+				cid, glog.Int(active), glog.IntAmount(cnts, "active session", "active sessions"), glog.Duration(uint(tw)))
 		} else {
 			LogSessions.OK(
 				"%s: Session removed, host now uses %s of %s. It was active for %s and removed because %s.",
-				cid, colorInt(active), colorIntAmount(cnts, "active session", "active sessions"), colorDuration(uint(tw)), colorReason(reason))
+				cid, glog.Int(active), glog.IntAmount(cnts, "active session", "active sessions"), glog.Duration(uint(tw)), glog.Reason(reason))
 		}
 	}
 }
@@ -321,7 +323,7 @@ func (ss *Sessions) cleanUp(age uint) {
 }
 
 func (ss *Sessions) cleanUpWorker(maxAge uint) {
-	RandomSleep(30, 60, time.Second)
+	gutils.RandomSleep(30, 60, time.Second)
 	for {
 		time.Sleep(INTERVAL_SESSIONS_CLEANUP)
 		ss.cleanUp(maxAge)

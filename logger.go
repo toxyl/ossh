@@ -2,228 +2,35 @@ package main
 
 import (
 	"fmt"
-	"strings"
-	"time"
+
+	"github.com/toxyl/glog"
 )
 
 func colorConnID(user, host string, port int) string {
-	host = enrichAndColorHost(host)
+	addr := glog.AddrHostPort(host, port, true)
 	if user == "" {
-		return fmt.Sprintf("%s:%s", host, colorPort(port))
+		return addr
 	}
-	return fmt.Sprintf("%s:%s > %s", host, colorPort(port), colorUser(user))
+	return fmt.Sprintf("%s > %s", addr, glog.Wrap(user, glog.Green))
 }
 
-func colorWrap(str string, color uint) string {
-	return fmt.Sprintf("\033[38;5;%dm%s\033[0m", color, str)
-}
-
-func colorUser(user string) string {
-	return colorWrap(user, colorGreen)
-}
-
-func colorPort(port int) string {
-	// 94 - 231 (137 total)
-	return colorWrap(fmt.Sprint(port), uint(94.0+137.0*(float64(port)/65535.0)))
-}
-
-func enrichAndColorHost(host string) string {
-	parts := strings.Split(host, ".")
-	pt := 0.0
-	for _, p := range parts {
-		f, _ := GetFloat(p)
-		pt += f
-	}
-	revDNS := ReverseDNS(host)
-	hostName := getHostname(host)
-	hostColor := uint(88.0 + 143.0*(pt/4.0/255.0)) // 88 - 231 (143 total)
-	whitelisted := isIPWhitelisted(host)
-
-	if hostName != host {
-		host = hostName
-	} else if revDNS != "N/A" {
-		host = fmt.Sprintf("%s (%s)", host, revDNS)
-	} else {
-		host = hostName
-	}
-	host = colorWrap(host, hostColor)
-
-	if whitelisted {
-		host = fmt.Sprintf("(whitelisted) %s", host)
-	}
-
-	return host
-}
-
-func colorHosts(hosts []string) string {
-	hs := []string{}
-	for _, h := range hosts {
-		hs = append(hs, enrichAndColorHost(h))
-	}
-	return strings.Join(hs, ", ")
-}
-
-func colorPassword(password string) string {
-	return colorWrap(password, colorGreen)
-}
-
-func colorError(err error) string {
-	return colorWrap(err.Error(), colorOrange)
-}
-
-func colorReason(reason string) string {
-	return colorWrap(reason, colorOrange)
-}
-
-func colorFile(file string) string {
-	return colorWrap(file, colorLightBlue)
-}
-
-func colorHighlight(message string) string {
-	return colorWrap(message, colorCyan)
-}
-
-func colorDuration(seconds uint) string {
-	return colorWrap(time.Duration(seconds*uint(time.Second)).String(), colorCyan)
-}
-
-func colorInt(n int) string {
-	return colorWrap(fmt.Sprintf("%d", n), colorCyan)
-}
-
-// colorIntAmount colors n as int and appends either the
-// given singular (n == 1) or plural (n > 1 || n == 0).
-func colorIntAmount(n int, singular, plural string) string {
-	unit := singular
-	if n > 1 {
-		unit = plural
-	}
-	amount := colorWrap(fmt.Sprintf("%d", n), colorCyan)
-	if n == 0 {
-		amount = colorWrap("0", colorOrange)
-		unit = plural
-	}
-	return fmt.Sprintf("%s %s", amount, unit)
-}
-
-const (
-	colorDarkBlue     = 17
-	colorBlue         = 21
-	colorDarkGreen    = 22
-	colorLightBlue    = 27
-	colorOliveGreen   = 34
-	colorGreen        = 46
-	colorCyan         = 51
-	colorPurple       = 53
-	colorDarkOrange   = 130
-	colorDarkYellow   = 142
-	colorLime         = 154
-	colorDarkRed      = 160
-	colorRed          = 196
-	colorPink         = 201
-	colorOrange       = 208
-	colorYellow       = 220
-	colorBrightYellow = 229
-	colorDarkGray     = 234
-	colorMediumGray   = 240
-	colorGray         = 250
-)
-
-type Logger struct {
-	ID    string
-	color uint
-	debug bool
-}
-
-func (ssl *Logger) write(indicator rune, format string, a ...interface{}) {
-	prefix := "[ ]"
-	switch indicator {
-	case 'i':
-		prefix = colorWrap("[i]", colorLightBlue)
-	case '+':
-		prefix = colorWrap("[+]", colorOliveGreen)
-	case '✓':
-		prefix = colorWrap("[✓]", colorGreen)
-	case '-':
-		prefix = colorWrap("[-]", colorDarkRed)
-	case 'x':
-		prefix = colorWrap("[x]", colorRed)
-	case '!':
-		prefix = colorWrap("[!]", colorOrange)
-	case 'd':
-		prefix = colorWrap("[D]", colorOrange)
-	case ' ':
-		prefix = colorWrap("[ ]", colorGray)
-	}
-	msg := fmt.Sprintf(prefix+" "+format+"\n", a...)
-
+func logMessageHandler(msg string) {
 	fmt.Print(msg)
 	if SrvUI != nil {
 		SrvUI.PushLog(msg)
 	}
 }
 
-func (ssl *Logger) prependFormat(format string) string {
-	return fmt.Sprintf("%s: %s\n", colorWrap(fmt.Sprintf("%-16s", ssl.ID), ssl.color), format)
-}
-
-func (ssl *Logger) Default(format string, a ...interface{}) {
-	ssl.write(' ', ssl.prependFormat(format), a...)
-}
-
-func (ssl *Logger) Info(format string, a ...interface{}) {
-	ssl.write('i', ssl.prependFormat(format), a...)
-}
-
-func (ssl *Logger) Success(format string, a ...interface{}) {
-	ssl.write('✓', ssl.prependFormat(format), a...)
-}
-
-func (ssl *Logger) OK(format string, a ...interface{}) {
-	ssl.write('+', ssl.prependFormat(format), a...)
-}
-
-func (ssl *Logger) NotOK(format string, a ...interface{}) {
-	ssl.write('-', ssl.prependFormat(format), a...)
-}
-
-func (ssl *Logger) Error(format string, a ...interface{}) {
-	ssl.write('x', ssl.prependFormat(format), a...)
-}
-
-func (ssl *Logger) Warning(format string, a ...interface{}) {
-	ssl.write('!', ssl.prependFormat(format), a...)
-}
-
-func (ssl *Logger) Debug(format string, a ...interface{}) {
-	if !ssl.debug {
-		return
-	}
-	ssl.write('d', ssl.prependFormat(format), a...)
-}
-
-func (ssl *Logger) EnableDebug() {
-	ssl.debug = true
-}
-
-func NewLogger(id string, color uint) *Logger {
-	return &Logger{
-		ID:    id,
-		color: color,
-		debug: false,
-	}
-}
-
 var (
-	LogGlobal        = NewLogger("Global", colorGray)
-	LogASCIICastV2   = NewLogger("ASCIICast v2", colorBrightYellow)
-	LogFakeShell     = NewLogger("Fake Shell", colorOliveGreen)
-	LogOverlayFS     = NewLogger("Overlay FS", colorLightBlue)
-	LogOSSHServer    = NewLogger("oSSH Server", colorLime)
-	LogSessions      = NewLogger("Sessions", colorDarkOrange)
-	LogSyncClient    = NewLogger("Sync Client", colorBlue)
-	LogSyncCommands  = NewLogger("Sync Commands", colorDarkGreen)
-	LogSyncServer    = NewLogger("Sync Server", colorDarkRed)
-	LogTextTemplater = NewLogger("Text Templater", colorMediumGray)
-	LogUIServer      = NewLogger("UI Server", colorCyan)
+	LogGlobal        = glog.NewLogger("Global", glog.Gray, false, false, false, logMessageHandler)
+	LogASCIICastV2   = glog.NewLogger("ASCIICast v2", glog.BrightYellow, false, false, false, logMessageHandler)
+	LogFakeShell     = glog.NewLogger("Fake Shell", glog.OliveGreen, false, false, false, logMessageHandler)
+	LogOverlayFS     = glog.NewLogger("Overlay FS", glog.LightBlue, false, false, false, logMessageHandler)
+	LogOSSHServer    = glog.NewLogger("oSSH Server", glog.Lime, false, false, false, logMessageHandler)
+	LogSessions      = glog.NewLogger("Sessions", glog.DarkOrange, false, false, false, logMessageHandler)
+	LogSyncClient    = glog.NewLogger("Sync Client", glog.Blue, false, false, false, logMessageHandler)
+	LogSyncCommands  = glog.NewLogger("Sync Commands", glog.DarkGreen, false, false, false, logMessageHandler)
+	LogSyncServer    = glog.NewLogger("Sync Server", glog.DarkRed, false, false, false, logMessageHandler)
+	LogTextTemplater = glog.NewLogger("Text Templater", glog.MediumGray, false, false, false, logMessageHandler)
+	LogUIServer      = glog.NewLogger("UI Server", glog.Cyan, false, false, false, logMessageHandler)
 )

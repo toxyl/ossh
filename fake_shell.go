@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/gliderlabs/ssh"
+	"github.com/toxyl/glog"
+	"github.com/toxyl/gutils"
+	"github.com/toxyl/ossh/utils"
 	"golang.org/x/term"
 )
 
@@ -19,7 +22,7 @@ const (
 type FakeShell struct {
 	session  *ssh.Session
 	terminal *term.Terminal
-	writer   *SlowWriter
+	writer   *utils.SlowWriter
 	created  time.Time
 	stats    *FakeShellStats
 	prompt   string
@@ -36,7 +39,7 @@ func (fs *FakeShell) User() string {
 	return (*fs.session).User()
 }
 func (fs *FakeShell) Host() string {
-	return ExtractHostFromAddr((*fs.session).RemoteAddr())
+	return gutils.ExtractHostFromAddr((*fs.session).RemoteAddr())
 }
 
 func (fs *FakeShell) Close() {
@@ -152,12 +155,12 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 	command := pieces[0]
 	args := pieces[1:]
 
-	rmtH, rmtP := SplitHostPortFromAddr((*fs.session).RemoteAddr())
-	lclH, lclP := SplitHostPortFromAddr((*fs.session).LocalAddr())
+	rmtH, rmtP := gutils.SplitHostPortFromAddr((*fs.session).RemoteAddr())
+	lclH, lclP := gutils.SplitHostPortFromAddr((*fs.session).LocalAddr())
 
-	cmd := fmt.Sprintf("%s %s", colorReason(command), colorWrap(strings.Join(args, " "), colorLightBlue))
+	cmd := fmt.Sprintf("%s %s", glog.Reason(command), glog.Wrap(strings.Join(args, " "), glog.LightBlue))
 	if lSeq > 1 {
-		cmd = fmt.Sprintf("(%s/%s) %s", colorInt(iSeq), colorInt(lSeq), cmd)
+		cmd = fmt.Sprintf("(%s/%s) %s", glog.Int(iSeq), glog.Int(lSeq), cmd)
 	}
 	s.UpdateActivity()
 	LogFakeShell.Info("%s: %s", s.LogID(), cmd)
@@ -169,7 +172,7 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 		// 1) make sure the client waits some time at least,
 		//    the more input the more wait time, hehe
 		dly := len(line) * int(Conf.InputDelay)
-		RandomSleep(dly, dly*2, time.Millisecond)
+		gutils.RandomSleep(dly, dly*2, time.Millisecond)
 	}
 
 	// Ignore just pressing enter with whitespace
@@ -180,7 +183,7 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 	// 3) check if command should exit immediately
 	for _, cmd := range Conf.Commands.Exit {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.RecordExec(line, GeneratePseudoEmptyString(0)) // just to waste some more time ;)
+			fs.RecordExec(line, gutils.GeneratePseudoEmptyString(0)) // just to waste some more time ;)
 			return true
 		}
 	}
@@ -228,7 +231,7 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 	// 5) check if command should return disk i/o error
 	for _, cmd := range Conf.Commands.DiskError {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.RecordExec(line, ParseTemplateFromString(GenerateGarbageString(1000)+"\nend_request: I/O error", data))
+			fs.RecordExec(line, ParseTemplateFromString(gutils.GenerateGarbageString(1000)+"\nend_request: I/O error", data))
 			return false
 		}
 	}
@@ -260,7 +263,7 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 	// 9) check if command should return bullshit
 	for _, cmd := range Conf.Commands.Bullshit {
 		if strings.HasPrefix(line+" ", cmd+" ") {
-			fs.RecordExec(line, GenerateGarbageString(1000))
+			fs.RecordExec(line, gutils.GenerateGarbageString(1000))
 			return false
 		}
 	}
@@ -356,13 +359,13 @@ func NewFakeShell(s *Session) *FakeShell {
 	}
 
 	fs.terminal = term.NewTerminal(*s.SSHSession, "")
-	fs.writer = NewSlowWriter(fs.terminal)
+	fs.writer = utils.NewSlowWriter(Conf.Ratelimit, fs.terminal)
 	if s.Whitelisted {
-		fs.writer.ratelimit = 10000 // set ridicuously high to effectively disable rate limit
+		fs.writer.SetRatelimit(10000) // set ridicuously high to effectively disable rate limit
 	}
 	fs.stats.Host = fs.Host()
 	fs.cwd = "/home/" + (*s.SSHSession).User()
 	fs.UpdatePrompt("~")
-	LogFakeShell.Debug("%s: Fake shell ready, current working directory: %s", s.LogID(), colorFile(fs.cwd))
+	LogFakeShell.Debug("%s: Fake shell ready, current working directory: %s", s.LogID(), glog.File(fs.cwd))
 	return fs
 }

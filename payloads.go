@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/toxyl/gutils"
 	"golang.org/x/exp/maps"
 )
 
@@ -18,7 +19,7 @@ type Payload struct {
 }
 
 func (p *Payload) Exists() bool {
-	return FileExists(p.file)
+	return gutils.FileExists(p.file)
 }
 
 func (p *Payload) Save() {

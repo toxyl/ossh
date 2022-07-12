@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/toxyl/glog"
+	"github.com/toxyl/gutils"
 )
 
 const (
@@ -254,12 +256,12 @@ func (ws *UIServer) PushLog(msg string) {
 func (ws *UIServer) Serve() {
 	err := ws.server.ListenAndServeTLS(ws.CertFile, ws.KeyFile)
 	if !strings.Contains(err.Error(), "Server closed") {
-		LogUIServer.Error("Server stopped: %s", colorError(err))
+		LogUIServer.Error("Server stopped: %s", glog.Error(err))
 	}
 }
 
 func (ws *UIServer) Start() {
-	SleepSeconds(10)
+	gutils.SleepSeconds(10)
 
 	mux := http.NewServeMux()
 	ws.init()
@@ -268,8 +270,11 @@ func (ws *UIServer) Start() {
 		mux.HandleFunc(k, v)
 	}
 
-	if !FileExists(ws.CertFile) || !FileExists(ws.KeyFile) {
-		GenerateSelfSignedCertificate("local.ossh", "oSSH", ws.KeyFile, ws.CertFile)
+	if !gutils.FileExists(ws.CertFile) || !gutils.FileExists(ws.KeyFile) {
+		err := gutils.GenerateSelfSignedCertificate("local.ossh", "oSSH", ws.KeyFile, ws.CertFile)
+		if err != nil {
+			panic(fmt.Sprintf("could not create self signed certificate for UI server: %s", err.Error()))
+		}
 	}
 
 	ws.server = &http.Server{
@@ -290,18 +295,18 @@ func (ws *UIServer) Start() {
 	}
 
 	ws.server.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		addr := RealAddr(req)
+		addr := gutils.RealAddr(req)
 
 		if !isIPWhitelisted(addr) && addr != Conf.Host {
 			rt := fmt.Sprintf("https://%s%s", addr, req.URL.Path)
 			http.Redirect(w, req, rt, 307) // let's give them their request back
-			LogUIServer.OK("%s: Redirected request to source: %s", enrichAndColorHost(addr), colorHighlight(req.URL.Path))
+			LogUIServer.OK("%s: Redirected request to source: %s", glog.Addr(addr, true), glog.Highlight(req.URL.Path))
 			return
 		}
 		mux.ServeHTTP(w, req)
 	})
 
-	LogUIServer.Default("Starting UI server on %s...", colorWrap("https://"+srv, colorBrightYellow))
+	LogUIServer.Default("Starting UI server on %s...", glog.Wrap("https://"+srv, glog.BrightYellow))
 	go ws.Serve()
 }
 
@@ -312,7 +317,7 @@ func (ws *UIServer) Shutdown() {
 	}()
 
 	if err := ws.server.Shutdown(ctxShutDown); err != nil {
-		LogUIServer.Error("Shutdown failed: %s", colorError(err))
+		LogUIServer.Error("Shutdown failed: %s", glog.Error(err))
 	}
 
 	ws.Handlers = nil
@@ -354,24 +359,24 @@ func (ws *UIServer) init() {
 		}
 		p, err := SrvOSSH.Loot.payloads.Get(string(msg))
 		if err != nil {
-			LogUIServer.Error("Could not retrieve payload %s: %s", colorHighlight(string(msg)), colorError(err))
+			LogUIServer.Error("Could not retrieve payload %s: %s", glog.Highlight(string(msg)), glog.Error(err))
 			return nil
 		}
 		if p == nil {
-			LogUIServer.Error("Could not retrieve payload %s: %s", colorHighlight(string(msg)), colorError(errors.New("no error reported")))
+			LogUIServer.Error("Could not retrieve payload %s: %s", glog.Highlight(string(msg)), glog.Error(errors.New("no error reported")))
 			return nil
 		}
 		if !p.Exists() {
-			LogUIServer.Warning("Could not find payload %s: %s", colorHighlight(string(msg)), colorError(errors.New("file does not exist")))
+			LogUIServer.Warning("Could not find payload %s: %s", glog.Highlight(string(msg)), glog.Error(errors.New("file does not exist")))
 			return nil
 		}
 
 		pl, err := p.Read()
 		if err != nil {
-			LogUIServer.Error("Could not read payload %s: %s", colorHighlight(string(msg)), colorError(err))
+			LogUIServer.Error("Could not read payload %s: %s", glog.Highlight(string(msg)), glog.Error(err))
 			return nil
 		}
-		return []byte(EncodeBase64String(pl))
+		return []byte(gutils.EncodeBase64String(pl))
 	})
 	ws.AddHTMLHandler("/",
 		ws.MakeHTMLHandler("index", struct {

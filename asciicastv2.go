@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/toxyl/glog"
 )
 
 // {"version": 2, "width": 80, "height": 24, "timestamp": 1504467315, "title": "Demo", "env": {"TERM": "xterm-256color", "SHELL": "/bin/zsh"}}
@@ -33,7 +35,7 @@ type ASCIICastV2Header struct {
 func (ac2h *ASCIICastV2Header) String() string {
 	json, err := json.Marshal(ac2h)
 	if err != nil {
-		LogASCIICastV2.Error("Could not marshal ASCIICastV2Header: %s", colorError(err))
+		LogASCIICastV2.Error("Could not marshal ASCIICastV2Header: %s", glog.Error(err))
 		return ""
 	}
 
@@ -50,7 +52,7 @@ func (ac2e *ASCIICastV2Event) String() string {
 	if ac2e.Type != "o" && ac2e.Type != "i" {
 		LogASCIICastV2.Error(
 			"Could not convert ASCIICastV2Event to string, type '%s' is unknown.",
-			colorWrap(ac2e.Type, colorOrange),
+			glog.Wrap(ac2e.Type, glog.Orange),
 		)
 		return ""
 	}
@@ -61,7 +63,7 @@ func (ac2e *ASCIICastV2Event) String() string {
 		ac2e.Data,
 	})
 	if err != nil {
-		LogASCIICastV2.Error("Could not marshal ASCIICastV2Event data: %s", colorError(err))
+		LogASCIICastV2.Error("Could not marshal ASCIICastV2Event data: %s", glog.Error(err))
 		return ""
 	}
 
@@ -128,8 +130,8 @@ func (ac2 *ASCIICastV2) Load(file string) {
 	if err != nil {
 		LogASCIICastV2.Error(
 			"Could not load ASCIICastV2 from file '%s': %s",
-			colorFile(file),
-			colorError(err),
+			glog.File(file),
+			glog.Error(err),
 		)
 		return
 	}
@@ -141,8 +143,8 @@ func (ac2 *ASCIICastV2) Load(file string) {
 		if err != nil {
 			LogASCIICastV2.Error(
 				"Could not unmarshal ASCIICastV2Header from file '%s': %s",
-				colorFile(file),
-				colorError(err),
+				glog.File(file),
+				glog.Error(err),
 			)
 			return
 		}
@@ -154,9 +156,9 @@ func (ac2 *ASCIICastV2) Load(file string) {
 			if err != nil {
 				LogASCIICastV2.Error(
 					"Could not unmarshal ASCIICastV2Event from file '%s': %s (input was: '%s')",
-					colorFile(file),
-					colorError(err),
-					colorHighlight(line),
+					glog.File(file),
+					glog.Error(err),
+					glog.Highlight(line),
 				)
 				continue
 			}

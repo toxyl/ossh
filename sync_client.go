@@ -9,6 +9,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/toxyl/glog"
+	"github.com/toxyl/gutils"
 )
 
 type SyncClient struct {
@@ -20,8 +23,8 @@ type SyncClient struct {
 
 func (sc *SyncClient) LogID() string {
 	if sc.conn != nil {
-		lhost, lport := SplitHostPortFromAddr(sc.conn.LocalAddr())
-		rhost, rport := SplitHostPortFromAddr(sc.conn.RemoteAddr())
+		lhost, lport := gutils.SplitHostPortFromAddr(sc.conn.LocalAddr())
+		rhost, rport := gutils.SplitHostPortFromAddr(sc.conn.RemoteAddr())
 		return fmt.Sprintf("%s -> %s", colorConnID("", lhost, lport), colorConnID("", rhost, rport))
 	}
 	return fmt.Sprintf("(not connected) %s", colorConnID("", sc.Host, sc.Port))
@@ -56,7 +59,7 @@ func (sc *SyncClient) write(msg string) error {
 	}
 	_ = sc.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	msg = strings.TrimSpace(msg)
-	msg = EncodeGzBase64String(msg)
+	msg = gutils.EncodeGzBase64String(msg)
 	fmt.Fprintf(sc.conn, msg+"\n")
 	return nil
 }
@@ -76,9 +79,9 @@ func (sc *SyncClient) read() (string, error) {
 	if resp == "" {
 		return "", nil
 	}
-	resp, err = DecodeGzBase64String(resp)
+	resp, err = gutils.DecodeGzBase64String(resp)
 	if err != nil {
-		return "", fmt.Errorf("Decoding failed: %s. Response was: %s.", colorError(err), colorHighlight(resp))
+		return "", fmt.Errorf("Decoding failed: %s. Response was: %s.", glog.Error(err), glog.Highlight(resp))
 	}
 
 	return resp, nil
@@ -109,7 +112,7 @@ func (sc *SyncClient) ID() string {
 }
 
 func (sc *SyncClient) AddChunked(section, data string) {
-	chunks := ChunkString(data, " ", 5000)
+	chunks := gutils.ChunkString(data, " ", 5000)
 	for _, chunk := range chunks {
 		_, _ = sc.Exec(fmt.Sprintf("ADD-%s %s", section, strings.Join(chunk, " ")))
 	}
@@ -137,13 +140,13 @@ func (sc *SyncClient) AddPayload(fingerprint string) {
 		}
 
 		if !SrvOSSH.Loot.payloads.Has(fp) {
-			LogSyncClient.Info("%s: We can't send payload %s, we don't have it.", sc.LogID(), colorHighlight(fp))
+			LogSyncClient.Info("%s: We can't send payload %s, we don't have it.", sc.LogID(), glog.Highlight(fp))
 			continue
 		}
 
 		pl, err := SrvOSSH.Loot.payloads.Get(fp)
 		if err != nil {
-			LogSyncClient.Error("%s: Looks like we can't give them the payload %s, we got an error retrieving it: %s", sc.LogID(), colorHighlight(fp), colorError(err))
+			LogSyncClient.Error("%s: Looks like we can't give them the payload %s, we got an error retrieving it: %s", sc.LogID(), glog.Highlight(fp), glog.Error(err))
 			continue
 		}
 
@@ -159,15 +162,15 @@ func (sc *SyncClient) AddPayload(fingerprint string) {
 }
 
 func (sc *SyncClient) SyncData(cmd string, fnGet func() []string, fnAddRemote func(data string)) {
-	LogSyncClient.Debug("%s: Syncing %s", sc.LogID(), colorHighlight(cmd))
+	LogSyncClient.Debug("%s: Syncing %s", sc.LogID(), glog.Highlight(cmd))
 	res, err := sc.Exec(cmd)
 	if err != nil {
 		// chances are that the node refused the connection because it's busy with syncing itself
-		LogSyncClient.Debug("%s: Failed to get %s: %s", sc.LogID(), colorHighlight(cmd), colorError(err))
+		LogSyncClient.Debug("%s: Failed to get %s: %s", sc.LogID(), glog.Highlight(cmd), glog.Error(err))
 		return
 	}
 
-	fnAddRemote(strings.Join(StringSliceDifference(fnGet(), ExplodeLines(res)), " "))
+	fnAddRemote(strings.Join(gutils.StringSliceDifference(fnGet(), gutils.ExplodeLines(res)), " "))
 }
 
 func NewSyncClient(host string, port int) *SyncClient {

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/gliderlabs/ssh"
+	"github.com/toxyl/glog"
+	"github.com/toxyl/gutils"
 )
 
 type TimeWastedCounter struct {
@@ -69,7 +71,7 @@ func (ossh *OSSHServer) getWastedTime() float64 {
 func (ossh *OSSHServer) statsToJSON() string {
 	json, err := json.Marshal(ossh.stats())
 	if err != nil {
-		LogOSSHServer.Error("Could not marshal stats data: %s", colorError(err))
+		LogOSSHServer.Error("Could not marshal stats data: %s", glog.Error(err))
 		return ""
 	}
 
@@ -80,7 +82,7 @@ func (ossh *OSSHServer) JSONToStats(jsonString string) *SyncNodeStats {
 	data := &SyncNodeStats{}
 	err := json.Unmarshal([]byte(jsonString), data)
 	if err != nil {
-		LogOSSHServer.Error("Could not unmarshal stats data: %s", colorError(err))
+		LogOSSHServer.Error("Could not unmarshal stats data: %s", glog.Error(err))
 		return nil
 	}
 
@@ -88,15 +90,15 @@ func (ossh *OSSHServer) JSONToStats(jsonString string) *SyncNodeStats {
 }
 
 func (ossh *OSSHServer) loadDataFile(path, contentType string, fnAdd func(s string) bool) {
-	if FileExists(path) {
+	if gutils.FileExists(path) {
 		content, err := os.ReadFile(path)
 		if err != nil {
-			LogOSSHServer.Error("Failed to read %s file: %s", colorHighlight(contentType), colorError(err))
+			LogOSSHServer.Error("Failed to read %s file: %s", glog.Highlight(contentType), glog.Error(err))
 			return
 		}
 		items := strings.Split(string(content), "\n")
 
-		LogOSSHServer.OK("Loading %s %s", colorInt(len(items)), contentType)
+		LogOSSHServer.OK("Loading %s %s", glog.Int(len(items)), contentType)
 		for _, fp := range items {
 			_ = fnAdd(fp)
 		}
@@ -115,7 +117,7 @@ func (ossh *OSSHServer) saveDataFile(path, contentType string, lines []string) {
 	data := strings.Join(lines, "\n") + "\n"
 	err := os.WriteFile(path, []byte(data), 0644)
 	if err != nil {
-		LogOSSHServer.Error("Failed to write %s file: %s", colorHighlight(contentType), colorError(err))
+		LogOSSHServer.Error("Failed to write %s file: %s", glog.Highlight(contentType), glog.Error(err))
 	}
 }
 
@@ -140,7 +142,7 @@ func (ossh *OSSHServer) addLoginFailure(s *Session, reason string) {
 	}
 
 	if isIPWhitelisted(s.Host) {
-		LogOSSHServer.NotOK("%s failed to login: %s.", s.LogID(), colorReason(reason))
+		LogOSSHServer.NotOK("%s failed to login: %s.", s.LogID(), glog.Reason(reason))
 		return // we don't want stats for whitelisted IPs
 	}
 
@@ -153,8 +155,8 @@ func (ossh *OSSHServer) addLoginFailure(s *Session, reason string) {
 	LogOSSHServer.NotOK(
 		"%s: Failed to login with password %s: %s. (%d attempts; %d failed; %d success)",
 		s.LogID(),
-		colorPassword(s.Password),
-		colorReason(reason),
+		glog.Password(s.Password),
+		glog.Reason(reason),
 		ossh.Logins.Get(s.Host).GetAttempts(),
 		ossh.Logins.Get(s.Host).GetFailures(),
 		ossh.Logins.Get(s.Host).GetSuccesses(),
@@ -181,8 +183,8 @@ func (ossh *OSSHServer) addLoginSuccess(s *Session, reason string) {
 	LogOSSHServer.OK(
 		"%s: Logged in with password %s: %s. (%d attempts; %d failed; %d success)",
 		s.LogID(),
-		colorPassword(s.Password),
-		colorReason(reason),
+		glog.Password(s.Password),
+		glog.Reason(reason),
 		ossh.Logins.Get(s.Host).GetAttempts(),
 		ossh.Logins.Get(s.Host).GetFailures(),
 		ossh.Logins.Get(s.Host).GetSuccesses(),
@@ -191,7 +193,7 @@ func (ossh *OSSHServer) addLoginSuccess(s *Session, reason string) {
 
 func (ossh *OSSHServer) GracefulCloseOnError(err error, s *Session, sess *ssh.Session, ofs *OverlayFS) {
 	// TODO  graceful fallback?
-	LogOSSHServer.Debug("Graceful close because %s.", colorError(err))
+	LogOSSHServer.Debug("Graceful close because %s.", glog.Error(err))
 	if ofs != nil {
 		ofs.Close()
 	}
@@ -222,14 +224,14 @@ func (ossh *OSSHServer) initOverlayFS(fs *FakeShell, s *Session) {
 		if !overlayFS.DirExists("/home") {
 			err := overlayFS.Mkdir("/home", 700)
 			if err != nil {
-				LogOverlayFS.Error("%s: mkdir failed: %s", s.LogID(), colorError(err))
+				LogOverlayFS.Error("%s: mkdir failed: %s", s.LogID(), glog.Error(err))
 			}
 		}
 
 		if !overlayFS.DirExists("/home/" + (*s.SSHSession).User()) {
 			err := overlayFS.Mkdir("/home/"+(*s.SSHSession).User(), 700)
 			if err != nil {
-				LogOverlayFS.Error("%s: mkdir failed: %s", s.LogID(), colorError(err))
+				LogOverlayFS.Error("%s: mkdir failed: %s", s.LogID(), glog.Error(err))
 			}
 		}
 		fs.SetOverlayFS(overlayFS)
@@ -240,7 +242,7 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 	// Catch panics, so a bug triggered in a SSH session doesn't crash the whole service
 	defer func() {
 		if err := recover(); err != nil {
-			LogOSSHServer.Error("Fatal error: %s", colorReason(fmt.Sprint(err)))
+			LogOSSHServer.Error("Fatal error: %s", glog.Reason(fmt.Sprint(err)))
 		}
 	}()
 	s := ossh.Sessions.Create(sess.RemoteAddr().String()).SetSSHSession(&sess)
@@ -256,12 +258,12 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 	if !s.Whitelisted {
 		LogOSSHServer.Success("%s: Finished running %s command(s)",
 			s.LogID(),
-			colorInt(int(stats.CommandsExecuted)),
+			glog.Int(int(stats.CommandsExecuted)),
 		)
 	} else {
 		LogOSSHServer.Success("%s: %s",
 			s.LogID(),
-			colorReason("Elvis has left the building."),
+			glog.Reason("Elvis has left the building."),
 		)
 	}
 
@@ -277,10 +279,9 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 
 func (ossh *OSSHServer) localPortForwardingCallback(ctx ssh.Context, bindHost string, bindPort uint32) bool {
 	s := ossh.Sessions.Create(ctx.RemoteAddr().String())
-	LogOSSHServer.Warning("%s: Tried to locally port forward to %s:%s. Request denied!",
+	LogOSSHServer.Warning("%s: Tried to locally port forward to %s. Request denied!",
 		s.LogID(),
-		enrichAndColorHost(bindHost),
-		colorInt(int(bindPort)),
+		glog.AddrHostPort(bindHost, int(bindPort), true),
 	)
 	ossh.Sessions.Remove(s.ID, "local port forwarding denied")
 	return false
@@ -290,8 +291,7 @@ func (ossh *OSSHServer) reversePortForwardingCallback(ctx ssh.Context, bindHost 
 	s := ossh.Sessions.Create(ctx.RemoteAddr().String())
 	LogOSSHServer.Warning("%s: Tried to reverse port forward to %s:%s. Request denied!",
 		s.LogID(),
-		enrichAndColorHost(bindHost),
-		colorInt(int(bindPort)),
+		glog.AddrHostPort(bindHost, int(bindPort), true),
 	)
 	ossh.Sessions.Remove(s.ID, "reverse port forwarding denied")
 	return false
@@ -302,7 +302,7 @@ func (ossh *OSSHServer) ptyCallback(ctx ssh.Context, pty ssh.Pty) bool {
 	if !s.Whitelisted {
 		LogOSSHServer.OK("%s: Requested %s PTY session",
 			s.LogID(),
-			colorHighlight(s.Term),
+			glog.Highlight(s.Term),
 		)
 	}
 	s.RandomSleep(1, 250)
@@ -314,7 +314,7 @@ func (ossh *OSSHServer) sessionRequestCallback(sess ssh.Session, requestType str
 	if !s.Whitelisted {
 		LogOSSHServer.OK("%s: Requested %s session",
 			s.LogID(),
-			colorHighlight(s.Type),
+			glog.Highlight(s.Type),
 		)
 	}
 	s.RandomSleep(1, 250)
@@ -402,12 +402,12 @@ func (ossh *OSSHServer) publicKeyHandler(ctx ssh.Context, key ssh.PublicKey) boo
 	}
 
 	kb := key.Marshal()
-	sha1 := StringToSha1(string(kb))
+	sha1 := gutils.StringToSha1(string(kb))
 	fpath := fmt.Sprintf("%s/%s/%s.pub", Conf.PathCaptures, "ssh-keys", sha1)
 
-	if !FileExists(fpath) {
+	if !gutils.FileExists(fpath) {
 		_ = os.WriteFile(fpath, kb, 0400)
-		LogOSSHServer.OK("%s: SSH key saved to %s", s.LogID(), colorFile(fpath))
+		LogOSSHServer.OK("%s: SSH key saved to %s", s.LogID(), glog.File(fpath))
 		ossh.addLoginSuccess(s, "host gave us a public key")
 		return true
 	}
@@ -423,7 +423,7 @@ func (ossh *OSSHServer) publicKeyHandler(ctx ssh.Context, key ssh.PublicKey) boo
 }
 
 func (ossh *OSSHServer) updateStatsWorker() {
-	RandomSleep(30, 60, time.Second)
+	gutils.RandomSleep(30, 60, time.Second)
 
 	for {
 		hs := ossh.stats()
@@ -443,7 +443,7 @@ func (ossh *OSSHServer) updateStatsWorker() {
 }
 
 func (ossh *OSSHServer) broadcastStatsWorker() {
-	RandomSleep(30, 60, time.Second)
+	gutils.RandomSleep(30, 60, time.Second)
 
 	for {
 		LogOSSHServer.Debug("Executing stats broadcast...")
@@ -495,7 +495,7 @@ func (ossh *OSSHServer) init() {
 	}
 	err := ossh.fs.Init(path)
 	if err != nil {
-		LogOverlayFS.Error("%s", colorError(err))
+		LogOverlayFS.Error("%s", glog.Error(err))
 	}
 }
 
@@ -503,8 +503,8 @@ func (ossh *OSSHServer) Start() {
 	go ossh.updateStatsWorker()
 	go ossh.broadcastStatsWorker()
 
-	LogOSSHServer.Default("Starting oSSH server on %s...", colorWrap("ssh://"+ossh.server.Addr, colorBrightYellow))
-	LogOSSHServer.Error("%s", colorError(ossh.server.ListenAndServe()))
+	LogOSSHServer.Default("Starting oSSH server on %s...", glog.Wrap("ssh://"+ossh.server.Addr, glog.BrightYellow))
+	LogOSSHServer.Error("%s", glog.Error(ossh.server.ListenAndServe()))
 }
 
 func NewOSSHServer() *OSSHServer {

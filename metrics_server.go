@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -38,67 +39,92 @@ type MetricsServer struct {
 		timeOnline       float64
 		timeWasted       float64
 	}
+	lock *sync.Mutex
 }
 
 func (m *MetricsServer) IncrementLogins() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.logins.Inc()
 	m.last.logins++
 	m.loginsPerSecond.Set(float64(m.last.logins) / m.last.timeOnline)
 }
 
 func (m *MetricsServer) IncrementFailedLogins() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.loginsFailed.Inc()
 	m.last.loginsFailed++
 }
 
 func (m *MetricsServer) IncrementSuccessfulLogins() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.loginsSuccessful.Inc()
 	m.last.loginsSuccessful++
 }
 
 func (m *MetricsServer) IncrementKnownHosts() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.knownHosts.Inc()
 	m.last.knownHosts++
 }
 
 func (m *MetricsServer) IncrementKnownPasswords() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.knownPasswords.Inc()
 	m.last.knownPasswords++
 }
 
 func (m *MetricsServer) IncrementKnownUsers() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.knownUsers.Inc()
 	m.last.knownUsers++
 }
 
 func (m *MetricsServer) IncrementKnownPayloads() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.knownPayloads.Inc()
 	m.last.knownPayloads++
 }
 
 func (m *MetricsServer) IncrementExecutedCommands() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.commandsExecuted.Inc()
 	m.last.commandsExecuted++
 	m.commandsExecutedPerSecond.Set(float64(m.last.commandsExecuted) / m.last.timeOnline)
 }
 
 func (m *MetricsServer) IncrementSessions() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.activeSessions.Inc()
 	m.last.activeSessions++
 }
 
 func (m *MetricsServer) DecrementSessions() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.activeSessions.Dec()
 	m.last.activeSessions--
 }
 
 func (m *MetricsServer) SetTimeOnline(seconds float64) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.timeOnline.Set(seconds)
 	m.last.timeOnline = seconds
 	m.timeWastedPerSecond.Set(m.last.timeWasted / m.last.timeOnline)
 }
 
 func (m *MetricsServer) AddTimeWasted(seconds float64) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.timeWasted.Add(seconds)
 	m.last.timeWasted += seconds
 }
@@ -194,6 +220,7 @@ func NewMetricsServer() *MetricsServer {
 			timeOnline:       0.0,
 			timeWasted:       0.0,
 		},
+		lock: &sync.Mutex{},
 	}
 	return m
 }

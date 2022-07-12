@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/toxyl/glog"
+	"github.com/toxyl/gutils"
 	"golang.org/x/exp/maps"
 )
 
@@ -28,8 +30,8 @@ type SyncServerConnection struct {
 
 func (ssc *SyncServerConnection) LogID() string {
 	if ssc.conn != nil {
-		lhost, lport := SplitHostPortFromAddr(ssc.conn.LocalAddr())
-		rhost, rport := SplitHostPortFromAddr(ssc.conn.RemoteAddr())
+		lhost, lport := gutils.SplitHostPortFromAddr(ssc.conn.LocalAddr())
+		rhost, rport := gutils.SplitHostPortFromAddr(ssc.conn.RemoteAddr())
 		return fmt.Sprintf("%s -> %s", colorConnID("", lhost, lport), colorConnID("", rhost, rport))
 	}
 	return colorConnID("", ssc.Host, ssc.Port)
@@ -49,7 +51,7 @@ func (ssc *SyncServerConnection) write(msg string) {
 	if msg == "" || ssc.conn == nil {
 		return
 	}
-	_, _ = ssc.conn.Write([]byte(EncodeGzBase64String(msg)))
+	_, _ = ssc.conn.Write([]byte(gutils.EncodeGzBase64String(msg)))
 }
 
 func (ssc *SyncServerConnection) process(cmd string) error {
@@ -62,7 +64,7 @@ func (ssc *SyncServerConnection) process(cmd string) error {
 
 	res, err := SyncServerCommands.Run(ssc, str[0], str[1:])
 	if err != nil {
-		LogSyncServer.Error("%s: Error running sync command %s: %s", ssc.LogID(), colorHighlight(str[0]), colorError(err))
+		LogSyncServer.Error("%s: Error running sync command %s: %s", ssc.LogID(), glog.Highlight(str[0]), glog.Error(err))
 		ssc.write(EmptyCommandResponse)
 		return err
 	}
@@ -81,9 +83,9 @@ func (ssc *SyncServerConnection) handleConnection() error {
 	s := bufio.NewScanner(ssc.conn)
 	for s.Scan() {
 		data := s.Text()
-		data, err := DecodeGzBase64String(data)
+		data, err := gutils.DecodeGzBase64String(data)
 		if err != nil {
-			return fmt.Errorf("could not decode input: %s", colorError(err))
+			return fmt.Errorf("could not decode input: %s", glog.Error(err))
 		}
 
 		if data == EmptyCommandResponse {
@@ -97,7 +99,7 @@ func (ssc *SyncServerConnection) handleConnection() error {
 
 		err = ssc.process(data)
 		if err != nil {
-			return fmt.Errorf("failed to process: %s", colorError(err))
+			return fmt.Errorf("failed to process: %s", glog.Error(err))
 		}
 		return nil
 	}
@@ -120,7 +122,7 @@ func (sscs *SyncServerConnections) Hosts() []string {
 	defer sscs.lock.Unlock()
 	keys := maps.Keys(sscs.conns)
 	for i, k := range keys {
-		keys[i] = ExtractHost(k)
+		keys[i] = gutils.ExtractHost(k)
 	}
 
 	return keys
@@ -248,7 +250,7 @@ func (ss *SyncServer) GetOutOfSyncNodes(fingerprint string) map[string]string {
 }
 
 func (ss *SyncServer) SyncWorker() {
-	RandomSleep(30, 60, time.Second)
+	gutils.RandomSleep(30, 60, time.Second)
 	for {
 		fp := SrvOSSH.Loot.Fingerprint()
 		fp = strings.TrimSpace(fp)
@@ -259,11 +261,11 @@ func (ss *SyncServer) SyncWorker() {
 				continue // node is already in sync
 			}
 			sections := strings.Split(v, ",")
-			host, port := SplitHostPort(k)
+			host, port := gutils.SplitHostPort(k)
 
 			client, err := ss.GetClient(host, port)
 			if err != nil {
-				LogSyncServer.Error("%s: Failed to get client: %s", colorConnID("", host, port), colorError(err))
+				LogSyncServer.Error("%s: Failed to get client: %s", colorConnID("", host, port), glog.Error(err))
 				continue
 			}
 
@@ -319,18 +321,18 @@ func (ss *SyncServer) ConnectionHandler(listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			LogSyncServer.Error("Accept failed: %s", colorError(err))
+			LogSyncServer.Error("Accept failed: %s", glog.Error(err))
 			conn.Close()
 			continue
 		}
 
-		host, port := SplitHostPortFromAddr(conn.RemoteAddr())
+		host, port := gutils.SplitHostPortFromAddr(conn.RemoteAddr())
 		ssc := ss.conns.Create(conn, host, port)
 		lid := ssc.LogID()
 
 		if !ss.nodes.IsAllowedHost(host) {
 			LogSyncServer.NotOK("%s: Not a sync node, returning bullshit.", lid)
-			ssc.write(GenerateGarbageString(1000))
+			ssc.write(gutils.GenerateGarbageString(1000))
 			_ = ss.conns.Remove(host, port)
 			continue
 		}
@@ -350,14 +352,14 @@ func (ss *SyncServer) ConnectionHandler(listener net.Listener) {
 }
 
 func (ss *SyncServer) CleanUpWorker() {
-	RandomSleep(30, 60, time.Second)
+	gutils.RandomSleep(30, 60, time.Second)
 	for {
 		time.Sleep(INTERVAL_SYNC_CLEANUP)
 		removed := ss.conns.CleanUp()
 		lr := len(removed)
 		l := ss.conns.Length()
-		hs := colorHosts(ss.conns.Hosts())
-		hsr := colorHosts(removed)
+		hs := glog.Hosts(ss.conns.Hosts(), true)
+		hsr := glog.Hosts(removed, true)
 		if lr > 0 {
 			if l == 0 {
 				LogSyncServer.Info("Cleanup worker: Removed %s, none left", hsr)
@@ -371,7 +373,7 @@ func (ss *SyncServer) CleanUpWorker() {
 func (ss *SyncServer) Start() {
 	ss.UpdateClients()
 	srv := fmt.Sprintf("%s:%d", Conf.SyncServer.Host, Conf.SyncServer.Port)
-	LogSyncServer.Default("Starting sync server on %s...", colorWrap("tcp://"+srv, colorBrightYellow))
+	LogSyncServer.Default("Starting sync server on %s...", glog.Wrap("tcp://"+srv, glog.BrightYellow))
 	listener, err := net.Listen("tcp", srv)
 	if err != nil {
 		panic(err)

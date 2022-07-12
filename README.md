@@ -50,7 +50,7 @@ The following assumes that you will use `/etc/ossh` as [data directory](#data-di
 
 First of all, you need to become root (or run everything with `sudo`). Then get the repo and build the executable:
 ```bash
-git clone https://github.com/Toxyl/ossh.git
+git clone https://github.com/toxyl/ossh.git
 cd ossh
 CGO_ENABLED=0 go build
 mv ossh /usr/local/bin/

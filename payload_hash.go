@@ -6,6 +6,7 @@ import (
 	"github.com/dgryski/go-farm"
 	"github.com/dgryski/go-spooky"
 	"github.com/shawnohare/go-minhash"
+	"github.com/toxyl/gutils"
 )
 
 func PayloadToHash(payload string) string {
@@ -23,6 +24,6 @@ func PayloadToHash(payload string) string {
 		w = append(w, strings.Split(line, " ")...)
 	}
 
-	signature := Uint64SliceToStringSlice(hash(w, 1).Signature())[0]
-	return signature + "_" + StringToSha1(payload)
+	signature := gutils.Uint64SliceToStringSlice(hash(w, 1).Signature())[0]
+	return signature + "_" + gutils.StringToSha1(payload)
 }

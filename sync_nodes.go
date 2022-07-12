@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"sync"
+
+	"github.com/toxyl/glog"
 )
 
 type SyncNodeStats struct {
@@ -173,7 +175,7 @@ func (sn *SyncNodes) Exec(command string) string {
 			return r
 		}
 		if err != nil {
-			LogSyncServer.Error("%s: Failed to exec command %s: %s", c.LogID(), colorHighlight(command), colorError(err))
+			LogSyncServer.Error("%s: Failed to exec command %s: %s", c.LogID(), glog.Highlight(command), glog.Error(err))
 		}
 	}
 	return ""

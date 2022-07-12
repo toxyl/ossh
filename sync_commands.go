@@ -4,6 +4,9 @@ import (
 	"errors"
 	"strings"
 	"sync"
+
+	"github.com/toxyl/glog"
+	"github.com/toxyl/gutils"
 )
 
 type SyncCommand func(ssc *SyncServerConnection, args []string) (string, error)
@@ -38,19 +41,19 @@ func NewSyncCommands() *SyncCommands {
 				}
 				fpsrv := SrvOSSH.Loot.Fingerprint()
 				if fp == fpsrv {
-					LogSyncCommands.Debug("%s: Ignored SYNC request: %s", ssc.LogID(), colorHighlight("already up-to-date"))
+					LogSyncCommands.Debug("%s: Ignored SYNC request: %s", ssc.LogID(), glog.Highlight("already up-to-date"))
 					return "", nil
 				}
 				fpRemote := strings.Split(fp, ":")
 				fpLocal := strings.Split(fpsrv, ":")
 
 				if len(fpRemote) != len(fpLocal) {
-					LogSyncCommands.Debug("%s: Ignored SYNC request, fingerprints are not the same length: %s (we have: %s)", ssc.LogID(), colorHighlight(fp), colorHighlight(fpsrv))
+					LogSyncCommands.Debug("%s: Ignored SYNC request, fingerprints are not the same length: %s (we have: %s)", ssc.LogID(), glog.Highlight(fp), glog.Highlight(fpsrv))
 					return "", nil
 				}
 
 				if len(fpRemote) == 0 || len(fpLocal) == 0 {
-					LogSyncCommands.Debug("%s: Ignored SYNC request, one of the fingerprints is empty: %s (we have: %s)", ssc.LogID(), colorHighlight(fp), colorHighlight(fpsrv))
+					LogSyncCommands.Debug("%s: Ignored SYNC request, one of the fingerprints is empty: %s (we have: %s)", ssc.LogID(), glog.Highlight(fp), glog.Highlight(fpsrv))
 					return "", nil
 				}
 
@@ -75,16 +78,16 @@ func NewSyncCommands() *SyncCommands {
 				return sl, nil
 			},
 			"HOSTS": func(ssc *SyncServerConnection, args []string) (string, error) {
-				return ImplodeLines(SrvOSSH.Loot.GetHosts()), nil
+				return gutils.ImplodeLines(SrvOSSH.Loot.GetHosts()), nil
 			},
 			"USERS": func(ssc *SyncServerConnection, args []string) (string, error) {
-				return ImplodeLines(SrvOSSH.Loot.GetUsers()), nil
+				return gutils.ImplodeLines(SrvOSSH.Loot.GetUsers()), nil
 			},
 			"PASSWORDS": func(ssc *SyncServerConnection, args []string) (string, error) {
-				return ImplodeLines(SrvOSSH.Loot.GetPasswords()), nil
+				return gutils.ImplodeLines(SrvOSSH.Loot.GetPasswords()), nil
 			},
 			"PAYLOADS": func(ssc *SyncServerConnection, args []string) (string, error) {
-				return ImplodeLines(SrvOSSH.Loot.GetPayloads()), nil
+				return gutils.ImplodeLines(SrvOSSH.Loot.GetPayloads()), nil
 			},
 			"ADD-HOST": func(ssc *SyncServerConnection, args []string) (string, error) {
 				if len(args) < 1 {
@@ -92,8 +95,8 @@ func NewSyncCommands() *SyncCommands {
 				}
 				added := SrvOSSH.Loot.AddHosts(args)
 				if added > 0 {
-					if added > 1 || LogSyncCommands.debug { // to avoid log clutter
-						LogSyncCommands.OK("%s: Donated %s", ssc.LogID(), colorIntAmount(added, "host", "hosts"))
+					if added > 1 || Conf.Debug.SyncCommands { // to avoid log clutter
+						LogSyncCommands.OK("%s: Donated %s", ssc.LogID(), glog.IntAmount(added, "host", "hosts"))
 					}
 					SrvOSSH.SaveData()
 				}
@@ -105,8 +108,8 @@ func NewSyncCommands() *SyncCommands {
 				}
 				added := SrvOSSH.Loot.AddUsers(args)
 				if added > 0 {
-					if added > 1 || LogSyncCommands.debug { // to avoid log clutter
-						LogSyncCommands.OK("%s: Donated %s", ssc.LogID(), colorIntAmount(added, "user", "users"))
+					if added > 1 || Conf.Debug.SyncCommands { // to avoid log clutter
+						LogSyncCommands.OK("%s: Donated %s", ssc.LogID(), glog.IntAmount(added, "user", "users"))
 					}
 					SrvOSSH.SaveData()
 				}
@@ -118,8 +121,8 @@ func NewSyncCommands() *SyncCommands {
 				}
 				added := SrvOSSH.Loot.AddPasswords(args)
 				if added > 0 {
-					if added > 1 || LogSyncCommands.debug { // to avoid log clutter
-						LogSyncCommands.OK("%s: Donated %s", ssc.LogID(), colorIntAmount(added, "password", "passwords"))
+					if added > 1 || Conf.Debug.SyncCommands { // to avoid log clutter
+						LogSyncCommands.OK("%s: Donated %s", ssc.LogID(), glog.IntAmount(added, "password", "passwords"))
 					}
 					SrvOSSH.SaveData()
 				}
@@ -138,7 +141,7 @@ func NewSyncCommands() *SyncCommands {
 				pl.Save()
 				if pl.Exists() {
 					if SrvOSSH.Loot.AddPayload(hash) {
-						LogSyncCommands.OK("%s: Donated payload %s", ssc.LogID(), colorFile(pl.file))
+						LogSyncCommands.OK("%s: Donated payload %s", ssc.LogID(), glog.File(pl.file))
 						SrvOSSH.SaveData()
 					}
 				}

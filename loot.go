@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/toxyl/glog"
+	"github.com/toxyl/gutils"
 	"golang.org/x/exp/maps"
 )
 
@@ -230,7 +232,7 @@ func (l *Loot) GetPayloadsWithTimestamp() []string {
 		p := NewPayload()
 		p.SetHash(fp)
 		if p.Exists() {
-			m, err := FileModTime(p.file)
+			m, err := gutils.FileModTime(p.file)
 			if err == nil {
 				res = append(res, fmt.Sprintf("%d-%s", m.UnixMilli(), p.hash))
 			}
@@ -248,7 +250,7 @@ func (l *Loot) JSON() string {
 	}
 	json, err := json.Marshal(data)
 	if err != nil {
-		LogOSSHServer.Error("Could not marshal sync data: %s", colorError(err))
+		LogOSSHServer.Error("Could not marshal sync data: %s", glog.Error(err))
 		return ""
 	}
 
@@ -266,19 +268,19 @@ func (l *Loot) Fingerprint() string {
 }
 
 func (l *Loot) FingerprintHosts() string {
-	return StringSliceToSha256(l.GetHosts())
+	return gutils.StringSliceToSha256(l.GetHosts())
 }
 
 func (l *Loot) FingerprintUsers() string {
-	return StringSliceToSha256(l.GetUsers())
+	return gutils.StringSliceToSha256(l.GetUsers())
 }
 
 func (l *Loot) FingerprintPasswords() string {
-	return StringSliceToSha256(l.GetPasswords())
+	return gutils.StringSliceToSha256(l.GetPasswords())
 }
 
 func (l *Loot) FingerprintPayloads() string {
-	return StringSliceToSha256(l.GetPayloads())
+	return gutils.StringSliceToSha256(l.GetPayloads())
 }
 
 func NewLoot() *Loot {
