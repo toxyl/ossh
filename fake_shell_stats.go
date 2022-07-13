@@ -2,6 +2,8 @@ package main
 
 import (
 	"strings"
+
+	"github.com/toxyl/ossh/utils"
 )
 
 type FakeShellStats struct {
@@ -9,7 +11,7 @@ type FakeShellStats struct {
 	User             string
 	CommandsExecuted uint
 	CommandHistory   []string
-	recording        *ASCIICastV2
+	recording        *utils.ASCIICastV2
 }
 
 func (fss *FakeShellStats) AddCommandToHistory(cmd string) {

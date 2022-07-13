@@ -353,7 +353,7 @@ func NewFakeShell(s *Session) *FakeShell {
 			CommandHistory:   []string{},
 			Host:             "",
 			User:             (*s.SSHSession).User(),
-			recording:        NewASCIICastV2(fakeShellInitialWidth, fakeShellInitialHeight),
+			recording:        utils.NewASCIICastV2(fakeShellInitialWidth, fakeShellInitialHeight),
 		},
 		overlayFS: nil,
 	}

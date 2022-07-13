@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"encoding/json"
@@ -6,8 +6,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"github.com/toxyl/glog"
 )
 
 // {"version": 2, "width": 80, "height": 24, "timestamp": 1504467315, "title": "Demo", "env": {"TERM": "xterm-256color", "SHELL": "/bin/zsh"}}
@@ -35,8 +33,7 @@ type ASCIICastV2Header struct {
 func (ac2h *ASCIICastV2Header) String() string {
 	json, err := json.Marshal(ac2h)
 	if err != nil {
-		LogASCIICastV2.Error("Could not marshal ASCIICastV2Header: %s", glog.Error(err))
-		return ""
+		return "" // marshal error, ignore
 	}
 
 	return string(json)
@@ -50,11 +47,7 @@ type ASCIICastV2Event struct {
 
 func (ac2e *ASCIICastV2Event) String() string {
 	if ac2e.Type != "o" && ac2e.Type != "i" {
-		LogASCIICastV2.Error(
-			"Could not convert ASCIICastV2Event to string, type '%s' is unknown.",
-			glog.Wrap(ac2e.Type, glog.Orange),
-		)
-		return ""
+		return "" // unknown type, ignore
 	}
 
 	json, err := json.Marshal([]any{
@@ -63,8 +56,7 @@ func (ac2e *ASCIICastV2Event) String() string {
 		ac2e.Data,
 	})
 	if err != nil {
-		LogASCIICastV2.Error("Could not marshal ASCIICastV2Event data: %s", glog.Error(err))
-		return ""
+		return "" // unmarshal error, ignore
 	}
 
 	return string(json)
@@ -125,15 +117,10 @@ func (ac2 *ASCIICastV2) Save(file string) error {
 	return nil
 }
 
-func (ac2 *ASCIICastV2) Load(file string) {
+func (ac2 *ASCIICastV2) Load(file string) error {
 	data, err := os.ReadFile(file)
 	if err != nil {
-		LogASCIICastV2.Error(
-			"Could not load ASCIICastV2 from file '%s': %s",
-			glog.File(file),
-			glog.Error(err),
-		)
-		return
+		return fmt.Errorf("Could not load ASCIICastV2 from file '%s': %s", file, err.Error())
 	}
 	lines := strings.Split(string(data), "\n")
 	if len(lines) > 0 {
@@ -141,12 +128,7 @@ func (ac2 *ASCIICastV2) Load(file string) {
 		lines = lines[1:]
 		err = json.Unmarshal([]byte(meta), &ac2.Header)
 		if err != nil {
-			LogASCIICastV2.Error(
-				"Could not unmarshal ASCIICastV2Header from file '%s': %s",
-				glog.File(file),
-				glog.Error(err),
-			)
-			return
+			return fmt.Errorf("Could not unmarshal ASCIICastV2Header from file '%s': %s", file, err.Error())
 		}
 		ac2.EventStream = []ASCIICastV2Event{}
 		for _, line := range lines {
@@ -154,18 +136,13 @@ func (ac2 *ASCIICastV2) Load(file string) {
 			err := json.Unmarshal([]byte(line), &ed)
 
 			if err != nil {
-				LogASCIICastV2.Error(
-					"Could not unmarshal ASCIICastV2Event from file '%s': %s (input was: '%s')",
-					glog.File(file),
-					glog.Error(err),
-					glog.Highlight(line),
-				)
-				continue
+				return fmt.Errorf("Could not unmarshal ASCIICastV2Event from file '%s': %s (input was: '%s')", file, err.Error(), line)
 			}
 
 			ac2.addEventRaw(ed[1].(string), ed[2].(string), ed[0].(float64))
 		}
 	}
+	return nil
 }
 
 func NewASCIICastV2(width int, height int) *ASCIICastV2 {

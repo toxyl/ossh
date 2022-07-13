@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/toxyl/gutils"
+	"github.com/toxyl/ossh/utils"
 	"golang.org/x/exp/maps"
 )
 
@@ -76,7 +77,7 @@ func (p *Payload) SetHash(hash string) {
 }
 
 func (p *Payload) Set(payload string) {
-	hash := PayloadToHash(payload)
+	hash := utils.PayloadToHash(payload)
 	p.SetHash(hash)
 	p.payload = payload
 }
