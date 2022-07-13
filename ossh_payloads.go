@@ -73,7 +73,7 @@ func (p *Payload) EncodeToString() string {
 
 func (p *Payload) SetHash(hash string) {
 	p.hash = hash
-	p.file = fmt.Sprintf("%s/payload-%s.cast", Conf.PathCaptures, hash)
+	p.file = fmt.Sprintf("%s/payloads/%s.cast", Conf.PathCaptures, hash)
 }
 
 func (p *Payload) Set(payload string) {

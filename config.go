@@ -182,7 +182,15 @@ func InitPaths() {
 		Conf.Webinterface.KeyFile = fmt.Sprintf("%s/ossh.key", Conf.PathData)
 	}
 
-	err := gutils.MkDirs(Conf.PathCommands, Conf.PathCaptures, fmt.Sprintf("%s/%s", Conf.PathCaptures, "scp-uploads"), fmt.Sprintf("%s/%s", Conf.PathCaptures, "ssh-keys"), Conf.PathFFS, Conf.PathWebinterface)
+	err := gutils.MkDirs(
+		Conf.PathCommands,
+		Conf.PathCaptures,
+		fmt.Sprintf("%s/%s", Conf.PathCaptures, "payloads"),
+		fmt.Sprintf("%s/%s", Conf.PathCaptures, "scp-uploads"),
+		fmt.Sprintf("%s/%s", Conf.PathCaptures, "ssh-keys"),
+		Conf.PathFFS,
+		Conf.PathWebinterface,
+	)
 	if err != nil {
 		panic(err)
 	}
