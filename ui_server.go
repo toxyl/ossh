@@ -300,7 +300,7 @@ func (ws *UIServer) Start() {
 		if !isIPWhitelisted(addr) && addr != Conf.Host {
 			rt := fmt.Sprintf("https://%s%s", addr, req.URL.Path)
 			http.Redirect(w, req, rt, 307) // let's give them their request back
-			LogUIServer.OK("%s: Redirected request to source: %s", glog.Addr(addr, true), glog.Highlight(req.URL.Path))
+			LogUIServer.OK("%s: Redirected request to source: %s", glog.Addr(req.RemoteAddr, true), glog.Highlight(req.URL.Path))
 			return
 		}
 		mux.ServeHTTP(w, req)

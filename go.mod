@@ -13,7 +13,7 @@ require (
 	github.com/shawnohare/go-minhash v0.0.0-20160713203314-58d649feb1f9
 	github.com/spf13/viper v1.12.0
 	github.com/toxyl/glog v0.0.0-20220712190040-bd7dd7f54dfe
-	github.com/toxyl/gutils v0.0.0-20220712175618-fbc2dc3fa948
+	github.com/toxyl/gutils v0.0.0-20220712185957-11f73b226139
 	golang.org/x/exp v0.0.0-20220706164943-b4a6d9510983
 	golang.org/x/sys v0.0.0-20220712014510-0a85c31ab51e
 	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467

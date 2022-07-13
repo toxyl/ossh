@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/toxyl/glog"
+	"github.com/toxyl/gutils"
 )
 
 type SyncNodeStats struct {
@@ -98,16 +99,16 @@ func (sn *SyncNodes) GetStats(hostStats *SyncNodeStats) *SyncNodeStats {
 	stats["_"] = hostStats // we should include ourselves
 
 	for _, s := range stats {
-		total.Hosts = MaxOfInts(total.Hosts, s.Hosts)
-		total.Passwords = MaxOfInts(total.Passwords, s.Passwords)
-		total.Users = MaxOfInts(total.Users, s.Users)
-		total.Payloads = MaxOfInts(total.Payloads, s.Payloads)
-		total.Sessions = SumOfInts(total.Sessions, s.Sessions)
-		total.AttemptedLogins = SumOfUints(total.AttemptedLogins, s.AttemptedLogins)
-		total.FailedLogins = SumOfUints(total.FailedLogins, s.FailedLogins)
-		total.SuccessfulLogins = SumOfUints(total.SuccessfulLogins, s.SuccessfulLogins)
-		total.TimeWasted = SumOfFloats(total.TimeWasted, s.TimeWasted)
-		total.Uptime = SumOfFloats(total.Uptime, s.Uptime)
+		total.Hosts = gutils.MaxOfInts(total.Hosts, s.Hosts)
+		total.Passwords = gutils.MaxOfInts(total.Passwords, s.Passwords)
+		total.Users = gutils.MaxOfInts(total.Users, s.Users)
+		total.Payloads = gutils.MaxOfInts(total.Payloads, s.Payloads)
+		total.Sessions = gutils.SumOfInts(total.Sessions, s.Sessions)
+		total.AttemptedLogins = gutils.SumOfUints(total.AttemptedLogins, s.AttemptedLogins)
+		total.FailedLogins = gutils.SumOfUints(total.FailedLogins, s.FailedLogins)
+		total.SuccessfulLogins = gutils.SumOfUints(total.SuccessfulLogins, s.SuccessfulLogins)
+		total.TimeWasted = gutils.SumOfFloats(total.TimeWasted, s.TimeWasted)
+		total.Uptime = gutils.SumOfFloats(total.Uptime, s.Uptime)
 	}
 
 	return total

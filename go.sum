@@ -253,8 +253,8 @@ github.com/subosito/gotenv v1.3.0 h1:mjC+YW8QpAdXibNi+vNWgzmgBH4+5l5dCXv8cNysBLI
 github.com/subosito/gotenv v1.3.0/go.mod h1:YzJjq/33h7nrwdY+iHMhEOEEbW0ovIz0tB6t6PwAXzs=
 github.com/toxyl/glog v0.0.0-20220712190040-bd7dd7f54dfe h1:/baZ3rRmduqL2DU/FIwRBsYd0zWtuRx3ULipmsweP24=
 github.com/toxyl/glog v0.0.0-20220712190040-bd7dd7f54dfe/go.mod h1:Oo/Hv9YwDAdq6577wE/hUZ0uNJvBstLMF+rtsNNbgL8=
-github.com/toxyl/gutils v0.0.0-20220712175618-fbc2dc3fa948 h1:O+mAelnjV6sNOqKQa+Me/Ykvg7/XrslpYBK+Cs+ZKnY=
-github.com/toxyl/gutils v0.0.0-20220712175618-fbc2dc3fa948/go.mod h1:vwGE/QEaI/Elm2wzoFQ/YiDrI9qd7+jSq+CtzHz/p5M=
+github.com/toxyl/gutils v0.0.0-20220712185957-11f73b226139 h1:1cG6Y92gyDfVFG7U6HAAFPqc4aEarAxRfEUhaehBTRk=
+github.com/toxyl/gutils v0.0.0-20220712185957-11f73b226139/go.mod h1:vwGE/QEaI/Elm2wzoFQ/YiDrI9qd7+jSq+CtzHz/p5M=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
