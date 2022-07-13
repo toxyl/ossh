@@ -35,7 +35,6 @@ var fsWebinterfaceTemplates embed.FS
 
 type Config struct {
 	Debug struct {
-		ASCIICastV2  bool `mapstructure:"asciicast_v2"`
 		FakeShell    bool `mapstructure:"fake_shell"`
 		SyncCommands bool `mapstructure:"sync_commands"`
 		SyncServer   bool `mapstructure:"sync_server"`
@@ -110,6 +109,34 @@ func isIPWhitelisted(ip string) bool {
 	return false
 }
 
+func colorConnID(user, host string, port int) string {
+	addr := glog.AddrHostPort(host, port, true)
+	if user == "" {
+		return addr
+	}
+	return fmt.Sprintf("%s > %s", addr, glog.Wrap(user, glog.Green))
+}
+
+func logMessageHandler(msg string) {
+	fmt.Print(msg)
+	if SrvUI != nil {
+		SrvUI.PushLog(msg)
+	}
+}
+
+var (
+	LogGlobal        = glog.NewLogger("Global", glog.Gray, false, false, false, logMessageHandler)
+	LogFakeShell     = glog.NewLogger("Fake Shell", glog.OliveGreen, false, false, false, logMessageHandler)
+	LogOverlayFS     = glog.NewLogger("Overlay FS", glog.LightBlue, false, false, false, logMessageHandler)
+	LogOSSHServer    = glog.NewLogger("oSSH Server", glog.Lime, false, false, false, logMessageHandler)
+	LogSessions      = glog.NewLogger("Sessions", glog.DarkOrange, false, false, false, logMessageHandler)
+	LogSyncClient    = glog.NewLogger("Sync Client", glog.Blue, false, false, false, logMessageHandler)
+	LogSyncCommands  = glog.NewLogger("Sync Commands", glog.DarkGreen, false, false, false, logMessageHandler)
+	LogSyncServer    = glog.NewLogger("Sync Server", glog.DarkRed, false, false, false, logMessageHandler)
+	LogTextTemplater = glog.NewLogger("Text Templater", glog.MediumGray, false, false, false, logMessageHandler)
+	LogUIServer      = glog.NewLogger("UI Server", glog.Cyan, false, false, false, logMessageHandler)
+)
+
 func InitPaths() {
 	if Conf.PathData == "" {
 		Conf.PathData = "/etc/ossh"
@@ -162,10 +189,6 @@ func InitPaths() {
 }
 
 func InitDebug() {
-	if Conf.Debug.ASCIICastV2 {
-		LogASCIICastV2.EnableDebug()
-	}
-
 	if Conf.Debug.SyncCommands {
 		LogSyncCommands.EnableDebug()
 	}
