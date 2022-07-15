@@ -1,22 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 
-	"github.com/toxyl/glog"
 	"github.com/toxyl/gutils"
 	"golang.org/x/exp/maps"
 )
-
-type LootJSON struct {
-	Hosts     []string `json:"hosts"`
-	Users     []string `json:"users"`
-	Passwords []string `json:"passwords"`
-	Payloads  []string `json:"payloads"`
-}
 
 type Loot struct {
 	users     map[string]bool
@@ -239,22 +230,6 @@ func (l *Loot) GetPayloadsWithTimestamp() []string {
 		}
 	}
 	return res
-}
-
-func (l *Loot) JSON() string {
-	data := LootJSON{
-		Hosts:     l.GetHosts(),
-		Users:     l.GetUsers(),
-		Passwords: l.GetPasswords(),
-		Payloads:  l.GetPayloads(),
-	}
-	json, err := json.Marshal(data)
-	if err != nil {
-		LogOSSHServer.Error("Could not marshal sync data: %s", glog.Error(err))
-		return ""
-	}
-
-	return string(json)
 }
 
 func (l *Loot) Fingerprint() string {

@@ -13,8 +13,11 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/toxyl/glog"
 	"github.com/toxyl/gutils"
 )
+
+var LogTextTemplater *glog.Logger = glog.NewLogger("Text Templater", glog.MediumGray, false, false, false, logMessageHandler)
 
 var templateFunctions template.FuncMap = template.FuncMap{}
 

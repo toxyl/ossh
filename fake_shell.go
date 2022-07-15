@@ -20,14 +20,14 @@ const (
 )
 
 type FakeShell struct {
-	session  *ssh.Session
-	terminal *term.Terminal
-	writer   *utils.SlowWriter
-	created  time.Time
-	stats    *FakeShellStats
-	prompt   string
-
+	session   *ssh.Session
+	terminal  *term.Terminal
+	writer    *utils.SlowWriter
+	created   time.Time
+	stats     *FakeShellStats
+	prompt    string
 	cwd       string
+	logger    *glog.Logger
 	overlayFS *OverlayFS
 }
 
@@ -163,7 +163,7 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 		cmd = fmt.Sprintf("(%s/%s) %s", glog.Int(iSeq), glog.Int(lSeq), cmd)
 	}
 	s.UpdateActivity()
-	LogFakeShell.Info("%s: %s", s.LogID(), cmd)
+	fs.logger.Info("%s: %s", s.LogID(), cmd)
 	defer func() {
 		s.UpdateActivity()
 	}()
@@ -356,6 +356,7 @@ func NewFakeShell(s *Session) *FakeShell {
 			recording:        utils.NewASCIICastV2(fakeShellInitialWidth, fakeShellInitialHeight),
 		},
 		overlayFS: nil,
+		logger:    glog.NewLogger("Fake Shell", glog.OliveGreen, Conf.Debug.FakeShell, false, false, logMessageHandler),
 	}
 
 	fs.terminal = term.NewTerminal(*s.SSHSession, "")
@@ -366,6 +367,6 @@ func NewFakeShell(s *Session) *FakeShell {
 	fs.stats.Host = fs.Host()
 	fs.cwd = "/home/" + (*s.SSHSession).User()
 	fs.UpdatePrompt("~")
-	LogFakeShell.Debug("%s: Fake shell ready, current working directory: %s", s.LogID(), glog.File(fs.cwd))
+	fs.logger.Debug("%s: Fake shell ready, current working directory: %s", s.LogID(), glog.File(fs.cwd))
 	return fs
 }

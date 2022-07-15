@@ -28,15 +28,17 @@ var (
 )
 
 // https://github.com/golang/go/issues/26918#issuecomment-974257205
-type serverErrorLogWriter struct{}
+type serverErrorLogWriter struct {
+	logger *glog.Logger
+}
 
-func (*serverErrorLogWriter) Write(p []byte) (int, error) {
+func (selw *serverErrorLogWriter) Write(p []byte) (int, error) {
 	m := string(p)
 	// https://github.com/golang/go/issues/26918
 	if strings.HasPrefix(m, "http: TLS handshake error") {
 		return 0, nil // we don't care about these
 	} else {
-		LogUIServer.Error("%s", m)
+		selw.logger.Error("%s", m)
 	}
 	return len(p), nil
 }
@@ -154,19 +156,20 @@ type UIServer struct {
 	Stats    *WebsocketStream
 	Console  *WebsocketStream
 	server   *http.Server
+	logger   *glog.Logger
 }
 
-func (w *UIServer) AddHTMLHandler(path string, handler func(w http.ResponseWriter, r *http.Request)) *UIServer {
-	if _, ok := w.Handlers[path]; ok {
-		return w
+func (uis *UIServer) AddHTMLHandler(path string, handler func(w http.ResponseWriter, r *http.Request)) *UIServer {
+	if _, ok := uis.Handlers[path]; ok {
+		return uis
 	}
-	w.Handlers[path] = handler
+	uis.Handlers[path] = handler
 
-	return w
+	return uis
 }
 
-func (w *UIServer) AddSubscriptionHandler(path string, hub *Hub) *UIServer {
-	return w.AddHTMLHandler(
+func (uis *UIServer) AddSubscriptionHandler(path string, hub *Hub) *UIServer {
+	return uis.AddHTMLHandler(
 		path,
 		func(w http.ResponseWriter, r *http.Request) {
 			upgrader := websocket.Upgrader{
@@ -175,7 +178,7 @@ func (w *UIServer) AddSubscriptionHandler(path string, hub *Hub) *UIServer {
 			}
 			conn, err := upgrader.Upgrade(w, r, nil)
 			if err != nil {
-				LogUIServer.Default("Connection connection upgrade failed: %s", err)
+				uis.logger.Default("Connection connection upgrade failed: %s", err)
 				return
 			}
 			client := &Client{
@@ -189,15 +192,15 @@ func (w *UIServer) AddSubscriptionHandler(path string, hub *Hub) *UIServer {
 	)
 }
 
-func (w *UIServer) AddHandler(path string, messageHandler func(message []byte) []byte) *UIServer {
-	if _, ok := w.Handlers[path]; ok {
-		return w
+func (uis *UIServer) AddHandler(path string, messageHandler func(message []byte) []byte) *UIServer {
+	if _, ok := uis.Handlers[path]; ok {
+		return uis
 	}
-	w.Handlers[path] = func(wc http.ResponseWriter, r *http.Request) {
+	uis.Handlers[path] = func(wc http.ResponseWriter, r *http.Request) {
 		// Upgrade our raw HTTP connection to a websocket based one
 		conn, err := upgrader.Upgrade(wc, r, nil)
 		if err != nil {
-			LogUIServer.Error("Error during connection upgrade: %s", err.Error())
+			uis.logger.Error("Error during connection upgrade: %s", err.Error())
 			return
 		}
 		defer conn.Close()
@@ -208,7 +211,7 @@ func (w *UIServer) AddHandler(path string, messageHandler func(message []byte) [
 			if err != nil {
 				if !strings.Contains(err.Error(), "close 1000 (normal)") &&
 					!strings.Contains(err.Error(), "close 1001 (going away)") {
-					LogUIServer.Error("Error during message reading: %s", err.Error())
+					uis.logger.Error("Error during message reading: %s", err.Error())
 				}
 				break
 			}
@@ -216,21 +219,21 @@ func (w *UIServer) AddHandler(path string, messageHandler func(message []byte) [
 			message = messageHandler(message)
 			err = conn.WriteMessage(messageType, message)
 			if err != nil {
-				LogUIServer.Error("Error during message writing: %s", err.Error())
+				uis.logger.Error("Error during message writing: %s", err.Error())
 				break
 			}
 		}
 	}
 
-	return w
+	return uis
 }
 
-func (w *UIServer) MakeHTMLHandler(template string, data interface{}) func(w http.ResponseWriter, r *http.Request) {
+func (uis *UIServer) MakeHTMLHandler(template string, data interface{}) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var tpl bytes.Buffer
 		err := ParseTemplateHTML(template, &tpl, data)
 		if err != nil {
-			LogUIServer.Error("Failed to parse template: %s", err.Error())
+			uis.logger.Error("Failed to parse template: %s", err.Error())
 			return
 		}
 
@@ -239,46 +242,46 @@ func (w *UIServer) MakeHTMLHandler(template string, data interface{}) func(w htt
 	}
 }
 
-func (ws *UIServer) PushStats(msg string) {
-	if ws.Stats == nil || ws.Stats.Hub == nil {
+func (uis *UIServer) PushStats(msg string) {
+	if uis.Stats == nil || uis.Stats.Hub == nil {
 		return
 	}
-	ws.Stats.Hub.Broadcast(msg)
+	uis.Stats.Hub.Broadcast(msg)
 }
 
-func (ws *UIServer) PushLog(msg string) {
-	if ws.Console == nil || ws.Console.Hub == nil {
+func (uis *UIServer) PushLog(msg string) {
+	if uis.Console == nil || uis.Console.Hub == nil {
 		return
 	}
-	ws.Console.Hub.Broadcast(msg)
+	uis.Console.Hub.Broadcast(msg)
 }
 
-func (ws *UIServer) Serve() {
-	err := ws.server.ListenAndServeTLS(ws.CertFile, ws.KeyFile)
+func (uis *UIServer) Serve() {
+	err := uis.server.ListenAndServeTLS(uis.CertFile, uis.KeyFile)
 	if !strings.Contains(err.Error(), "Server closed") {
-		LogUIServer.Error("Server stopped: %s", glog.Error(err))
+		uis.logger.Error("Server stopped: %s", glog.Error(err))
 	}
 }
 
-func (ws *UIServer) Start() {
+func (uis *UIServer) Start() {
 	gutils.SleepSeconds(10)
 
 	mux := http.NewServeMux()
-	ws.init()
-	srv := fmt.Sprintf("%s:%d", ws.Host, ws.Port)
-	for k, v := range ws.Handlers {
+	uis.init()
+	srv := fmt.Sprintf("%s:%d", uis.Host, uis.Port)
+	for k, v := range uis.Handlers {
 		mux.HandleFunc(k, v)
 	}
 
-	if !gutils.FileExists(ws.CertFile) || !gutils.FileExists(ws.KeyFile) {
-		err := gutils.GenerateSelfSignedCertificate("local.ossh", "oSSH", ws.KeyFile, ws.CertFile)
+	if !gutils.FileExists(uis.CertFile) || !gutils.FileExists(uis.KeyFile) {
+		err := gutils.GenerateSelfSignedCertificate("local.ossh", "oSSH", uis.KeyFile, uis.CertFile)
 		if err != nil {
 			panic(fmt.Sprintf("could not create self signed certificate for UI server: %s", err.Error()))
 		}
 	}
 
-	ws.server = &http.Server{
-		ErrorLog: log.New(&serverErrorLogWriter{}, "", 0),
+	uis.server = &http.Server{
+		ErrorLog: log.New(&serverErrorLogWriter{logger: uis.logger}, "", 0),
 		Addr:     srv,
 		TLSConfig: &tls.Config{
 			MinVersion:               tls.VersionTLS12,
@@ -294,58 +297,58 @@ func (ws *UIServer) Start() {
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
 	}
 
-	ws.server.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	uis.server.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		addr := gutils.RealAddr(req)
 
 		if !isIPWhitelisted(addr) && addr != Conf.Host {
 			rt := fmt.Sprintf("https://%s%s", addr, req.URL.Path)
 			http.Redirect(w, req, rt, 307) // let's give them their request back
-			LogUIServer.OK("%s: Redirected request to source: %s", glog.Addr(req.RemoteAddr, true), glog.Highlight(req.URL.Path))
+			uis.logger.OK("%s: Redirected request to source: %s", glog.Addr(req.RemoteAddr, true), glog.Highlight(req.URL.Path))
 			return
 		}
 		mux.ServeHTTP(w, req)
 	})
 
-	LogUIServer.Default("Starting UI server on %s...", glog.Wrap("https://"+srv, glog.BrightYellow))
-	go ws.Serve()
+	uis.logger.Default("Starting UI server on %s...", glog.Wrap("https://"+srv, glog.BrightYellow))
+	go uis.Serve()
 }
 
-func (ws *UIServer) Shutdown() {
+func (uis *UIServer) Shutdown() {
 	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		cancel()
 	}()
 
-	if err := ws.server.Shutdown(ctxShutDown); err != nil {
-		LogUIServer.Error("Shutdown failed: %s", glog.Error(err))
+	if err := uis.server.Shutdown(ctxShutDown); err != nil {
+		uis.logger.Error("Shutdown failed: %s", glog.Error(err))
 	}
 
-	ws.Handlers = nil
+	uis.Handlers = nil
 
-	LogUIServer.OK("Shutdown complete")
+	uis.logger.OK("Shutdown complete")
 }
 
-func (ws *UIServer) Reload() {
-	ws.Shutdown()
-	go ws.Start()
+func (uis *UIServer) Reload() {
+	uis.Shutdown()
+	go uis.Start()
 }
 
-func (ws *UIServer) init() {
-	ws.Host = Conf.Webinterface.Host
-	ws.Port = int(Conf.Webinterface.Port)
-	ws.CertFile = Conf.Webinterface.CertFile
-	ws.KeyFile = Conf.Webinterface.KeyFile
+func (uis *UIServer) init() {
+	uis.Host = Conf.Webinterface.Host
+	uis.Port = int(Conf.Webinterface.Port)
+	uis.CertFile = Conf.Webinterface.CertFile
+	uis.KeyFile = Conf.Webinterface.KeyFile
 	wsscheme := "ws"
-	if ws.CertFile != "" && ws.KeyFile != "" {
+	if uis.CertFile != "" && uis.KeyFile != "" {
 		wsscheme = "wss"
 	}
-	ws.Handlers = map[string]func(w http.ResponseWriter, r *http.Request){}
-	ws.Stats = NewWebsocketStream()
-	ws.Console = NewWebsocketStream()
+	uis.Handlers = map[string]func(w http.ResponseWriter, r *http.Request){}
+	uis.Stats = NewWebsocketStream()
+	uis.Console = NewWebsocketStream()
 
-	ws.AddSubscriptionHandler("/stats", ws.Stats.Hub)
-	ws.AddSubscriptionHandler("/console", ws.Console.Hub)
-	ws.AddHandler("/config", func(config []byte) []byte {
+	uis.AddSubscriptionHandler("/stats", uis.Stats.Hub)
+	uis.AddSubscriptionHandler("/console", uis.Console.Hub)
+	uis.AddHandler("/config", func(config []byte) []byte {
 		err := updateConfig(config)
 		if err != nil {
 			return nil
@@ -353,33 +356,33 @@ func (ws *UIServer) init() {
 		SrvUI.Reload()
 		return nil
 	})
-	ws.AddHandler("/payloads", func(msg []byte) []byte {
+	uis.AddHandler("/payloads", func(msg []byte) []byte {
 		if string(msg) == "list" {
 			return []byte(fmt.Sprintf("list:%s", strings.Join(SrvOSSH.Loot.GetPayloadsWithTimestamp(), ",")))
 		}
 		p, err := SrvOSSH.Loot.payloads.Get(string(msg))
 		if err != nil {
-			LogUIServer.Error("Could not retrieve payload %s: %s", glog.Highlight(string(msg)), glog.Error(err))
+			uis.logger.Error("Could not retrieve payload %s: %s", glog.Highlight(string(msg)), glog.Error(err))
 			return nil
 		}
 		if p == nil {
-			LogUIServer.Error("Could not retrieve payload %s: %s", glog.Highlight(string(msg)), glog.Error(errors.New("no error reported")))
+			uis.logger.Error("Could not retrieve payload %s: %s", glog.Highlight(string(msg)), glog.Error(errors.New("no error reported")))
 			return nil
 		}
 		if !p.Exists() {
-			LogUIServer.Warning("Could not find payload %s: %s", glog.Highlight(string(msg)), glog.Error(errors.New("file does not exist")))
+			uis.logger.Warning("Could not find payload %s: %s", glog.Highlight(string(msg)), glog.Error(errors.New("file does not exist")))
 			return nil
 		}
 
 		pl, err := p.Read()
 		if err != nil {
-			LogUIServer.Error("Could not read payload %s: %s", glog.Highlight(string(msg)), glog.Error(err))
+			uis.logger.Error("Could not read payload %s: %s", glog.Highlight(string(msg)), glog.Error(err))
 			return nil
 		}
 		return []byte(gutils.EncodeBase64String(pl))
 	})
-	ws.AddHTMLHandler("/",
-		ws.MakeHTMLHandler("index", struct {
+	uis.AddHTMLHandler("/",
+		uis.MakeHTMLHandler("index", struct {
 			Scheme         string
 			Config         string
 			HostName       string
@@ -396,6 +399,9 @@ func (ws *UIServer) init() {
 }
 
 func NewUIServer() *UIServer {
+	if !Conf.Webinterface.Enabled {
+		return nil
+	}
 	return &UIServer{
 		Handlers: map[string]func(w http.ResponseWriter, r *http.Request){},
 		Host:     "",
@@ -405,5 +411,6 @@ func NewUIServer() *UIServer {
 		Stats:    nil,
 		Console:  nil,
 		server:   nil,
+		logger:   glog.NewLogger("UI Server", glog.Cyan, Conf.Debug.UIServer, false, false, logMessageHandler),
 	}
 }

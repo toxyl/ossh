@@ -34,6 +34,7 @@ type SyncNodes struct {
 	nodes   map[string]*SyncNode
 	stats   map[string]*SyncNodeStats
 	clients map[string]*SyncClient
+	logger  *glog.Logger
 	lock    *sync.Mutex
 }
 
@@ -176,7 +177,7 @@ func (sn *SyncNodes) Exec(command string) string {
 			return r
 		}
 		if err != nil {
-			LogSyncServer.Error("%s: Failed to exec command %s: %s", c.LogID(), glog.Highlight(command), glog.Error(err))
+			sn.logger.Error("%s: Failed to exec command %s: %s", c.LogID(), glog.Highlight(command), glog.Error(err))
 		}
 	}
 	return ""
@@ -187,6 +188,7 @@ func NewSyncNodes() *SyncNodes {
 		nodes:   map[string]*SyncNode{},
 		clients: map[string]*SyncClient{},
 		stats:   map[string]*SyncNodeStats{},
+		logger:  glog.NewLogger("Sync Server", glog.DarkRed, Conf.Debug.SyncServer, false, false, logMessageHandler),
 		lock:    &sync.Mutex{},
 	}
 }

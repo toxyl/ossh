@@ -24,6 +24,7 @@ type Session struct {
 	Port         int
 	Whitelisted  bool
 	Orphan       bool
+	logger       *glog.Logger
 	lock         *sync.Mutex
 }
 
@@ -56,7 +57,7 @@ func (s *Session) SetID(id string) *Session {
 	defer s.Unlock()
 	ip, port := gutils.SplitHostPort(id)
 	if ip == "" || port == 0 {
-		LogSessions.Error("Invalid session ID %s. Format must be 'host:port'!", glog.Reason(id))
+		s.logger.Error("Invalid session ID %s. Format must be 'host:port'!", glog.Reason(id))
 		return nil
 	}
 	s.Host = ip
@@ -166,14 +167,14 @@ func (s *Session) expire(age uint) bool {
 		return true
 	}
 	if s.StaleSince().Seconds() > float64(age) {
-		LogSessions.Info("%s: Expiring session...", s.LogID())
+		s.logger.Info("%s: Expiring session...", s.LogID())
 		_ = (*s.SSHSession).Exit(-1) // clean up
 		return true
 	}
 	return false
 }
 
-func NewSession() *Session {
+func NewSession(logger *glog.Logger) *Session {
 	s := &Session{
 		CreatedAt:    time.Now(),
 		LastActivity: time.Now(),
@@ -187,6 +188,7 @@ func NewSession() *Session {
 		Term:         "",
 		Whitelisted:  false,
 		Orphan:       false,
+		logger:       logger,
 		lock:         &sync.Mutex{},
 	}
 	return s
@@ -194,6 +196,7 @@ func NewSession() *Session {
 
 type Sessions struct {
 	sessions map[string]*Session
+	logger   *glog.Logger
 	lock     *sync.Mutex
 }
 
@@ -234,7 +237,7 @@ func (ss *Sessions) Create(sessionID string) *Session {
 	defer ss.Unlock()
 
 	if !ss.has(sessionID) {
-		s := NewSession().SetID(sessionID)
+		s := NewSession(glog.NewLogger("Sessions", glog.DarkOrange, Conf.Debug.Sessions, false, false, logMessageHandler)).SetID(sessionID)
 		if s == nil {
 			return nil
 		}
@@ -243,7 +246,7 @@ func (ss *Sessions) Create(sessionID string) *Session {
 		cnts := len(ss.sessions)
 		active := ss.countActiveSessions(s.Host)
 		SrvMetrics.IncrementSessions()
-		LogSessions.OK(
+		ss.logger.OK(
 			"%s: Session started, host now uses %s of %s.",
 			s.LogID(), glog.Int(active), glog.IntAmount(cnts, "active session", "active sessions"))
 	}
@@ -278,11 +281,11 @@ func (ss *Sessions) Remove(sessionID, reason string) {
 		active := ss.countActiveSessions(sh)
 
 		if reason == "" {
-			LogSessions.OK(
+			ss.logger.OK(
 				"%s: Session removed, host now uses %s of %s. It was active for %s.",
 				cid, glog.Int(active), glog.IntAmount(cnts, "active session", "active sessions"), glog.Duration(uint(tw)))
 		} else {
-			LogSessions.OK(
+			ss.logger.OK(
 				"%s: Session removed, host now uses %s of %s. It was active for %s and removed because %s.",
 				cid, glog.Int(active), glog.IntAmount(cnts, "active session", "active sessions"), glog.Duration(uint(tw)), glog.Reason(reason))
 		}
@@ -330,10 +333,11 @@ func (ss *Sessions) cleanUpWorker(maxAge uint) {
 	}
 }
 
-func NewActiveSessions(maxAge uint) *Sessions {
+func NewActiveSessions(maxAge uint, logger *glog.Logger) *Sessions {
 	ss := &Sessions{
 		sessions: map[string]*Session{},
 		lock:     &sync.Mutex{},
+		logger:   logger,
 	}
 	go ss.cleanUpWorker(maxAge)
 	return ss

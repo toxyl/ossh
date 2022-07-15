@@ -95,6 +95,9 @@ input_delay: {{ range(ossh_input_delay - ossh_input_delay_variability, ossh_inpu
 
 # Settings for the web server.
 webinterface: 
+  # Whether to enable the web interface (disabled by default to save resources).
+  enabled: {{ ui_enabled }}
+
   # IP to serve on, usually 0.0.0.0 (public exposure) or 127.0.0.1 (local machine).
   host: 0.0.0.0
 

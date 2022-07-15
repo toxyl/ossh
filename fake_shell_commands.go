@@ -238,7 +238,7 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 
 			if err != nil {
 				if err.Error() != "EOF" {
-					LogOverlayFS.Error("Could not read type: %s", glog.Error(err))
+					fs.logger.Error("Could not read type: %s", glog.Error(err))
 				}
 				break
 			}
@@ -249,19 +249,19 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 				// C = single file copy
 				msgMode, err := fs.ReadBytesUntil(' ')
 				if err != nil {
-					LogOverlayFS.Error("Could not read mode: %s", glog.Error(err))
+					fs.logger.Error("Could not read mode: %s", glog.Error(err))
 					break
 				}
 				msgLength, err := fs.ReadBytesUntil(' ')
 				if err != nil {
-					LogOverlayFS.Error("Could not read length: %s", glog.Error(err))
+					fs.logger.Error("Could not read length: %s", glog.Error(err))
 					break
 				}
 				msgLengthInt := gutils.BytesToInt(msgLength, 0)
 
 				msgFileName, err := fs.ReadBytesUntil('\n')
 				if err != nil {
-					LogOverlayFS.Error("Could not read file name: %s", glog.Error(err))
+					fs.logger.Error("Could not read file name: %s", glog.Error(err))
 					break
 				}
 				msgFileNameStr := string(msgFileName)
@@ -272,32 +272,32 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 
 				path := toAbs(fs, msgFileNameFull)
 				if fs.overlayFS == nil {
-					LogOverlayFS.Error("scp: %s: %s", msgFileNameStr, glog.Reason("no OverlayFS available!"))
+					fs.logger.Error("scp: %s: %s", msgFileNameStr, glog.Reason("no OverlayFS available!"))
 					return
 				}
 
 				file, err := fs.overlayFS.OpenFile(path, os.O_RDWR|os.O_CREATE, fso.FileMode(gutils.BytesToInt(msgMode, 0777)))
 				if err != nil && gutils.GetLastError(err) != "is a directory" {
-					LogOverlayFS.Error("scp: %s: %s", msgFileNameStr, gutils.GetLastError(err))
+					fs.logger.Error("scp: %s: %s", msgFileNameStr, gutils.GetLastError(err))
 					return
 				}
 				defer file.Close()
 
 				msgFileData, err := fs.ReadBytesUntilEOF(msgLengthInt)
 				if err != nil && err.Error() != "EOF" {
-					LogOverlayFS.Error("Could not read file data: %s", glog.Error(err))
+					fs.logger.Error("Could not read file data: %s", glog.Error(err))
 					break
 				}
 
 				_, _ = file.Write(msgFileData)
 
-				LogOverlayFS.OK("File uploaded via SCP: %s", glog.File(msgFileNameFull))
+				fs.logger.OK("File uploaded via SCP: %s", glog.File(msgFileNameFull))
 				fpath := filepath.Clean(fmt.Sprintf("%s/scp-uploads/%s", Conf.PathCaptures, msgFileNameFull))
 				if !gutils.FileExists(fpath) {
 					basedir := filepath.Dir(fpath)
 					_ = os.MkdirAll(basedir, 0644)
 					_ = os.WriteFile(fpath, msgFileData, 0400)
-					LogOverlayFS.OK("SCP upload saved to: %s", glog.File(fpath))
+					fs.logger.OK("SCP upload saved to: %s", glog.File(fpath))
 				}
 
 				fs.WriteBinary(0b0) // data read
@@ -308,19 +308,19 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 				// D = recursive dir copy
 				msgMode, err := fs.ReadBytesUntil(' ')
 				if err != nil {
-					LogOverlayFS.Error("Could not read mode: %s", glog.Error(err))
+					fs.logger.Error("Could not read mode: %s", glog.Error(err))
 					break
 				}
 
 				_, err = fs.ReadBytesUntil(' ')
 				if err != nil {
-					LogOverlayFS.Error("Could not read length: %s", glog.Error(err))
+					fs.logger.Error("Could not read length: %s", glog.Error(err))
 					break
 				}
 
 				msgDirName, err := fs.ReadBytesUntil('\n')
 				if err != nil {
-					LogOverlayFS.Error("Could not read dir name: %s", glog.Error(err))
+					fs.logger.Error("Could not read dir name: %s", glog.Error(err))
 					break
 				}
 
@@ -328,7 +328,7 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 				msgDirNameStr = strings.Trim(msgDirNameStr, "'\"")
 
 				if fs.overlayFS == nil {
-					LogOverlayFS.Error("scp: %s: %s", msgDirNameStr, glog.Reason("no OverlayFS available!"))
+					fs.logger.Error("scp: %s: %s", msgDirNameStr, glog.Reason("no OverlayFS available!"))
 					return
 				}
 

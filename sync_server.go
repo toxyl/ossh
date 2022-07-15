@@ -25,6 +25,7 @@ type SyncServerConnection struct {
 	Host      string
 	Port      int
 	CreatedAt time.Time
+	logger    *glog.Logger
 	lock      *sync.Mutex
 }
 
@@ -64,7 +65,7 @@ func (ssc *SyncServerConnection) process(cmd string) error {
 
 	res, err := SyncServerCommands.Run(ssc, str[0], str[1:])
 	if err != nil {
-		LogSyncServer.Error("%s: Error running sync command %s: %s", ssc.LogID(), glog.Highlight(str[0]), glog.Error(err))
+		ssc.logger.Error("%s: Error running sync command %s: %s", ssc.LogID(), glog.Highlight(str[0]), glog.Error(err))
 		ssc.write(EmptyCommandResponse)
 		return err
 	}
@@ -149,6 +150,7 @@ func (sscs *SyncServerConnections) Create(conn net.Conn, host string, port int) 
 			Port:      port,
 			CreatedAt: time.Now(),
 			lock:      &sync.Mutex{},
+			logger:    glog.NewLogger("Sync Server", glog.DarkRed, Conf.Debug.SyncServer, false, false, logMessageHandler),
 		}
 	}
 	return sscs.conns[sid]
@@ -203,6 +205,7 @@ type SyncServer struct {
 	listener net.Listener
 	conns    *SyncServerConnections
 	nodes    *SyncNodes
+	logger   *glog.Logger
 }
 
 func (ss *SyncServer) close() {
@@ -265,7 +268,7 @@ func (ss *SyncServer) SyncWorker() {
 
 			client, err := ss.GetClient(host, port)
 			if err != nil {
-				LogSyncServer.Error("%s: Failed to get client: %s", colorConnID("", host, port), glog.Error(err))
+				ss.logger.Error("%s: Failed to get client: %s", colorConnID("", host, port), glog.Error(err))
 				continue
 			}
 
@@ -311,7 +314,7 @@ func (ss *SyncServer) UpdateClients() {
 	for _, node := range Conf.Sync.Nodes {
 		if node.Host != Conf.SyncServer.Host || node.Port != int(Conf.SyncServer.Port) {
 			Conf.IPWhitelist = append(Conf.IPWhitelist, node.Host)
-			LogSyncServer.Debug("%s: Client added", node.LogID())
+			ss.logger.Debug("%s: Client added", node.LogID())
 			ss.nodes.AddClient(NewSyncClient(node.Host, node.Port))
 		}
 	}
@@ -321,7 +324,7 @@ func (ss *SyncServer) ConnectionHandler(listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			LogSyncServer.Error("Accept failed: %s", glog.Error(err))
+			ss.logger.Error("Accept failed: %s", glog.Error(err))
 			conn.Close()
 			continue
 		}
@@ -331,7 +334,7 @@ func (ss *SyncServer) ConnectionHandler(listener net.Listener) {
 		lid := ssc.LogID()
 
 		if !ss.nodes.IsAllowedHost(host) {
-			LogSyncServer.NotOK("%s: Not a sync node, returning bullshit.", lid)
+			ss.logger.NotOK("%s: Not a sync node, returning bullshit.", lid)
 			ssc.write(gutils.GenerateGarbageString(1000))
 			_ = ss.conns.Remove(host, port)
 			continue
@@ -340,12 +343,12 @@ func (ss *SyncServer) ConnectionHandler(listener net.Listener) {
 		go func(host string, port int) {
 			err := ssc.handleConnection()
 			if err != nil {
-				LogSyncServer.Error("%s: %s", lid, err)
+				ss.logger.Error("%s: %s", lid, err)
 			}
 
 			err = ss.conns.Remove(host, port)
 			if err != nil {
-				LogSyncServer.Error("%s: Could not remove goroutine: %s", lid, err)
+				ss.logger.Error("%s: Could not remove goroutine: %s", lid, err)
 			}
 		}(host, port)
 	}
@@ -362,10 +365,10 @@ func (ss *SyncServer) CleanUpWorker() {
 		hsr := glog.Hosts(removed, true)
 		if lr > 0 {
 			if l == 0 {
-				LogSyncServer.Info("Cleanup worker: Removed %s, none left", hsr)
+				ss.logger.Info("Cleanup worker: Removed %s, none left", hsr)
 				continue
 			}
-			LogSyncServer.Info("Cleanup worker: Removed %s, still open: %s", hsr, hs)
+			ss.logger.Info("Cleanup worker: Removed %s, still open: %s", hsr, hs)
 		}
 	}
 }
@@ -373,7 +376,7 @@ func (ss *SyncServer) CleanUpWorker() {
 func (ss *SyncServer) Start() {
 	ss.UpdateClients()
 	srv := fmt.Sprintf("%s:%d", Conf.SyncServer.Host, Conf.SyncServer.Port)
-	LogSyncServer.Default("Starting sync server on %s...", glog.Wrap("tcp://"+srv, glog.BrightYellow))
+	ss.logger.Default("Starting sync server on %s...", glog.Wrap("tcp://"+srv, glog.BrightYellow))
 	listener, err := net.Listen("tcp", srv)
 	if err != nil {
 		panic(err)
@@ -388,6 +391,7 @@ func NewSyncServer() *SyncServer {
 		listener: nil,
 		nodes:    NewSyncNodes(),
 		conns:    NewSyncServerConnections(),
+		logger:   glog.NewLogger("Sync Server", glog.DarkRed, Conf.Debug.SyncServer, false, false, logMessageHandler),
 	}
 
 	return ss

@@ -27,7 +27,9 @@ func main() {
 	SrvSync = NewSyncServer()
 	SrvMetrics.Start()
 	SrvSync.Start()
-	SrvUI.Start()
+	if SrvUI != nil {
+		SrvUI.Start()
+	}
 	SrvOSSH.Start()
 }
 

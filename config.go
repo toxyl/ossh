@@ -67,6 +67,7 @@ type Config struct {
 	InputDelay     uint    `mapstructure:"input_delay"`
 	Ratelimit      float64 `mapstructure:"ratelimit"`
 	Webinterface   struct {
+		Enabled  bool   `mapstructure:"enabled"`
 		Host     string `mapstructure:"host"`
 		Port     uint   `mapstructure:"port"`
 		CertFile string `mapstructure:"cert_file"`
@@ -100,6 +101,15 @@ type Config struct {
 var cfgFile string = ""
 var Conf Config
 
+var LogGlobal *glog.Logger = glog.NewLogger("Global", glog.Gray, false, false, false, logMessageHandler)
+
+func logMessageHandler(msg string) {
+	fmt.Print(msg)
+	if SrvUI != nil {
+		SrvUI.PushLog(msg)
+	}
+}
+
 func isIPWhitelisted(ip string) bool {
 	for _, wip := range Conf.IPWhitelist {
 		if ip == wip {
@@ -117,70 +127,25 @@ func colorConnID(user, host string, port int) string {
 	return fmt.Sprintf("%s > %s", addr, glog.Wrap(user, glog.Green))
 }
 
-func logMessageHandler(msg string) {
-	fmt.Print(msg)
-	if SrvUI != nil {
-		SrvUI.PushLog(msg)
+func initPath(p, d string) string {
+	if p == "" {
+		p = fmt.Sprintf("%s/%s", Conf.PathData, d)
 	}
+	return p
 }
 
-var (
-	LogGlobal        = glog.NewLogger("Global", glog.Gray, false, false, false, logMessageHandler)
-	LogFakeShell     = glog.NewLogger("Fake Shell", glog.OliveGreen, false, false, false, logMessageHandler)
-	LogOverlayFS     = glog.NewLogger("Overlay FS", glog.LightBlue, false, false, false, logMessageHandler)
-	LogOSSHServer    = glog.NewLogger("oSSH Server", glog.Lime, false, false, false, logMessageHandler)
-	LogSessions      = glog.NewLogger("Sessions", glog.DarkOrange, false, false, false, logMessageHandler)
-	LogSyncClient    = glog.NewLogger("Sync Client", glog.Blue, false, false, false, logMessageHandler)
-	LogSyncCommands  = glog.NewLogger("Sync Commands", glog.DarkGreen, false, false, false, logMessageHandler)
-	LogSyncServer    = glog.NewLogger("Sync Server", glog.DarkRed, false, false, false, logMessageHandler)
-	LogTextTemplater = glog.NewLogger("Text Templater", glog.MediumGray, false, false, false, logMessageHandler)
-	LogUIServer      = glog.NewLogger("UI Server", glog.Cyan, false, false, false, logMessageHandler)
-)
-
 func InitPaths() {
-	if Conf.PathData == "" {
-		Conf.PathData = "/etc/ossh"
-	}
-
-	if Conf.PathCaptures == "" {
-		Conf.PathCaptures = fmt.Sprintf("%s/captures", Conf.PathData)
-	}
-
-	if Conf.PathCommands == "" {
-		Conf.PathCommands = fmt.Sprintf("%s/commands", Conf.PathData)
-	}
-
-	if Conf.PathWebinterface == "" {
-		Conf.PathWebinterface = fmt.Sprintf("%s/webinterface", Conf.PathData)
-	}
-
-	if Conf.PathFFS == "" {
-		Conf.PathFFS = fmt.Sprintf("%s/ffs", Conf.PathData)
-	}
-
-	if Conf.PathPayloads == "" {
-		Conf.PathPayloads = fmt.Sprintf("%s/payloads.txt", Conf.PathData)
-	}
-
-	if Conf.PathHosts == "" {
-		Conf.PathHosts = fmt.Sprintf("%s/hosts.txt", Conf.PathData)
-	}
-
-	if Conf.PathPasswords == "" {
-		Conf.PathPasswords = fmt.Sprintf("%s/passwords.txt", Conf.PathData)
-	}
-
-	if Conf.PathUsers == "" {
-		Conf.PathUsers = fmt.Sprintf("%s/users.txt", Conf.PathData)
-	}
-
-	if Conf.Webinterface.CertFile == "" {
-		Conf.Webinterface.CertFile = fmt.Sprintf("%s/ossh.crt", Conf.PathData)
-	}
-
-	if Conf.Webinterface.KeyFile == "" {
-		Conf.Webinterface.KeyFile = fmt.Sprintf("%s/ossh.key", Conf.PathData)
-	}
+	Conf.PathData = initPath(Conf.PathData, "/etc/ossh")
+	Conf.PathCaptures = initPath(Conf.PathCaptures, "captures")
+	Conf.PathCommands = initPath(Conf.PathCommands, "commands")
+	Conf.PathWebinterface = initPath(Conf.PathWebinterface, "webinterface")
+	Conf.PathFFS = initPath(Conf.PathFFS, "ffs")
+	Conf.PathPayloads = initPath(Conf.PathPayloads, "payloads.txt")
+	Conf.PathHosts = initPath(Conf.PathHosts, "hosts.txt")
+	Conf.PathPasswords = initPath(Conf.PathPasswords, "passwords.txt")
+	Conf.PathUsers = initPath(Conf.PathUsers, "users.txt")
+	Conf.Webinterface.CertFile = initPath(Conf.Webinterface.CertFile, "ossh.crt")
+	Conf.Webinterface.KeyFile = initPath(Conf.Webinterface.KeyFile, "ossh.key")
 
 	err := gutils.MkDirs(
 		Conf.PathCommands,
@@ -193,40 +158,6 @@ func InitPaths() {
 	)
 	if err != nil {
 		panic(err)
-	}
-}
-
-func InitDebug() {
-	if Conf.Debug.SyncCommands {
-		LogSyncCommands.EnableDebug()
-	}
-
-	if Conf.Debug.SyncClient {
-		LogSyncClient.EnableDebug()
-	}
-
-	if Conf.Debug.SyncServer {
-		LogSyncServer.EnableDebug()
-	}
-
-	if Conf.Debug.OSSHServer {
-		LogOSSHServer.EnableDebug()
-	}
-
-	if Conf.Debug.Sessions {
-		LogSessions.EnableDebug()
-	}
-
-	if Conf.Debug.UIServer {
-		LogUIServer.EnableDebug()
-	}
-
-	if Conf.Debug.OverlayFS {
-		LogOverlayFS.EnableDebug()
-	}
-
-	if Conf.Debug.FakeShell {
-		LogFakeShell.EnableDebug()
 	}
 }
 
@@ -253,7 +184,6 @@ func initConfig() {
 	}
 
 	InitPaths()
-	InitDebug()
 
 	err = gutils.CopyEmbeddedFSToDisk(fsCommandTemplates, Conf.PathCommands, "commands")
 	if err != nil {

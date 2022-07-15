@@ -55,6 +55,20 @@ all:
     # The amount of milliseconds that the input delay is allowed to be offset ny the playbook.
     ossh_input_delay_variability: 10
 
+    # Determines whether the web interface will made be available. 
+    # Running the web interface takes extra resources that you can spare
+    # if you are fine with using oSSH via CLI only (monitoring still works via Prometheus). 
+    #
+    # It can be useful to enable the web interface on a single node
+    # of a cluster, preferably one connected to other clusters,
+    # so you can comfortably inspect collected payloads and
+    # see stats for your cluster and connected neighbors.
+    # When using Prometheus and the Grafana dashboard you will only see
+    # stats from the nodes in your own cluster, not other nodes connected to it.
+    #
+    # Use on a per-host level to enable/disable.
+    ui_enabled: false
+
     # The port of the HTTPS server. Usually 443.
     ui_port: "443"
 

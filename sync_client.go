@@ -15,10 +15,11 @@ import (
 )
 
 type SyncClient struct {
-	Host string
-	Port int
-	conn net.Conn
-	lock *sync.Mutex
+	Host   string
+	Port   int
+	conn   net.Conn
+	logger *glog.Logger
+	lock   *sync.Mutex
 }
 
 func (sc *SyncClient) LogID() string {
@@ -140,13 +141,13 @@ func (sc *SyncClient) AddPayload(fingerprint string) {
 		}
 
 		if !SrvOSSH.Loot.payloads.Has(fp) {
-			LogSyncClient.Info("%s: We can't send payload %s, we don't have it.", sc.LogID(), glog.Highlight(fp))
+			sc.logger.Info("%s: We can't send payload %s, we don't have it.", sc.LogID(), glog.Highlight(fp))
 			continue
 		}
 
 		pl, err := SrvOSSH.Loot.payloads.Get(fp)
 		if err != nil {
-			LogSyncClient.Error("%s: Looks like we can't give them the payload %s, we got an error retrieving it: %s", sc.LogID(), glog.Highlight(fp), glog.Error(err))
+			sc.logger.Error("%s: Looks like we can't give them the payload %s, we got an error retrieving it: %s", sc.LogID(), glog.Highlight(fp), glog.Error(err))
 			continue
 		}
 
@@ -162,11 +163,11 @@ func (sc *SyncClient) AddPayload(fingerprint string) {
 }
 
 func (sc *SyncClient) SyncData(cmd string, fnGet func() []string, fnAddRemote func(data string)) {
-	LogSyncClient.Debug("%s: Syncing %s", sc.LogID(), glog.Highlight(cmd))
+	sc.logger.Debug("%s: Syncing %s", sc.LogID(), glog.Highlight(cmd))
 	res, err := sc.Exec(cmd)
 	if err != nil {
 		// chances are that the node refused the connection because it's busy with syncing itself
-		LogSyncClient.Debug("%s: Failed to get %s: %s", sc.LogID(), glog.Highlight(cmd), glog.Error(err))
+		sc.logger.Debug("%s: Failed to get %s: %s", sc.LogID(), glog.Highlight(cmd), glog.Error(err))
 		return
 	}
 
@@ -175,9 +176,10 @@ func (sc *SyncClient) SyncData(cmd string, fnGet func() []string, fnAddRemote fu
 
 func NewSyncClient(host string, port int) *SyncClient {
 	sc := &SyncClient{
-		Host: host,
-		Port: port,
-		lock: &sync.Mutex{},
+		Host:   host,
+		Port:   port,
+		logger: glog.NewLogger("Sync Client", glog.Blue, Conf.Debug.SyncClient, false, false, logMessageHandler),
+		lock:   &sync.Mutex{},
 	}
 	return sc
 }

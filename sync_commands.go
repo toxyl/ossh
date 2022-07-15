@@ -41,19 +41,19 @@ func NewSyncCommands() *SyncCommands {
 				}
 				fpsrv := SrvOSSH.Loot.Fingerprint()
 				if fp == fpsrv {
-					LogSyncCommands.Debug("%s: Ignored SYNC request: %s", ssc.LogID(), glog.Highlight("already up-to-date"))
+					ssc.logger.Debug("%s: Ignored SYNC request: %s", ssc.LogID(), glog.Highlight("already up-to-date"))
 					return "", nil
 				}
 				fpRemote := strings.Split(fp, ":")
 				fpLocal := strings.Split(fpsrv, ":")
 
 				if len(fpRemote) != len(fpLocal) {
-					LogSyncCommands.Debug("%s: Ignored SYNC request, fingerprints are not the same length: %s (we have: %s)", ssc.LogID(), glog.Highlight(fp), glog.Highlight(fpsrv))
+					ssc.logger.Debug("%s: Ignored SYNC request, fingerprints are not the same length: %s (we have: %s)", ssc.LogID(), glog.Highlight(fp), glog.Highlight(fpsrv))
 					return "", nil
 				}
 
 				if len(fpRemote) == 0 || len(fpLocal) == 0 {
-					LogSyncCommands.Debug("%s: Ignored SYNC request, one of the fingerprints is empty: %s (we have: %s)", ssc.LogID(), glog.Highlight(fp), glog.Highlight(fpsrv))
+					ssc.logger.Debug("%s: Ignored SYNC request, one of the fingerprints is empty: %s (we have: %s)", ssc.LogID(), glog.Highlight(fp), glog.Highlight(fpsrv))
 					return "", nil
 				}
 
@@ -96,7 +96,7 @@ func NewSyncCommands() *SyncCommands {
 				added := SrvOSSH.Loot.AddHosts(args)
 				if added > 0 {
 					if added > 1 || Conf.Debug.SyncCommands { // to avoid log clutter
-						LogSyncCommands.OK("%s: Donated %s", ssc.LogID(), glog.IntAmount(added, "host", "hosts"))
+						ssc.logger.OK("%s: Donated %s", ssc.LogID(), glog.IntAmount(added, "host", "hosts"))
 					}
 					SrvOSSH.SaveData()
 				}
@@ -109,7 +109,7 @@ func NewSyncCommands() *SyncCommands {
 				added := SrvOSSH.Loot.AddUsers(args)
 				if added > 0 {
 					if added > 1 || Conf.Debug.SyncCommands { // to avoid log clutter
-						LogSyncCommands.OK("%s: Donated %s", ssc.LogID(), glog.IntAmount(added, "user", "users"))
+						ssc.logger.OK("%s: Donated %s", ssc.LogID(), glog.IntAmount(added, "user", "users"))
 					}
 					SrvOSSH.SaveData()
 				}
@@ -122,7 +122,7 @@ func NewSyncCommands() *SyncCommands {
 				added := SrvOSSH.Loot.AddPasswords(args)
 				if added > 0 {
 					if added > 1 || Conf.Debug.SyncCommands { // to avoid log clutter
-						LogSyncCommands.OK("%s: Donated %s", ssc.LogID(), glog.IntAmount(added, "password", "passwords"))
+						ssc.logger.OK("%s: Donated %s", ssc.LogID(), glog.IntAmount(added, "password", "passwords"))
 					}
 					SrvOSSH.SaveData()
 				}
@@ -141,7 +141,7 @@ func NewSyncCommands() *SyncCommands {
 				pl.Save()
 				if pl.Exists() {
 					if SrvOSSH.Loot.AddPayload(hash) {
-						LogSyncCommands.OK("%s: Donated payload %s", ssc.LogID(), glog.File(pl.file))
+						ssc.logger.OK("%s: Donated payload %s", ssc.LogID(), glog.File(pl.file))
 						SrvOSSH.SaveData()
 					}
 				}
@@ -154,7 +154,7 @@ func NewSyncCommands() *SyncCommands {
 				}
 				stats := SrvOSSH.JSONToStats(strings.Join(args, " "))
 				SrvSync.nodes.AddStats(ssc.Host, stats)
-				LogSyncCommands.Debug("%s: Reported stats", ssc.LogID())
+				ssc.logger.Debug("%s: Reported stats", ssc.LogID())
 				return "", nil
 			},
 		},
