@@ -5,7 +5,7 @@
 It is inspired by [Endlessh](https://github.com/skeeto/endlessh) which was a lot of fun, but I wanted more than just slowing down bots, I was also curious what they would do once they've gotten in. The result is a combination of the characteristics of a honeypot and a tarpot, that uses few resources and can run as a cluster. Unlike a classical honeypot, it presents itself as a pretty broken system where many commands result in errors reminiscent of failing hardware, bad configuration and alike. Naturally, everything bots do is collected for further analysis. Host IPs, user names, passwords and payloads are shared with all nodes in a cluster. Many aspects of oSSH, such as the amount of tar added and the responses to commands, can be edited via a YAML configuration file or the Dashboard. 
 
 ## Features
-- Low memory and CPU footprint (runs perfectly fine on a $5 DigitalOcean droplet)
+- Low memory and CPU footprint (runs fine on a $5 DigitalOcean droplet[^1])
 - [Ansible Playbook](#ansible-playbook) to make deployment/update of a cluster easy
 - [Data Collection](#data-collection) for analysis, blacklisting, and so on
 - [Fake SSH Server](#fake-ssh-server) with:
@@ -30,15 +30,18 @@ It is inspired by [Endlessh](https://github.com/skeeto/endlessh) which was a lot
 - [Sync Server](#sync-server) 
   - [IP whitelist](#ip-whitelist-1)
 - [Metrics Server](#metrics-server) (Prometheus endpoint)
+  - [Grafana Dashboard](#grafana-dashboard) with cluster and node stats
 - [Dashboard](#dashboard) with:
   - [Node & cluster stats](#node--cluster-stats)
   - [Console](#console-viewer)
   - [Config editor](#config-editor) 
   - [Payload viewer](#payloads-viewer)
-  - [IP whitelist](#ip-whitelist-2)
+  - [IP whitelist](#ip-whitelist-2)  
+
+[^1]: Sometimes (as in every few days) bots open a lot of connections at almost the same time that require an OverlayFS, which can drive up memory usage (seen in the wild). So far instances with 2GB of RAM were able to deal with everything bots threw at it, but 1GB instances would sometimes restart the oSSH service (i.e. without crasing the machine). In that case, bots usually just pick up as if nothing happened. If you find restarts annoying for some reason, you might want to go for a droplet with 2GB of RAM, everyone else should be fine with 1GB of RAM.
 
 ## Installation
-It is **strongly recommended** that you install oSSH on a machine that is only used for that purpose to minimize the impact should an attacker manage to break out of oSSH. DigitalOcean's $5 droplets, for example, work perfectly fine for this task.
+It is **strongly recommended** that you install oSSH on a machine that is only used for that purpose to minimize the impact should an attacker manage to break out of oSSH. DigitalOcean's $5 droplets, for example, work fine for this task[^1].
 
 ### Ansible Playbook
 If you have Ansible installed, this is the route to take.  
@@ -102,7 +105,7 @@ Within that directory, you will find bind a bunch of files with data collected b
 | `payloads.txt` | List of payload fingerprints |
 
 ### Captures Subdirectory
-The subdirectory `captures` is the collection of payloads, public SSH keys and SCP file uploads received from bots. Whenever a bot connects oSSH will record what it's doing and then save that recording as an ASCIICast v2 file which you can play back with [`asciinema`](https://asciinema.org/) or the dashboard. oSSH will attempt to categorize payloads by prefixing the SHA fingerprint of the payload with a locality-sensitive hash. This approach is far from perfect (PRs for better solutions are welcome!), but it does work better than pure SHA fingerprints.  
+The subdirectory `captures` is the collection of payloads, public SSH keys and SCP file uploads received from bots. Whenever a bot connects, oSSH will record what it's doing and then save that recording as an ASCIICast v2 file which you can play back with [`asciinema`](https://asciinema.org/) or the dashboard. oSSH will attempt to categorize payloads by prefixing the SHA fingerprint of the payload with a locality-sensitive hash. This approach is far from perfect (PRs for better solutions are welcome!), but it does work better than pure SHA fingerprints.  
 Only the payloads from the `captures` directory are synced with other nodes at the moment, but that might change in the future.
 
 ### Commands Subdirectory
@@ -130,9 +133,9 @@ Keys used by whitelisted IPs are excluded from data collection.
 
 ### Payloads
 Everything run after logging into the [Fake SSH Server](#fake-ssh-server) will be recorded and collected in the directory `captures` in the installation directory.  
-When an SSH session ends all of its input will be compared to already recorded payloads. Existing payloads will not be overwritten. New payloads will be stored and then send to all known nodes.  
+When an SSH session ends, all of its input will be compared to already recorded payloads. Existing payloads will not be overwritten. New payloads will be stored and then send to all known nodes.  
 The file name used to store a payload contains a locality-sensitive hash followed by a SHA1 hash in an attempt to group similar payloads.  
-Sessions by whitelisted IPs are excluded from data collection.
+Payloads by whitelisted IPs are excluded from data collection.
 
 ### SCP Uploads
 All files uploaded to the [Fake SSH Server](#fake-ssh-server) will be collected in the directory `captures/scp-uploads` in the installation directory. These are currently not synced with the other nodes.  
@@ -262,7 +265,24 @@ sync:
 Whitelisted IPs are allowed to communicate with the sync server. All other IPs will receive [bullshit data](#bullshit-config).
 
 ## Metrics Server
-A Prometheus endpoint providing metrics for the oSSH instance. WIP.
+A Prometheus endpoint providing metrics for the oSSH instance.
+Add the following to your Prometheus config (probably lives at `/etc/`)
+
+### Grafana Dashboard
+In the file `grafana_dashboard.json` you can find a Grafana dashboard that you can import. It requires at least one Prometheus source that has oSSH data available. Adjust the IPs and add something like this to your Prometheus config (probably lives at `/etc/prometheus/prometheus.yml`):
+```yaml
+  - job_name: 'ossh_cluster'
+    scrape_interval: 10s
+    static_configs:
+    - targets:
+      - 1.2.3.4:2112
+      - 5.6.7.8:2112
+      - 9.10.11.12:2112
+      - 13.14.15.16:2112
+      - 17.18.19.20:2112
+      - 21.22.23.24:2112
+      - 25.26.27.28:2112
+```
 
 ## Dashboard
 oSSH comes with a dashboard that allows you to watch and filter the console output, check node & cluster stats, edit the config or view recorded payloads.
