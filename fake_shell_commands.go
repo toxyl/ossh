@@ -7,6 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/toxyl/glog"
+	"github.com/toxyl/gutils"
 )
 
 type Command func(fs *FakeShell, line string) (exit bool)
@@ -65,7 +68,7 @@ func cmdCd(fs *FakeShell, line string) (exit bool) {
 
 	// cd runs way too fast without any output,
 	// let's fuck a bit with the bots
-	fs.RecordWriteLn(GeneratePseudoEmptyString(0))
+	fs.RecordWriteLn(gutils.GeneratePseudoEmptyString(0))
 
 	return
 }
@@ -73,13 +76,14 @@ func cmdCd(fs *FakeShell, line string) (exit bool) {
 func cmdRm(fs *FakeShell, line string) (exit bool) {
 	parts := strings.Split(line, " ")
 
-	if len(parts) == 1 {
+	if len(parts) < 2 {
 		fs.RecordWriteLn("rm: missing operand")
 		fs.RecordWriteLn("Try 'rm --help' for more information.")
 		return
 	}
 
 	// TODO handle options
+	parts = gutils.RemoveCommandFlags(parts)
 
 	for _, pt := range parts[1:] {
 		if strings.HasPrefix(pt, "~") {
@@ -97,13 +101,16 @@ func cmdRm(fs *FakeShell, line string) (exit bool) {
 
 	// rm runs way too fast without any output,
 	// let's fuck a bit with the bots
-	fs.RecordWriteLn(GeneratePseudoEmptyString(0))
+	fs.RecordWriteLn(gutils.GeneratePseudoEmptyString(0))
 
 	return
 }
 
 func cmdLs(fs *FakeShell, line string) (exit bool) {
 	parts := strings.Split(line, " ")
+	// TODO handle options
+	parts = gutils.RemoveCommandFlags(parts)
+
 	var dir string
 	if len(parts) < 2 {
 		dir = fs.cwd
@@ -111,12 +118,10 @@ func cmdLs(fs *FakeShell, line string) (exit bool) {
 		dir = toAbs(fs, parts[1])
 	}
 
-	// TODO handle options
-
 	entries, err := fs.overlayFS.ReadDir(dir)
 	if err != nil {
 		if err.(*os.PathError).Err.Error() != "not a directory" {
-			fs.RecordWriteLn(fmt.Sprintf("ls: cannot access '%s': %s", dir, GetLastError(err.(*os.PathError).Err)))
+			fs.RecordWriteLn(fmt.Sprintf("ls: cannot access '%s': %s", dir, gutils.GetLastError(err.(*os.PathError).Err)))
 			return
 		}
 
@@ -143,6 +148,7 @@ func cmdPwd(fs *FakeShell, line string) (exit bool) {
 
 func cmdCat(fs *FakeShell, line string) (exit bool) {
 	parts := strings.Split(line, " ")
+
 	if len(parts) < 2 {
 		// TODO echo input, like the real `cat` command
 		fs.RecordWriteLn("cat: specify file")
@@ -150,18 +156,19 @@ func cmdCat(fs *FakeShell, line string) (exit bool) {
 	}
 
 	// TODO handle flags
+	parts = gutils.RemoveCommandFlags(parts)
 
 	path := toAbs(fs, parts[1])
 	file, err := fs.overlayFS.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {
-		fs.RecordWriteLn(fmt.Sprintf("cat: %s: %s", parts[1], GetLastError(err)))
+		fs.RecordWriteLn(fmt.Sprintf("cat: %s: %s", parts[1], gutils.GetLastError(err)))
 		return
 	}
 	defer file.Close()
 
 	stat, err := file.Stat()
 	if err != nil {
-		fs.RecordWriteLn(fmt.Sprintf("cat: %s: %s", parts[1], GetLastError(err)))
+		fs.RecordWriteLn(fmt.Sprintf("cat: %s: %s", parts[1], gutils.GetLastError(err)))
 		return
 	}
 
@@ -172,7 +179,7 @@ func cmdCat(fs *FakeShell, line string) (exit bool) {
 
 	fileContents, err := io.ReadAll(file)
 	if err != nil {
-		fs.RecordWriteLn(fmt.Sprintf("cat: %s: %s", parts[1], GetLastError(err)))
+		fs.RecordWriteLn(fmt.Sprintf("cat: %s: %s", parts[1], gutils.GetLastError(err)))
 		return
 	}
 
@@ -189,11 +196,12 @@ func cmdTouch(fs *FakeShell, line string) (exit bool) {
 	}
 
 	// TODO handle flags
+	parts = gutils.RemoveCommandFlags(parts)
 
 	path := toAbs(fs, parts[1])
 	file, err := fs.overlayFS.OpenFile(path, os.O_CREATE, 0)
 	if err != nil {
-		fs.RecordWriteLn(fmt.Sprintf("touch: %s: %s", parts[1], GetLastError(err)))
+		fs.RecordWriteLn(fmt.Sprintf("touch: %s: %s", parts[1], gutils.GetLastError(err)))
 		return
 	}
 	defer file.Close()
@@ -221,8 +229,8 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 	if isSink {
 		// someone wants to donate a file
 		fs.WriteBinary(0b0) // ready to receive
-
-		dirs := []string{parts[len(parts)-1]}
+		dname := strings.Trim(parts[len(parts)-1], "\"'")
+		dirs := []string{dname}
 
 		// read all messages
 		for {
@@ -230,7 +238,7 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 
 			if err != nil {
 				if err.Error() != "EOF" {
-					LogOverlayFS.Error("Could not read type: %s", colorError(err))
+					fs.logger.Error("Could not read type: %s", glog.Error(err))
 				}
 				break
 			}
@@ -241,48 +249,55 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 				// C = single file copy
 				msgMode, err := fs.ReadBytesUntil(' ')
 				if err != nil {
-					LogOverlayFS.Error("Could not read mode: %s", colorError(err))
+					fs.logger.Error("Could not read mode: %s", glog.Error(err))
 					break
 				}
 				msgLength, err := fs.ReadBytesUntil(' ')
 				if err != nil {
-					LogOverlayFS.Error("Could not read length: %s", colorError(err))
+					fs.logger.Error("Could not read length: %s", glog.Error(err))
 					break
 				}
-				msgLengthInt := StringToInt(string(msgLength), 0)
+				msgLengthInt := gutils.BytesToInt(msgLength, 0)
 
 				msgFileName, err := fs.ReadBytesUntil('\n')
 				if err != nil {
-					LogOverlayFS.Error("Could not read file name: %s", colorError(err))
+					fs.logger.Error("Could not read file name: %s", glog.Error(err))
 					break
 				}
-				msgFileNameFull := fmt.Sprintf("%s/%s", strings.Join(dirs, "/"), string(msgFileName))
+				msgFileNameStr := string(msgFileName)
+				msgFileNameStr = strings.Trim(msgFileNameStr, "'\"")
+				msgFileNameFull := fmt.Sprintf("%s/%s", strings.Join(dirs, "/"), msgFileNameStr)
 
 				fs.WriteBinary(0b0) // ready to receive
 
 				path := toAbs(fs, msgFileNameFull)
-				file, err := fs.overlayFS.OpenFile(path, os.O_RDWR|os.O_CREATE, fso.FileMode(StringToInt(string(msgMode), 0777)))
-				if err != nil && GetLastError(err) != "is a directory" {
-					LogOverlayFS.Error("scp: %s: %s", string(msgFileName), GetLastError(err))
+				if fs.overlayFS == nil {
+					fs.logger.Error("scp: %s: %s", msgFileNameStr, glog.Reason("no OverlayFS available!"))
+					return
+				}
+
+				file, err := fs.overlayFS.OpenFile(path, os.O_RDWR|os.O_CREATE, fso.FileMode(gutils.BytesToInt(msgMode, 0777)))
+				if err != nil && gutils.GetLastError(err) != "is a directory" {
+					fs.logger.Error("scp: %s: %s", msgFileNameStr, gutils.GetLastError(err))
 					return
 				}
 				defer file.Close()
 
-				msgFileData, err := fs.ReadBytes(msgLengthInt)
+				msgFileData, err := fs.ReadBytesUntilEOF(msgLengthInt)
 				if err != nil && err.Error() != "EOF" {
-					LogOverlayFS.Error("Could not read file data: %s", colorError(err))
+					fs.logger.Error("Could not read file data: %s", glog.Error(err))
 					break
 				}
 
 				_, _ = file.Write(msgFileData)
 
-				LogOverlayFS.OK("File uploaded via SCP: %s", colorFile(msgFileNameFull))
+				fs.logger.OK("File uploaded via SCP: %s", glog.File(msgFileNameFull))
 				fpath := filepath.Clean(fmt.Sprintf("%s/scp-uploads/%s", Conf.PathCaptures, msgFileNameFull))
-				if !FileExists(fpath) {
+				if !gutils.FileExists(fpath) {
 					basedir := filepath.Dir(fpath)
 					_ = os.MkdirAll(basedir, 0644)
 					_ = os.WriteFile(fpath, msgFileData, 0400)
-					LogOverlayFS.OK("SCP upload saved to: %s", colorFile(fpath))
+					fs.logger.OK("SCP upload saved to: %s", glog.File(fpath))
 				}
 
 				fs.WriteBinary(0b0) // data read
@@ -293,24 +308,32 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 				// D = recursive dir copy
 				msgMode, err := fs.ReadBytesUntil(' ')
 				if err != nil {
-					LogOverlayFS.Error("Could not read mode: %s", colorError(err))
+					fs.logger.Error("Could not read mode: %s", glog.Error(err))
 					break
 				}
 
 				_, err = fs.ReadBytesUntil(' ')
 				if err != nil {
-					LogOverlayFS.Error("Could not read length: %s", colorError(err))
+					fs.logger.Error("Could not read length: %s", glog.Error(err))
 					break
 				}
 
 				msgDirName, err := fs.ReadBytesUntil('\n')
 				if err != nil {
-					LogOverlayFS.Error("Could not read dir name: %s", colorError(err))
+					fs.logger.Error("Could not read dir name: %s", glog.Error(err))
 					break
 				}
 
-				dirs = append(dirs, string(msgDirName))
-				_ = fs.overlayFS.MkdirAll(strings.Join(dirs, "/"), fso.FileMode(StringToInt(string(msgMode), 0777)))
+				msgDirNameStr := string(msgDirName)
+				msgDirNameStr = strings.Trim(msgDirNameStr, "'\"")
+
+				if fs.overlayFS == nil {
+					fs.logger.Error("scp: %s: %s", msgDirNameStr, glog.Reason("no OverlayFS available!"))
+					return
+				}
+
+				dirs = append(dirs, msgDirNameStr)
+				_ = fs.overlayFS.MkdirAll(strings.Join(dirs, "/"), fso.FileMode(gutils.BytesToInt(msgMode, 0777)))
 
 				fs.WriteBinary(0b0) // data read
 				continue

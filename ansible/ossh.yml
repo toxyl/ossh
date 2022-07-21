@@ -1,0 +1,37 @@
+---
+- hosts: 127.0.0.1   
+  connection: local
+  gather_facts: no
+  tasks:
+    - name: Build oSSH locally
+      environment:
+        CGO_ENABLED: "0"
+      shell: "go build -o roles/ossh/files/ossh {{ data_dir }}"
+    - name: Generate SSH key
+      user:
+        name: "{{ ansible_user }}"
+        generate_ssh_key: yes
+        ssh_key_type: rsa
+        ssh_key_bits: 4096
+        ssh_key_file: "{{ ssh_key_file }}"
+        force: no
+      tags: install
+
+- hosts: all
+  become: True
+  roles:
+    - apt
+    - user
+    - ssh
+  tags: install
+
+- hosts: all
+  become: True
+  remote_user: "{{ admin_username }}"
+  vars:
+    ansible_port: "{{ admin_port }}"
+    ansible_ssh_private_key_file: "{{ lookup('file', ssh_key_file) }}"
+  roles:
+    - ufw
+    - hostname
+    - ossh

@@ -1,0 +1,7 @@
+[defaults]
+inventory = inventory.yml
+display_skipped_hosts = no
+interpreter_python = auto_silent
+remote_user = root
+[ssh_connection]
+retries = 2

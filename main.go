@@ -8,6 +8,7 @@ import (
 var SrvOSSH *OSSHServer
 var SrvUI *UIServer
 var SrvSync *SyncServer
+var SrvMetrics *MetricsServer
 
 var startTime time.Time
 
@@ -20,12 +21,15 @@ func main() {
 
 	startTime = time.Now()
 	initConfig()
+	SrvMetrics = NewMetricsServer()
 	SrvOSSH = NewOSSHServer()
 	SrvUI = NewUIServer()
 	SrvSync = NewSyncServer()
-	go SrvUI.Start()
-	go SrvSync.Start()
-	go SrvSync.SyncToNodes()
+	SrvMetrics.Start()
+	SrvSync.Start()
+	if SrvUI != nil {
+		SrvUI.Start()
+	}
 	SrvOSSH.Start()
 }
 

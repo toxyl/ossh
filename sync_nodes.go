@@ -4,6 +4,9 @@ import (
 	"errors"
 	"strings"
 	"sync"
+
+	"github.com/toxyl/glog"
+	"github.com/toxyl/gutils"
 )
 
 type SyncNodeStats struct {
@@ -23,10 +26,15 @@ type SyncNode struct {
 	Port int    `mapstructure:"port"`
 }
 
+func (sn *SyncNode) LogID() string {
+	return colorConnID("", sn.Host, sn.Port)
+}
+
 type SyncNodes struct {
 	nodes   map[string]*SyncNode
 	stats   map[string]*SyncNodeStats
 	clients map[string]*SyncClient
+	logger  *glog.Logger
 	lock    *sync.Mutex
 }
 
@@ -55,6 +63,15 @@ func (sn *SyncNodes) AddClient(client *SyncClient) {
 	sn.clients[client.ID()] = client
 }
 
+func (sn *SyncNodes) RemoveClient(id string) {
+	if !sn.HasClient(id) {
+		return
+	}
+	sn.lock.Lock()
+	defer sn.lock.Unlock()
+	delete(sn.clients, id)
+}
+
 func (sn *SyncNodes) AddStats(id string, stats *SyncNodeStats) {
 	sn.lock.Lock()
 	defer sn.lock.Unlock()
@@ -63,9 +80,10 @@ func (sn *SyncNodes) AddStats(id string, stats *SyncNodeStats) {
 
 // GetStats returns a SyncNodeStats struct with
 // the total of all SyncNodes + this oSSH instance.
-func (sn *SyncNodes) GetStats() *SyncNodeStats {
+func (sn *SyncNodes) GetStats(hostStats *SyncNodeStats) *SyncNodeStats {
 	sn.lock.Lock()
 	defer sn.lock.Unlock()
+
 	total := &SyncNodeStats{
 		Hosts:            0,
 		Passwords:        0,
@@ -79,18 +97,19 @@ func (sn *SyncNodes) GetStats() *SyncNodeStats {
 		Uptime:           0,
 	}
 	stats := sn.stats
-	stats["_"] = SrvOSSH.stats() // we should include ourselves
+	stats["_"] = hostStats // we should include ourselves
+
 	for _, s := range stats {
-		total.Hosts = MaxOfInts(total.Hosts, s.Hosts)
-		total.Passwords = MaxOfInts(total.Passwords, s.Passwords)
-		total.Users = MaxOfInts(total.Users, s.Users)
-		total.Payloads = MaxOfInts(total.Payloads, s.Payloads)
-		total.Sessions = SumOfInts(total.Sessions, s.Sessions)
-		total.AttemptedLogins = SumOfUints(total.AttemptedLogins, s.AttemptedLogins)
-		total.FailedLogins = SumOfUints(total.FailedLogins, s.FailedLogins)
-		total.SuccessfulLogins = SumOfUints(total.SuccessfulLogins, s.SuccessfulLogins)
-		total.TimeWasted = SumOfFloats(total.TimeWasted, s.TimeWasted)
-		total.Uptime = SumOfFloats(total.Uptime, s.Uptime)
+		total.Hosts = gutils.MaxOfInts(total.Hosts, s.Hosts)
+		total.Passwords = gutils.MaxOfInts(total.Passwords, s.Passwords)
+		total.Users = gutils.MaxOfInts(total.Users, s.Users)
+		total.Payloads = gutils.MaxOfInts(total.Payloads, s.Payloads)
+		total.Sessions = gutils.SumOfInts(total.Sessions, s.Sessions)
+		total.AttemptedLogins = gutils.SumOfUints(total.AttemptedLogins, s.AttemptedLogins)
+		total.FailedLogins = gutils.SumOfUints(total.FailedLogins, s.FailedLogins)
+		total.SuccessfulLogins = gutils.SumOfUints(total.SuccessfulLogins, s.SuccessfulLogins)
+		total.TimeWasted = gutils.SumOfFloats(total.TimeWasted, s.TimeWasted)
+		total.Uptime = gutils.SumOfFloats(total.Uptime, s.Uptime)
 	}
 
 	return total
@@ -137,12 +156,10 @@ func (sn *SyncNodes) Get(host string) (*SyncNode, error) {
 // ExecBroadcast runs the command on all known nodes and returns
 // a map with the results indexed on node IDs ("ip:port").
 func (sn *SyncNodes) ExecBroadcast(command string) map[string]string {
-	sn.lock.Lock()
-	defer sn.lock.Unlock()
 	res := map[string]string{}
 	for _, c := range sn.clients {
 		r, err := c.Exec(command)
-		if err == nil && r != "" {
+		if err == nil && strings.TrimSpace(r) != "" {
 			res[c.ID()] = r
 		}
 	}
@@ -154,15 +171,13 @@ func (sn *SyncNodes) ExecBroadcast(command string) map[string]string {
 // from a node. If all nodes have been tried without
 // success the return will be an empty string.
 func (sn *SyncNodes) Exec(command string) string {
-	sn.lock.Lock()
-	defer sn.lock.Unlock()
 	for _, c := range sn.clients {
 		r, err := c.Exec(command)
 		if err == nil && strings.TrimSpace(r) != "" {
 			return r
 		}
 		if err != nil {
-			LogSyncServer.Error("Failed to exec command %s on node %s: %s", colorHighlight(command), colorHost(c.ID()), colorError(err))
+			sn.logger.Error("%s: Failed to exec command %s: %s", c.LogID(), glog.Highlight(command), glog.Error(err))
 		}
 	}
 	return ""
@@ -173,6 +188,7 @@ func NewSyncNodes() *SyncNodes {
 		nodes:   map[string]*SyncNode{},
 		clients: map[string]*SyncClient{},
 		stats:   map[string]*SyncNodeStats{},
+		logger:  glog.NewLogger("Sync Server", glog.DarkRed, Conf.Debug.SyncServer, false, false, logMessageHandler),
 		lock:    &sync.Mutex{},
 	}
 }

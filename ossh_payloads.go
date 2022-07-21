@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/toxyl/gutils"
+	"github.com/toxyl/ossh/utils"
 	"golang.org/x/exp/maps"
 )
 
@@ -18,7 +20,7 @@ type Payload struct {
 }
 
 func (p *Payload) Exists() bool {
-	return FileExists(p.file)
+	return gutils.FileExists(p.file)
 }
 
 func (p *Payload) Save() {
@@ -30,10 +32,7 @@ func (p *Payload) Save() {
 		return // no need to save an empty payload
 	}
 
-	err := os.WriteFile(p.file, []byte(p.payload), 0744)
-	if err == nil {
-		LogPayloads.Success("Payload saved: %s", colorFile(p.file))
-	}
+	_ = os.WriteFile(p.file, []byte(p.payload), 0744)
 }
 
 func (p *Payload) Read() (string, error) {
@@ -74,11 +73,11 @@ func (p *Payload) EncodeToString() string {
 
 func (p *Payload) SetHash(hash string) {
 	p.hash = hash
-	p.file = fmt.Sprintf("%s/payload-%s.cast", Conf.PathCaptures, hash)
+	p.file = fmt.Sprintf("%s/payloads/%s.cast", Conf.PathCaptures, hash)
 }
 
 func (p *Payload) Set(payload string) {
-	hash := StringToSha1(payload)
+	hash := utils.PayloadToHash(payload)
 	p.SetHash(hash)
 	p.payload = payload
 }

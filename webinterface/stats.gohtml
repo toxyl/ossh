@@ -9,24 +9,40 @@
         if (message.trim() == "")
             return;
 
-        var fnUpdate = function(name, valueNode, valueCluster) {
-            $('#ts'+name).html(valueNode + "<br>" + valueCluster);
+        var fnUpdate = function(name, value) {
+            $('#ts'+name).html(value);
         };
 
         m = JSON.parse(message);
-        mn = m.node;
         mt = m.total;
         
-        fnUpdate('Hosts', mn.hosts, mt.hosts);
-        fnUpdate('Users', mn.users, mt.users);
-        fnUpdate('Passwords', mn.passwords, mt.passwords);
-        fnUpdate('Payloads', mn.payloads, mt.payloads);
-        fnUpdate('Sessions', mn.sessions, mt.sessions);
-        fnUpdate('LoginsAttempted', mn.logins_attempted, mt.logins_attempted);
-        fnUpdate('LoginsSuccessful', mn.logins_successful, mt.logins_successful);
-        fnUpdate('LoginsFailed', mn.logins_failed, mt.logins_failed);
-        fnUpdate('TimeWasted', humanTimeInterval(mn.time_wasted), humanTimeInterval(mt.time_wasted));
-        fnUpdate('Uptime', humanTimeInterval(mn.uptime), humanTimeInterval(mt.uptime));
+        if (m.node != undefined && m.node != null) {
+            mn = m.node;
+            fnUpdate('HostsNode', mn.hosts);
+            fnUpdate('UsersNode', mn.users);
+            fnUpdate('PasswordsNode', mn.passwords);
+            fnUpdate('PayloadsNode', mn.payloads);
+            fnUpdate('SessionsNode', mn.sessions);
+            fnUpdate('LoginsAttemptedNode', mn.logins_attempted);
+            fnUpdate('LoginsSuccessfulNode', mn.logins_successful);
+            fnUpdate('LoginsFailedNode', mn.logins_failed);
+            fnUpdate('TimeWastedNode', humanTimeInterval(mn.time_wasted));
+            fnUpdate('UptimeNode', humanTimeInterval(mn.uptime));
+        }
+        
+        if (m.total != undefined && m.total != null) {
+            mt = m.total;
+            fnUpdate('HostsTotal', mt.hosts);
+            fnUpdate('UsersTotal', mt.users);
+            fnUpdate('PasswordsTotal', mt.passwords);
+            fnUpdate('PayloadsTotal', mt.payloads);
+            fnUpdate('SessionsTotal', mt.sessions);
+            fnUpdate('LoginsAttemptedTotal', mt.logins_attempted);
+            fnUpdate('LoginsSuccessfulTotal', mt.logins_successful);
+            fnUpdate('LoginsFailedTotal', mt.logins_failed);
+            fnUpdate('TimeWastedTotal', humanTimeInterval(mt.time_wasted));
+            fnUpdate('UptimeTotal', humanTimeInterval(mt.uptime));
+        }
     }
 
     function ws_st_receive_complete() { }
@@ -38,52 +54,52 @@
     </div>
     
     <div class="w3-bar-item">
-        <div id="tsUptime" class="float-left right pad-right-5px"></div>
+        <div id="tsUptime" class="float-left right pad-right-5px"><span id="tsUptimeNode"></span><br><span id="tsUptimeTotal"></span></div>
         <div class="float-right left pad-left-5px"><b>uptime</b><br><i>(sum)</i></div>
     </div>
 
     <div class="w3-bar-item">
-        <div id="tsTimeWasted" class="float-left right pad-right-5px"></div>
+        <div id="tsTimeWasted" class="float-left right pad-right-5px"><span id="tsTimeWastedNode"></span><br><span id="tsTimeWastedTotal"></span></div>
         <div class="float-right left pad-left-5px"><b>wasted</b><br><i>(sum)</i></div>
     </div>   
 
     <div class="w3-bar-item">
-        <div id="tsSessions" class="float-left right pad-right-5px"></div>
+        <div id="tsSessions" class="float-left right pad-right-5px"><span id="tsSessionsNode"></span><br><span id="tsSessionsTotal"></span></div>
         <div class="float-right left pad-left-5px"><b>sessions</b><br><i>(sum)</i></div>
     </div>
 
     <div class="w3-bar-item">
-        <div id="tsLoginsAttempted" class="float-left right pad-right-5px"></div>
+        <div id="tsLoginsAttempted" class="float-left right pad-right-5px"><span id="tsLoginsAttemptedNode"></span><br><span id="tsLoginsAttemptedTotal"></span></div>
         <div class="float-right left pad-left-5px"><b>attempted logins</b><br><i>(sum)</i></div>
     </div>
 
     <div class="w3-bar-item">
-        <div id="tsLoginsSuccessful" class="float-left right pad-right-5px"></div>
+        <div id="tsLoginsSuccessful" class="float-left right pad-right-5px"><span id="tsLoginsSuccessfulNode"></span><br><span id="tsLoginsSuccessfulTotal"></span></div>
         <div class="float-right left pad-left-5px"><b>successful logins</b><br><i>(sum)</i></div>
     </div>
 
     <div class="w3-bar-item">
-        <div id="tsLoginsFailed" class="float-left right pad-right-5px"></div>
+        <div id="tsLoginsFailed" class="float-left right pad-right-5px"><span id="tsLoginsFailedNode"></span><br><span id="tsLoginsFailedTotal"></span></div>
         <div class="float-right left pad-left-5px"><b>failed logins</b><br><i>(sum)</i></div>
     </div>
 
     <div class="w3-bar-item">
-        <div id="tsHosts" class="float-left right pad-right-5px"></div>
+        <div id="tsHosts" class="float-left right pad-right-5px"><span id="tsHostsNode"></span><br><span id="tsHostsTotal"></span></div>
         <div class="float-right left pad-left-5px"><b>known hosts</b><br><i>(max)</i></div>
     </div>
 
     <div class="w3-bar-item">
-        <div id="tsUsers" class="float-left right pad-right-5px"></div>
+        <div id="tsUsers" class="float-left right pad-right-5px"><span id="tsUsersNode"></span><br><span id="tsUsersTotal"></span></div>
         <div class="float-right left pad-left-5px"><b>known users</b><br><i>(max)</i></div>
     </div>
 
     <div class="w3-bar-item">
-        <div id="tsPasswords" class="float-left right pad-right-5px"></div>
+        <div id="tsPasswords" class="float-left right pad-right-5px"><span id="tsPasswordsNode"></span><br><span id="tsPasswordsTotal"></span></div>
         <div class="float-right left pad-left-5px"><b>known passwords</b><br><i>(max)</i></div>
     </div>
     
     <div class="w3-bar-item">
-        <div id="tsPayloads" class="float-left right pad-right-5px"></div>
+        <div id="tsPayloads" class="float-left right pad-right-5px"><span id="tsPayloadsNode"></span><br><span id="tsPayloadsTotal"></span></div>
         <div class="float-right left pad-left-5px"><b>known payloads</b><br><i>(max)</i></div>
     </div>
 </div>

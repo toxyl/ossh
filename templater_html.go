@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/toxyl/gutils"
 )
 
 var templateFunctionsHTML template.FuncMap = template.FuncMap{}
@@ -35,28 +36,6 @@ func parseTemplateDirHTML(dir string) (*template.Template, error) {
 	return template.New(dir).Funcs(templateFunctionsHTML).ParseFiles(paths...)
 }
 
-func parseTemplateStringHTML(templateString string, wr io.Writer, data interface{}) error {
-	t, err := template.New("tpl").Funcs(templateFunctionsHTML).Parse(templateString)
-	if err != nil {
-		if strings.Contains(err.Error(), "no template") {
-			LogHTMLTemplater.Error("Template '%s' not found", templateString)
-		} else {
-			LogHTMLTemplater.Error("Failed to parse template string %s: %s", templateString, err.Error())
-		}
-		return err
-	}
-	return t.Execute(wr, data)
-}
-
-func ParseTemplateFromStringHTML(templateString string, data interface{}) string {
-	var tpl bytes.Buffer
-	err := parseTemplateStringHTML(templateString, &tpl, data)
-	if err != nil {
-		return ""
-	}
-	return strings.Trim(tpl.String(), " \r\n")
-}
-
 func ParseTemplateHTML(name string, wr io.Writer, data interface{}) error {
 	dir := Conf.PathWebinterface
 	_, err := os.Stat(dir)
@@ -73,28 +52,14 @@ func ParseTemplateHTML(name string, wr io.Writer, data interface{}) error {
 	return t.ExecuteTemplate(wr, name, data)
 }
 
-func ParseTemplateToStringHTML(name string, data interface{}) string {
-	var tpl bytes.Buffer
-	err := ParseTemplateHTML(name, &tpl, data)
-	if err != nil {
-		if strings.Contains(err.Error(), "no template") {
-			LogHTMLTemplater.Error("Template '%s' not found", name)
-		} else {
-			LogHTMLTemplater.Error("Failed to parse template string %s: %s", name, err.Error())
-		}
-		return fmt.Sprintf("%s: command not found", name)
-	}
-	return strings.Trim(tpl.String(), " \r\n")
-}
-
 func InitTemplaterFunctionsHTML() {
 	templateFunctionsHTML = templatehtml.FuncMap{
 		"sub": func(a, b float64) float64 {
 			return a - b
 		},
 		"add": func(a, b interface{}) float64 {
-			af, _ := GetFloat(a)
-			bf, _ := GetFloat(b)
+			af, _ := gutils.GetFloat(a)
+			bf, _ := gutils.GetFloat(b)
 			return af + bf
 		},
 		"div": func(a, b float64) float64 {
@@ -107,7 +72,7 @@ func InitTemplaterFunctionsHTML() {
 			return templatehtml.HTML(strings.Replace(s, " ", "&nbsp;", -1))
 		},
 		"sha256": func(s string) string {
-			return StringToSha256(s)
+			return gutils.StringToSha256(s)
 		},
 		"replace": func(s, re, repl string) string {
 			rx := regexp.MustCompile(re)

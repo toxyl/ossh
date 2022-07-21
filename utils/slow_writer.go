@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"fmt"
@@ -10,6 +10,10 @@ import (
 type SlowWriter struct {
 	ratelimit float64
 	w         io.Writer
+}
+
+func (sw *SlowWriter) SetRatelimit(ratelimit float64) {
+	sw.ratelimit = ratelimit
 }
 
 func (sw *SlowWriter) Write(str string) {
@@ -26,9 +30,9 @@ func (sw *SlowWriter) WriteLnUnlimited(str string) {
 	fmt.Fprint(sw.w, fmt.Sprintf("%s\n", str))
 }
 
-func NewSlowWriter(w io.Writer) *SlowWriter {
+func NewSlowWriter(ratelimit float64, w io.Writer) *SlowWriter {
 	sw := &SlowWriter{
-		ratelimit: Conf.Ratelimit,
+		ratelimit: ratelimit,
 		w:         w,
 	}
 	return sw

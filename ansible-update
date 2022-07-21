@@ -1,0 +1,4 @@
+#!/bin/bash
+cd ansible
+ansible-playbook ossh.yml --skip-tags install --flush-cache $@
+cd ..

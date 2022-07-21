@@ -1,16 +1,127 @@
 {{ define "tab_console" }}
 <script type="text/javascript">
-    var current_log_filter = "*";
+    var log_filters_messages = [ 
+        'info', 
+        'warning', 
+        'error', 
+        'not ok', 
+        'ok', 
+        'success', 
+        'debug' 
+    ];
+    var log_filters_subsystems = [ 
+        'ossh-server', 
+        'ui-server', 
+        'sync-server', 
+        'sync-client', 
+        'sync-commands', 
+        'overlay-fs', 
+        'fake-shell', 
+        'sessions', 
+        'text-templater' 
+    ];
+    var clf_messages = log_filters_messages;
+    var clf_subsystems = log_filters_subsystems;
 
-    function filter_log(category) {
-        current_log_filter = category;
-        $('.log').each(function(index) {
-            if (current_log_filter == "*" || $(this).hasClass(`log-${current_log_filter}`)) {
-                $(this).show();
-                return;
+    function has_filter(f, selection) {
+        for (let i = 0; i < selection.length; i++) {
+            if (selection[i] == f) {
+                return true;
+            } 
+        }
+        return false;
+    }
+
+    function add_filter(f, selection) {
+        if (!has_filter(f, selection)) {
+            selection.push(f);
+        }
+        return selection;
+    }
+
+    function remove_filter(f, selection) {
+        var nf = [];
+        for (let i = 0; i < selection.length; i++) {
+            if (selection[i] != f) {
+                nf.push(selection[i]);
             }
-            $(this).hide();
+        }
+        return nf;
+    }
+
+    function toggle_filter(elem, f, selection) {
+        if ($(elem).attr('selected') == undefined) {
+            selection = add_filter(f, selection);
+            $(elem).attr('selected','selected');
+            return selection;
+        } 
+    
+        selection = remove_filter(f, selection);
+        $(elem).removeAttr('selected');
+        return selection;
+    }
+
+    function update_filter() {
+        $('.log').each(function(index) {
+            var match_subsystem = clf_subsystems.length == 0;
+            for (let i = 0; !match_subsystem && i < clf_subsystems.length; i++) {
+                if ($(this).hasClass(`log-${clf_subsystems[i]}`)) {
+                    match_subsystem = true;                    
+                } 
+            }
+            
+            var match_message = clf_messages.length == 0;
+            for (let i = 0; !match_message && i < clf_messages.length; i++) {
+                if ($(this).hasClass(`log-${clf_messages[i]}`)) {
+                    match_message = true;                      
+                } 
+            }
+
+            if (match_subsystem && match_message) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
         });
+    }
+
+    function filter_log(event, category) {
+        var is_ctrl = event.ctrlKey;
+        var is_message_filter = $(event.currentTarget).hasClass("message-type") ||  $(event.currentTarget).hasClass("message-type-all");
+        var is_subsytem_filter = $(event.currentTarget).hasClass("subsystem") || $(event.currentTarget).hasClass("subsystem-all");
+
+        var categories = [];
+        
+        if (category == "*") {
+            if (is_message_filter) {
+                clf_messages = log_filters_messages;
+                $(".message-type").attr('selected','selected');
+            }
+            if (is_subsytem_filter) {
+                clf_subsystems = log_filters_subsystems;
+                $(".subsystem").attr('selected','selected');
+            }
+        } else if (!is_ctrl) {
+            if (is_message_filter) {
+                $(".message-type").removeAttr('selected');
+                clf_messages = [ category ];
+            }
+            if (is_subsytem_filter) {
+                $(".subsystem").removeAttr('selected');
+                clf_subsystems = [ category ];
+            }            
+            $(event.currentTarget).attr('selected','selected');
+        } else {
+            if (is_message_filter) {
+                clf_messages = toggle_filter(event.currentTarget, category, clf_messages);
+            }
+            
+            if (is_subsytem_filter) {
+                clf_subsystems = toggle_filter(event.currentTarget, category, clf_subsystems);
+            }          
+        }
+        
+        update_filter();
     }
 
     function log_console(str) {
@@ -61,17 +172,15 @@
         cs.prepend(`
         <tr class='log log-${txttype} log-${txtsubsys}'>
             <td class="w10 left monospace">${(new Date()).toLocaleString()}</td>
-            <td class="w5 left"><tag class='w3-button w3-text-black bg-color-${txtsubsys} w100' onclick="filter_log('${txtsubsys}')">${txtsubsys}</tag></td>
-            <td class="w5 left"><tag class='w3-button w3-text-black bg-color-${txttype} w100' onclick="filter_log('${txttype}')">${ct}</tag></td>
-            <td class="w80 left monospace">${msg}</td>
+            <td class="w10 left monospace color-${txtsubsys}">${txtsubsys}</td>
+            <td class="w5 left monospace color-${txttype}">${ct}</td>
+            <td class="w75 left monospace">${msg}</td>
         </tr>`);
-        if (current_log_filter != "*" && current_log_filter != txttype && current_log_filter != txtsubsys) {
-            $(`.log-${txttype}`).hide();
-            $(`.log-${txtsubsys}`).hide();
+
+        if (cs.children().length > 1500) {
+            cs.children().slice(1500).remove();
         }
-        if (cs.children().length > 500) {
-            cs.children().slice(500).remove();
-        }
+        update_filter();
     }
 
     function ws_con_open(evt) { hide_overlay_connection(); }
@@ -83,38 +192,38 @@
 </script>
 {{ template "ws_conn" dict "Scheme" .Scheme "Name" "console" "OpenFn" "ws_con_open" "CloseFn" "ws_con_close" "PreConnectFn" "ws_con_preconnect" "ReceiveFn" "ws_con_receive" "ReceiveCompleteFn" "ws_con_receive_complete" "SendFn" "ws_con_send" }}
 <div id="tabConsole" class="w3-display-container w3-dark-gray tab">
-    <div style="padding-top: 7px;">
+    <div style="padding-top: 7px;" class="pad-top-5px bg-color-lighter">
         <table class="w100 no-margin">
             <tr>
                 <td><b>Message types</b></td>
-                <td><tag class="w3-button w3-text-black bg-color-info w100" onclick="filter_log('info')">info</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-warning w100" onclick="filter_log('warning')">warning</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-error w100" onclick="filter_log('error')">error</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-not-ok w100" onclick="filter_log('not ok')">not ok</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-ok w100" onclick="filter_log('ok')">ok</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-success w100" onclick="filter_log('success')">success</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-debug w100" onclick="filter_log('debug')">debug</tag></td>
-                <td></td>
+                <td><tag class="w3-button w3-text-black bg-color-other w100 message-type-all" onclick="filter_log(event, '*')">All</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-info w100 message-type" selected onclick="filter_log(event, 'info')">info</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-warning w100 message-type" selected onclick="filter_log(event, 'warning')">warning</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-error w100 message-type" selected onclick="filter_log(event, 'error')">error</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-not-ok w100 message-type" selected onclick="filter_log(event, 'not-ok')">not ok</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-ok w100 message-type" selected onclick="filter_log(event, 'ok')">ok</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-success w100 message-type" selected onclick="filter_log(event, 'success')">success</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-debug w100 message-type" selected onclick="filter_log(event, 'debug')">debug</tag></td>
                 <td></td>
                 <td></td>
             </tr>
             <tr>
                 <td><b>Sub systems</b></td>
-                <td><tag class="w3-button w3-text-black bg-color-ossh-server w100" onclick="filter_log('ossh-server')">ossh-server</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-ui-server w100" onclick="filter_log('ui-server')">ui-server</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-sync-server w100" onclick="filter_log('sync-server')">sync-server</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-sync-client w100" onclick="filter_log('sync-client')">sync-client</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-sync-commands w100" onclick="filter_log('sync-commands')">sync-commands</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-overlay-fs w100" onclick="filter_log('overlay-fs')">overlay-fs</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-payloads w100" onclick="filter_log('payloads')">payloads</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-fake-shell w100" onclick="filter_log('fake-shell')">fake-shell</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-text-templater w100" onclick="filter_log('text-templater')">text-templater</tag></td>
-                <td><tag class="w3-button w3-text-black bg-color-html-templater w100" onclick="filter_log('html-templater')">html-templater</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-other w100 subsystem-all" onclick="filter_log(event, '*')">All</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-ossh-server w100 subsystem" selected onclick="filter_log(event, 'ossh-server')">ossh-server</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-ui-server w100 subsystem" selected onclick="filter_log(event, 'ui-server')">ui-server</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-sync-server w100 subsystem" selected onclick="filter_log(event, 'sync-server')">sync-server</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-sync-client w100 subsystem" selected onclick="filter_log(event, 'sync-client')">sync-client</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-sync-commands w100 subsystem" selected onclick="filter_log(event, 'sync-commands')">sync-commands</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-overlay-fs w100 subsystem" selected onclick="filter_log(event, 'overlay-fs')">overlay-fs</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-fake-shell w100 subsystem" selected onclick="filter_log(event, 'fake-shell')">fake-shell</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-sessions w100 subsystem" selected onclick="filter_log(event, 'sessions')">sessions</tag></td>
+                <td><tag class="w3-button w3-text-black bg-color-text-templater w100 subsystem" selected onclick="filter_log(event, 'text-templater')">text-templater</tag></td>
             </tr>
             <tr>
                 <td></td>
-                <td class="center"><tag class="w3-button w3-text-black bg-color-other w100" onclick="filter_log('*')">Reset</tag></td>
-                <td colspan="9"></td>
+                <td class="center"><tag class="w3-button w3-text-black bg-color-other w100 message-type-all subsystem-all" onclick="filter_log(event, '*')">Reset</tag></td>
+                <td colspan="9" class="left">Click to select a single filter, CTRL+click to toggle.</td>
             </tr>
         </table>
     </div>

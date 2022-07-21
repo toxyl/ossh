@@ -1,0 +1,5 @@
+---
+- name: Set hostname 
+  hostname:
+    name: "{{ inventory_hostname }}"
+  when: ansible_facts['hostname'] != inventory_hostname

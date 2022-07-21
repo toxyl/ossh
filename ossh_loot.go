@@ -1,20 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 
+	"github.com/toxyl/gutils"
 	"golang.org/x/exp/maps"
 )
-
-type LootJSON struct {
-	Hosts     []string `json:"hosts"`
-	Users     []string `json:"users"`
-	Passwords []string `json:"passwords"`
-	Payloads  []string `json:"payloads"`
-}
 
 type Loot struct {
 	users     map[string]bool
@@ -70,7 +63,22 @@ func (l *Loot) AddUser(user string) bool {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	l.users[user] = true
+	SrvMetrics.IncrementKnownUsers()
 	return true
+}
+
+func (l *Loot) AddUsers(users []string) int {
+	added := 0
+	for _, u := range users {
+		u = strings.TrimSpace(u)
+		if u == "" {
+			continue
+		}
+		if l.AddUser(u) {
+			added++
+		}
+	}
+	return added
 }
 
 func (l *Loot) AddPassword(password string) bool {
@@ -85,7 +93,22 @@ func (l *Loot) AddPassword(password string) bool {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	l.passwords[password] = true
+	SrvMetrics.IncrementKnownPasswords()
 	return true
+}
+
+func (l *Loot) AddPasswords(passwords []string) int {
+	added := 0
+	for _, p := range passwords {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if l.AddPassword(p) {
+			added++
+		}
+	}
+	return added
 }
 
 func (l *Loot) AddHost(host string) bool {
@@ -103,7 +126,22 @@ func (l *Loot) AddHost(host string) bool {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	l.hosts[host] = true
+	SrvMetrics.IncrementKnownHosts()
 	return true
+}
+
+func (l *Loot) AddHosts(hosts []string) int {
+	added := 0
+	for _, h := range hosts {
+		h = strings.TrimSpace(h)
+		if h == "" || isIPWhitelisted(h) {
+			continue
+		}
+		if l.AddHost(h) {
+			added++
+		}
+	}
+	return added
 }
 
 func (l *Loot) AddPayload(fingerprint string) bool {
@@ -116,6 +154,7 @@ func (l *Loot) AddPayload(fingerprint string) bool {
 		p := NewPayload()
 		p.SetHash(fingerprint)
 		l.payloads.Add(p)
+		SrvMetrics.IncrementKnownPayloads()
 	}
 	return true
 }
@@ -184,29 +223,13 @@ func (l *Loot) GetPayloadsWithTimestamp() []string {
 		p := NewPayload()
 		p.SetHash(fp)
 		if p.Exists() {
-			m, err := FileModTime(p.file)
+			m, err := gutils.FileModTime(p.file)
 			if err == nil {
 				res = append(res, fmt.Sprintf("%d-%s", m.UnixMilli(), p.hash))
 			}
 		}
 	}
 	return res
-}
-
-func (l *Loot) JSON() string {
-	data := LootJSON{
-		Hosts:     l.GetHosts(),
-		Users:     l.GetUsers(),
-		Passwords: l.GetPasswords(),
-		Payloads:  l.GetPayloads(),
-	}
-	json, err := json.Marshal(data)
-	if err != nil {
-		LogOSSHServer.Error("Could not marshal sync data: %s", colorError(err))
-		return ""
-	}
-
-	return string(json)
 }
 
 func (l *Loot) Fingerprint() string {
@@ -220,19 +243,19 @@ func (l *Loot) Fingerprint() string {
 }
 
 func (l *Loot) FingerprintHosts() string {
-	return StringSliceToSha256(l.GetHosts())
+	return gutils.StringSliceToSha256(l.GetHosts())
 }
 
 func (l *Loot) FingerprintUsers() string {
-	return StringSliceToSha256(l.GetUsers())
+	return gutils.StringSliceToSha256(l.GetUsers())
 }
 
 func (l *Loot) FingerprintPasswords() string {
-	return StringSliceToSha256(l.GetPasswords())
+	return gutils.StringSliceToSha256(l.GetPasswords())
 }
 
 func (l *Loot) FingerprintPayloads() string {
-	return StringSliceToSha256(l.GetPayloads())
+	return gutils.StringSliceToSha256(l.GetPayloads())
 }
 
 func NewLoot() *Loot {

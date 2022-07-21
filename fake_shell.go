@@ -3,13 +3,14 @@ package main
 import (
 	"fmt"
 	"io"
-	"net"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gliderlabs/ssh"
+	"github.com/toxyl/glog"
+	"github.com/toxyl/gutils"
+	"github.com/toxyl/ossh/utils"
 	"golang.org/x/term"
 )
 
@@ -19,35 +20,39 @@ const (
 )
 
 type FakeShell struct {
-	session  ssh.Session
-	terminal *term.Terminal
-	writer   *SlowWriter
-	created  time.Time
-	stats    *FakeShellStats
-	prompt   string
-
+	session   *ssh.Session
+	terminal  *term.Terminal
+	writer    *utils.SlowWriter
+	created   time.Time
+	stats     *FakeShellStats
+	prompt    string
 	cwd       string
+	logger    *glog.Logger
 	overlayFS *OverlayFS
 }
 
+func (fs *FakeShell) SetOverlayFS(ofs *OverlayFS) {
+	fs.overlayFS = ofs
+}
+
 func (fs *FakeShell) User() string {
-	return fs.session.User()
+	return (*fs.session).User()
 }
 func (fs *FakeShell) Host() string {
-	return strings.Split(fs.session.RemoteAddr().String(), ":")[0]
+	return gutils.ExtractHostFromAddr((*fs.session).RemoteAddr())
 }
 
 func (fs *FakeShell) Close() {
 	_, err := fs.terminal.Write([]byte(""))
 	if err != nil {
 		if err == io.EOF {
-			fs.session.Close()
+			(*fs.session).Close()
 			return
 		} else {
 			panic(err)
 		}
 	}
-	fs.session.Close()
+	(*fs.session).Close()
 }
 
 func (fs *FakeShell) UpdatePrompt(path string) {
@@ -87,7 +92,7 @@ func (fs *FakeShell) WriteBinaryLn(val int) {
 // ReadBytes reads and returns a byte array with the given number of bytes from the SSH session.
 func (fs *FakeShell) ReadBytes(numBytes int) ([]byte, error) {
 	b := make([]byte, numBytes)
-	_, err := fs.session.Read(b)
+	_, err := (*fs.session).Read(b)
 	return b, err
 }
 
@@ -118,25 +123,72 @@ func (fs *FakeShell) ReadBytesUntil(sep byte) ([]byte, error) {
 	return bytes, nil
 }
 
-func (fs *FakeShell) Exec(line string) bool {
+// ReadBytesUntilEOF reads from the SSH session until it encounters an error or EOF.
+// It will not read more bytes than the given maxBytes.
+// The read bytes will be returned as byte array.
+func (fs *FakeShell) ReadBytesUntilEOF(maxBytes int) ([]byte, error) {
+	bytes := []byte{}
+	i := 0
+	for {
+		if i >= maxBytes {
+			break
+		}
+		b, err := fs.ReadBytes(1)
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			return nil, err
+		}
+		bytes = append(bytes, b[0])
+		i++
+	}
+	return bytes, nil
+}
+
+func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 	fs.stats.AddCommandToHistory(line)
+
+	line = string(regexEnvVarPrefixes.ReplaceAll([]byte(line), []byte("$1")))
 
 	pieces := strings.Split(line, " ")
 	command := pieces[0]
 	args := pieces[1:]
 
-	rmt := strings.Split(fs.session.RemoteAddr().String(), ":")
-	lcl := strings.Split(fs.session.LocalAddr().String(), ":")
-	rmtH := rmt[0]
-	lclH := lcl[0]
-	rmtP := 22
-	lclP := 22
-	if i, err := strconv.Atoi(rmt[1]); err == nil {
-		rmtP = i
+	rmtH, rmtP := gutils.SplitHostPortFromAddr((*fs.session).RemoteAddr())
+	lclH, lclP := gutils.SplitHostPortFromAddr((*fs.session).LocalAddr())
+
+	cmd := fmt.Sprintf("%s %s", glog.Reason(command), glog.Wrap(strings.Join(args, " "), glog.LightBlue))
+	if lSeq > 1 {
+		cmd = fmt.Sprintf("(%s/%s) %s", glog.Int(iSeq), glog.Int(lSeq), cmd)
 	}
-	if i, err := strconv.Atoi(lcl[1]); err == nil {
-		lclP = i
+	s.UpdateActivity()
+	fs.logger.Info("%s: %s", s.LogID(), cmd)
+	defer func() {
+		s.UpdateActivity()
+	}()
+
+	if !s.Whitelisted {
+		// 1) make sure the client waits some time at least,
+		//    the more input the more wait time, hehe
+		dly := len(line) * int(Conf.InputDelay)
+		gutils.RandomSleep(dly, dly*2, time.Millisecond)
 	}
+
+	// Ignore just pressing enter with whitespace
+	if strings.TrimSpace(line) == "" {
+		return false
+	}
+
+	// 3) check if command should exit immediately
+	for _, cmd := range Conf.Commands.Exit {
+		if strings.HasPrefix(line+"  ", cmd+" ") {
+			fs.RecordExec(line, gutils.GeneratePseudoEmptyString(0)) // just to waste some more time ;)
+			return true
+		}
+	}
+
+	SrvMetrics.IncrementExecutedCommands()
 
 	data := struct {
 		User      string
@@ -149,7 +201,7 @@ func (fs *FakeShell) Exec(line string) bool {
 		Command   string
 		Arguments []string
 	}{
-		User:      fs.session.User(),
+		User:      s.User,
 		IP:        rmtH,
 		IPLocal:   lclH,
 		Port:      rmtP,
@@ -158,36 +210,6 @@ func (fs *FakeShell) Exec(line string) bool {
 		InputRaw:  line,
 		Command:   command,
 		Arguments: args,
-	}
-
-	if SrvSync.HasNode(data.IP) {
-		LogFakeShell.Warning("%s, what are you doing here? Go home!", colorConnID(data.User, data.IP, data.Port))
-		return true
-	}
-
-	LogFakeShell.Info(
-		"%s runs %s %s",
-		colorConnID(data.User, data.IP, data.Port),
-		colorReason(command),
-		colorWrap(strings.Join(args, " "), colorLightBlue),
-	)
-
-	// 1) make sure the client waits some time at least,
-	//    the more input the more wait time, hehe
-	dly := time.Duration(len(line) * int(Conf.InputDelay))
-	time.Sleep(dly * time.Millisecond)
-
-	// Ignore just pressing enter with whitespace
-	if strings.TrimSpace(line) == "" {
-		return false
-	}
-
-	// 3) check if command should exit immediately
-	for _, cmd := range Conf.Commands.Exit {
-		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.RecordExec(line, GeneratePseudoEmptyString(0)) // just to waste some more time ;)
-			return true
-		}
 	}
 
 	// 3) check if command matches a simple command
@@ -209,7 +231,7 @@ func (fs *FakeShell) Exec(line string) bool {
 	// 5) check if command should return disk i/o error
 	for _, cmd := range Conf.Commands.DiskError {
 		if strings.HasPrefix(line+"  ", cmd+" ") {
-			fs.RecordExec(line, ParseTemplateFromString(GenerateGarbageString(1000)+"\nend_request: I/O error", data))
+			fs.RecordExec(line, ParseTemplateFromString(gutils.GenerateGarbageString(1000)+"\nend_request: I/O error", data))
 			return false
 		}
 	}
@@ -241,7 +263,7 @@ func (fs *FakeShell) Exec(line string) bool {
 	// 9) check if command should return bullshit
 	for _, cmd := range Conf.Commands.Bullshit {
 		if strings.HasPrefix(line+" ", cmd+" ") {
-			fs.RecordExec(line, GenerateGarbageString(1000))
+			fs.RecordExec(line, gutils.GenerateGarbageString(1000))
 			return false
 		}
 	}
@@ -251,6 +273,7 @@ func (fs *FakeShell) Exec(line string) bool {
 
 	// 10) check if there is a go-implemented command for this
 	if goCmd, found := CmdLookup[instrCmd]; found {
+		SrvOSSH.initOverlayFS(fs, s)
 		return goCmd(fs, instr)
 	}
 
@@ -259,7 +282,7 @@ func (fs *FakeShell) Exec(line string) bool {
 	return false
 }
 
-func (fs *FakeShell) HandleInput() {
+func (fs *FakeShell) HandleInput(s *Session) {
 	for {
 		line, err := fs.terminal.ReadLine()
 		if err != nil {
@@ -280,8 +303,8 @@ func (fs *FakeShell) HandleInput() {
 
 		lines := strings.Split(line, "\n")
 		mustExit := false
-		for _, ln := range lines {
-			if fs.Exec(ln) {
+		for i, ln := range lines {
+			if fs.Exec(ln, s, i+1, len(lines)) {
 				mustExit = true
 				break
 			}
@@ -292,11 +315,11 @@ func (fs *FakeShell) HandleInput() {
 	}
 }
 
-func (fs *FakeShell) Process() *FakeShellStats {
-	if fs.session.RawCommand() != "" {
+func (fs *FakeShell) Process(s *Session) *FakeShellStats {
+	if (*fs.session).RawCommand() != "" {
 		// this means the client passed a command along (e.g. with -t/-tt param),
 		// let's run it and then close the connection.
-		raw := fs.session.RawCommand()
+		raw := (*fs.session).RawCommand()
 
 		// execute all rewriters
 		for _, rw := range Conf.Commands.Rewriters {
@@ -307,27 +330,21 @@ func (fs *FakeShell) Process() *FakeShellStats {
 		}
 
 		commands := strings.Split(raw, "\n")
-		host, port, _ := net.SplitHostPort(fs.session.RemoteAddr().String())
-		LogFakeShell.Info(
-			"%s wants to run %s commands",
-			colorConnID(fs.User(), host, StringToInt(port, 0)),
-			colorInt(len(commands)),
-		)
-		for _, cmd := range commands {
-			if fs.Exec(cmd) {
+		for i, cmd := range commands {
+			if fs.Exec(cmd, s, i+1, len(commands)) {
 				break
 			}
 		}
 	} else {
-		fs.HandleInput()
+		fs.HandleInput(s)
 	}
 	fs.Close()
 	return fs.stats
 }
 
-func NewFakeShell(s ssh.Session, overlay *OverlayFS) *FakeShell {
+func NewFakeShell(s *Session) *FakeShell {
 	fs := &FakeShell{
-		session:  s,
+		session:  s.SSHSession,
 		terminal: nil,
 		writer:   nil,
 		created:  time.Now(),
@@ -335,27 +352,21 @@ func NewFakeShell(s ssh.Session, overlay *OverlayFS) *FakeShell {
 			CommandsExecuted: 0,
 			CommandHistory:   []string{},
 			Host:             "",
-			User:             s.User(),
-			recording:        NewASCIICastV2(fakeShellInitialWidth, fakeShellInitialHeight),
+			User:             (*s.SSHSession).User(),
+			recording:        utils.NewASCIICastV2(fakeShellInitialWidth, fakeShellInitialHeight),
 		},
-		overlayFS: overlay,
+		overlayFS: nil,
+		logger:    glog.NewLogger("Fake Shell", glog.OliveGreen, Conf.Debug.FakeShell, false, false, logMessageHandler),
 	}
 
-	fs.terminal = term.NewTerminal(s, "")
-	fs.writer = NewSlowWriter(fs.terminal)
+	fs.terminal = term.NewTerminal(*s.SSHSession, "")
+	fs.writer = utils.NewSlowWriter(Conf.Ratelimit, fs.terminal)
+	if s.Whitelisted {
+		fs.writer.SetRatelimit(10000) // set ridicuously high to effectively disable rate limit
+	}
 	fs.stats.Host = fs.Host()
-
-	if overlay != nil {
-		if !overlay.DirExists("/home") {
-			_ = overlay.Mkdir("/home", 700)
-		}
-
-		if !overlay.DirExists("/home/" + s.User()) {
-			_ = overlay.Mkdir("/home/"+s.User(), 700)
-		}
-	}
-	fs.cwd = "/home/" + s.User()
-
+	fs.cwd = "/home/" + (*s.SSHSession).User()
 	fs.UpdatePrompt("~")
+	fs.logger.Debug("%s: Fake shell ready, current working directory: %s", s.LogID(), glog.File(fs.cwd))
 	return fs
 }

@@ -1,5 +1,4 @@
 debug:
-  asciicast_v2: false
   fake_shell: false
   sync_commands: false
   sync_server: false
@@ -15,6 +14,7 @@ ip_whitelist:
 host: 0.0.0.0
 port: 2200
 webinterface: 
+  enabled: true
   host: 0.0.0.0
   port: 443
 max_idle: 3600 # seconds before idling bots are kicked
