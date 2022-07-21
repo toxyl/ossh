@@ -38,7 +38,7 @@ It is inspired by [Endlessh](https://github.com/skeeto/endlessh) which was a lot
   - [Payload viewer](#payloads-viewer)
   - [IP whitelist](#ip-whitelist-2)  
 
-[^1]: Sometimes (as in every few days) bots open a lot of connections at almost the same time that require an OverlayFS, which can drive up memory usage (seen in the wild). So far instances with 2GB of RAM were able to deal with everything bots threw at it, but 1GB instances would sometimes restart the oSSH service (i.e. without crasing the machine). In that case, bots usually just pick up as if nothing happened. If you find restarts annoying for some reason, you might want to go for a droplet with 2GB of RAM, everyone else should be fine with 1GB of RAM.
+[^1]: Sometimes (as in every few days) bots open a lot of connections at almost the same time that require an OverlayFS, which can drive up memory usage (seen in the wild). So far instances with 2GB of RAM were able to deal with everything bots threw at it, but 1GB instances would sometimes restart the oSSH service (i.e. without crasing the machine). In that case, bots usually just pick up as if nothing happened. If you find restarts annoying for some reason, you might want to go for a droplet with 2GB of RAM, everyone else should be fine with 1GB of RAM.  
 
 ## Installation
 It is **strongly recommended** that you install oSSH on a machine that is only used for that purpose to minimize the impact should an attacker manage to break out of oSSH. DigitalOcean's $5 droplets, for example, work fine for this task[^1].
@@ -62,8 +62,6 @@ mv ossh /usr/local/bin/
 Create directories and copy data from the repo:
 ```bash
 mkdir -p /etc/ossh/{captures,commands,ffs}
-cp -R commands/* /etc/ossh/commands/
-cp -R ffs/* /etc/ossh/ffs/
 cp ossh.service /etc/systemd/system/ossh.service
 cp config.example.yaml /etc/ossh/config.yaml
 ```
@@ -132,7 +130,7 @@ All public SSH keys used to connect to the [Fake SSH Server](#fake-ssh-server) w
 Keys used by whitelisted IPs are excluded from data collection.
 
 ### Payloads
-Everything run after logging into the [Fake SSH Server](#fake-ssh-server) will be recorded and collected in the directory `captures` in the installation directory.  
+Everything run after logging into the [Fake SSH Server](#fake-ssh-server) will be recorded and collected in the directory `captures/payloads` in the installation directory.  
 When an SSH session ends, all of its input will be compared to already recorded payloads. Existing payloads will not be overwritten. New payloads will be stored and then send to all known nodes.  
 The file name used to store a payload contains a locality-sensitive hash followed by a SHA1 hash in an attempt to group similar payloads.  
 Payloads by whitelisted IPs are excluded from data collection.
@@ -169,7 +167,7 @@ Whitelisted IPs are excluded from most rate-limiting and data (such as user name
 The subdirectory `ffs/defaultfs` contains the files and directories bots can browse. The FFS is baked into the executable and extracted when the executable is run, existing files will **NOT** be overwritten. You can modify the extracted contents at runtime to react to new payloads. For example: if bots commonly `cat` a specific file, you can create a very lengthy fake version of that file in the `ffs/defaultfs` directory of the oSSH instance. Next time a bot `cat`s it, it will be waiting for a long time :D 
 
 ### Sandboxes
-The subdirectory `ffs/sandboxes` contains OverlayFS sandboxes per host IP. This is where a bot's file system changes end up. 
+The subdirectory `ffs/sandboxes` contains OverlayFS sandboxes per host IP. This is where all file system changes a bot makes are stored. 
 
 ## Fake Shell
 Once a bot connects to oSSH and requests a shell, it will interact with the Fake Shell. That parses the bots' input into instructions and tries to evaluate them. To do so it extracts the command and executes a series of steps to generate a response. The `commands` section of the config allows you to customize oSSHs responses to commands. They are evaluated in the following order:
@@ -266,10 +264,7 @@ Whitelisted IPs are allowed to communicate with the sync server. All other IPs w
 
 ## Metrics Server
 A Prometheus endpoint providing metrics for the oSSH instance.
-Add the following to your Prometheus config (probably lives at `/etc/`)
-
-### Grafana Dashboard
-In the file `grafana_dashboard.json` you can find a Grafana dashboard that you can import. It requires at least one Prometheus source that has oSSH data available. Adjust the IPs and add something like this to your Prometheus config (probably lives at `/etc/prometheus/prometheus.yml`):
+Adjust the IPs and add something like this to your Prometheus config (probably lives at `/etc/prometheus/prometheus.yml`):  
 ```yaml
   - job_name: 'ossh_cluster'
     scrape_interval: 10s
@@ -284,6 +279,9 @@ In the file `grafana_dashboard.json` you can find a Grafana dashboard that you c
       - 25.26.27.28:2112
 ```
 
+### Grafana Dashboard
+In the file `grafana_dashboard.json` you can find a Grafana dashboard that you can import. It requires at least one Prometheus source that has oSSH data available.
+
 ## Dashboard
 oSSH comes with a dashboard that allows you to watch and filter the console output, check node & cluster stats, edit the config or view recorded payloads.
 
@@ -294,10 +292,10 @@ At the bottom of the dashboard, you can find a black bar with stats for this nod
 Shows the logs of the oSSH instance. The output can be filtered by subsystem and message type. A single click on a filter selects it and deselects all others of the same type. Use CTRL+Click to toggle filters.
 
 ### Config Editor
-You can edit the entire config via the dashboard. The reload functionality provided by it, however, will not restart the [Fake [SSH Server](#fake-ssh-server) or the [Sync Server](#sync-server). It is most useful to update command responses on the fly without having to restart the oSSH service.
+You can edit the entire config via the dashboard. The reload functionality provided by it, however, will not restart the [Fake SSH Server](#fake-ssh-server) or the [Sync Server](#sync-server). It is most useful to update command responses on the fly without having to restart the oSSH service.
 
 ### Payloads Viewer
-Here you can review the latest payloads. The overview is sorted newest first. Select a payload to view the recording (input & output) of it. Sometimes payloads can get damaged (e.g. transfer error, out of disk space), the player then shows a blinking cursor in the upper right.
+Here you can review the latest payloads. The overview is sorted newest first. Select a payload to view the recording (input & output) of it. Sometimes payloads can get damaged (e.g. transfer error, out of disk space), then the player shows a blinking cursor in the upper right.
 
 ### IP Whitelist
 Whitelisted IPs are allowed to access the dashboard. HTTP requests from all other IPs will be redirected to themselves.
