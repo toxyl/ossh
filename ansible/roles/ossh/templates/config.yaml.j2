@@ -54,12 +54,24 @@ hostnames:
 {% endfor %}
 {% endif %}
 
-# IP to serve on, usually 0.0.0.0 (public exposure) or 127.0.0.1 (local machine).
-host: 0.0.0.0
-
-# Port oSSH listens on, usually 22. 
-# Managed by Ansible.
-port: {{ ossh_port }}
+servers:
+{% if ossh_servers %}
+{% for ip in ossh_servers %}
+  - host: {{ ip }}
+{% if ossh_port %}
+    port: {{ ossh_port }}
+{% else %}
+    port: 22
+{% endif %}
+{% endfor %}
+{% else %}
+  - host: 0.0.0.0
+{% if ossh_port %}
+    port: {{ ossh_port }}
+{% else %}
+    port: 22
+{% endif %}
+{% endif %}
 
 # After this many seconds idle connections will be removed. 
 # Since we want our tar to stick as much as possible,

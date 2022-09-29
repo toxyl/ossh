@@ -60,8 +60,10 @@ type Config struct {
 		Name string `mapstructure:"name"`
 		IP   string `mapstructure:"ip"`
 	} `mapstructure:"hostnames"`
-	Host           string  `mapstructure:"host"`
-	Port           uint    `mapstructure:"port"`
+	Servers []struct {
+		Host string `mapstructure:"host"`
+		Port uint   `mapstructure:"port"`
+	} `mapstructure:"servers"`
 	MaxIdleTimeout uint    `mapstructure:"max_idle"`
 	MaxSessionAge  uint    `mapstructure:"max_session_age"`
 	InputDelay     uint    `mapstructure:"input_delay"`

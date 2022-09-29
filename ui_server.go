@@ -300,7 +300,17 @@ func (uis *UIServer) Start() {
 	uis.server.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		addr := gutils.RealAddr(req)
 
-		if !isIPWhitelisted(addr) && addr != Conf.Host {
+		if !isIPWhitelisted(addr) {
+			redirect := true
+			for _, srv := range Conf.Servers {
+				if addr == srv.Host {
+					redirect = false
+					break
+				}
+			}
+			if !redirect {
+				return
+			}
 			rt := fmt.Sprintf("https://%s%s", addr, req.URL.Path)
 			http.Redirect(w, req, rt, 307) // let's give them their request back
 			uis.logger.OK("%s: Redirected request to source: %s", glog.Addr(req.RemoteAddr, true), glog.Highlight(req.URL.Path))

@@ -9,6 +9,7 @@ It is inspired by [Endlessh](https://github.com/skeeto/endlessh) which was a lot
 - [Ansible Playbook](#ansible-playbook) to make deployment/update of a cluster easy
 - [Data Collection](#data-collection) for analysis, blacklisting, and so on
 - [Fake SSH Server](#fake-ssh-server) with:
+  - [Multiple IPs](#multiple-ips)
   - [Password auth](#password-auth)
   - [Public key auth](#public-key-auth)
   - [SCP file uploads](#scp-support)
@@ -140,6 +141,9 @@ All files uploaded to the [Fake SSH Server](#fake-ssh-server) will be collected 
 Be aware that SCP file uploads by whitelisted IPs will **not** be excluded from data collection.
 
 ## Fake SSH Server
+### Multiple IPs
+oSSH can start multiple fake SSH servers, so you can serve multiple IPs, see the `servers` section of the config. This can be used to increase the reach of the honeypot. If you have oSSH droplets on DigitalOcean, you can use the "Reserved IP" feature to assign an additional IP to them (i.e. you can have 2 IPs per droplet). Be aware that this can attract more traffic which might require more droplet resources.
+
 ### Password Auth
 When a bot tries to connect for the first time oSSH will check if the username and password are already recorded. In that case, it will kick the bot and wait for it to come back. If the bot has something new (either username or password), oSSH will gladly let the bot in and record the credentials. For bots that offer a username and a password that oSSH doesn't know, oSSH will let it in if the current second is divisible by 3. This applies to new hosts, known hosts will be let it most of the time unless the current second is divisible by 7. 
 

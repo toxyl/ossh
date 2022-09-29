@@ -11,8 +11,9 @@ host_name: nasty-pot
 version: OpenSSH_8.4p1 Ubuntu-6ubuntu2.1
 ip_whitelist:
   - 127.0.0.1
-host: 0.0.0.0
-port: 2200
+servers:
+  host: 0.0.0.0
+  port: 2200
 webinterface: 
   enabled: true
   host: 0.0.0.0
@@ -29,6 +30,10 @@ sync:
   nodes:
     # - host: 127.0.0.1
     #   port: 1337
+
+metrics_server:
+  host: 0.0.0.0
+  port: 2222
 
 commands:
   rewriters:

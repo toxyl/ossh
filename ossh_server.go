@@ -38,7 +38,7 @@ type OSSHServer struct {
 	Logins     *Logins
 	Sessions   *Sessions
 	TimeWasted *TimeWastedCounter
-	server     *ssh.Server
+	server     []*ssh.Server
 	fs         *OverlayFSManager
 	logger     *glog.Logger
 }
@@ -473,20 +473,22 @@ func (ossh *OSSHServer) broadcastStatsWorker() {
 func (ossh *OSSHServer) init() {
 	ossh.loadData()
 
-	ossh.server = &ssh.Server{
-		Addr:                          fmt.Sprintf("%s:%d", Conf.Host, Conf.Port),
-		Handler:                       ossh.sessionHandler,
-		PasswordHandler:               ossh.authHandler,
-		IdleTimeout:                   time.Duration(Conf.MaxIdleTimeout) * time.Second,
-		MaxTimeout:                    time.Duration(Conf.MaxSessionAge) * time.Second,
-		ReversePortForwardingCallback: ossh.reversePortForwardingCallback,
-		LocalPortForwardingCallback:   ossh.localPortForwardingCallback,
-		PtyCallback:                   ossh.ptyCallback,
-		ConnectionFailedCallback:      ossh.connectionFailedCallback,
-		SessionRequestCallback:        ossh.sessionRequestCallback,
-		Version:                       Conf.Version,
-		ConnCallback:                  ossh.connectionCallback,
-		PublicKeyHandler:              ossh.publicKeyHandler,
+	for _, srv := range Conf.Servers {
+		ossh.server = append(ossh.server, &ssh.Server{
+			Addr:                          fmt.Sprintf("%s:%d", srv.Host, srv.Port),
+			Handler:                       ossh.sessionHandler,
+			PasswordHandler:               ossh.authHandler,
+			IdleTimeout:                   time.Duration(Conf.MaxIdleTimeout) * time.Second,
+			MaxTimeout:                    time.Duration(Conf.MaxSessionAge) * time.Second,
+			ReversePortForwardingCallback: ossh.reversePortForwardingCallback,
+			LocalPortForwardingCallback:   ossh.localPortForwardingCallback,
+			PtyCallback:                   ossh.ptyCallback,
+			ConnectionFailedCallback:      ossh.connectionFailedCallback,
+			SessionRequestCallback:        ossh.sessionRequestCallback,
+			Version:                       Conf.Version,
+			ConnCallback:                  ossh.connectionCallback,
+			PublicKeyHandler:              ossh.publicKeyHandler,
+		})
 	}
 
 	ossh.fs = &OverlayFSManager{}
@@ -504,15 +506,24 @@ func (ossh *OSSHServer) Start() {
 	go ossh.updateStatsWorker()
 	go ossh.broadcastStatsWorker()
 
-	ossh.logger.Default("Starting oSSH server on %s...", glog.Wrap("ssh://"+ossh.server.Addr, glog.BrightYellow))
-	ossh.logger.Error("%s", glog.Error(ossh.server.ListenAndServe()))
+	var wg sync.WaitGroup
+	n := len(ossh.server)
+	wg.Add(n)
+	for _, srv := range ossh.server {
+		go func(srv *ssh.Server) {
+			defer wg.Done()
+			ossh.logger.Default("Starting oSSH server on %s...", glog.Wrap("ssh://"+srv.Addr, glog.BrightYellow))
+			ossh.logger.Error("%s", glog.Error(srv.ListenAndServe()))
+		}(srv)
+	}
+	wg.Wait()
 }
 
 func NewOSSHServer() *OSSHServer {
 	ossh := &OSSHServer{
 		Loot:     NewLoot(),
 		Logins:   NewLogins(),
-		server:   nil,
+		server:   []*ssh.Server{},
 		Sessions: NewActiveSessions(Conf.MaxSessionAge, glog.NewLogger("Sessions", glog.DarkOrange, Conf.Debug.Sessions, false, false, logMessageHandler)),
 		TimeWasted: &TimeWastedCounter{
 			val:  0,

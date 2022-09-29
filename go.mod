@@ -12,7 +12,7 @@ require (
 	github.com/prometheus/client_golang v1.12.2
 	github.com/shawnohare/go-minhash v0.0.0-20160713203314-58d649feb1f9
 	github.com/spf13/viper v1.12.0
-	github.com/toxyl/glog v0.0.0-20220712190040-bd7dd7f54dfe
+	github.com/toxyl/glog v0.0.0-20220924165749-728e391e4499
 	github.com/toxyl/gutils v0.0.0-20220713042410-b539e3428793
 	golang.org/x/exp v0.0.0-20220706164943-b4a6d9510983
 	golang.org/x/sys v0.0.0-20220712014510-0a85c31ab51e

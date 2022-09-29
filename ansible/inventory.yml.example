@@ -40,6 +40,12 @@ all:
     # The SSH key to use after the initial setup.
     ssh_key_file: "~/.ssh/{{ admin_username }}"
 
+    # Defines which IPs oSSH will listen on,
+    # by default this is 0.0.0.0, 
+    # but you can override it per host.
+    ossh_servers:
+      - 0.0.0.0
+
     # The port of the oSSH server. Usually 22. Only change if strictly necessary.
     ossh_port: 22
 
@@ -140,6 +146,14 @@ all:
       # Uncomment if you want to reinstall.
       # ansible_user: "{{ admin_username }}"
     
+      # Let's listen to multiple IPs
+      ossh_servers:
+        - 192.168.0.10
+        - 192.168.0.11
+        - 192.168.0.13
+        - 192.168.0.14
+        - 192.168.0.15
+
       # To spice things up a little we don't use 22
       # for oSSH but instead use 2200. 
       # In this scenario I configured my router to
