@@ -20,19 +20,14 @@ const (
 )
 
 type FakeShell struct {
-	session   *ssh.Session
-	terminal  *term.Terminal
-	writer    *utils.SlowWriter
-	created   time.Time
-	stats     *FakeShellStats
-	prompt    string
-	cwd       string
-	logger    *glog.Logger
-	overlayFS *OverlayFS
-}
-
-func (fs *FakeShell) SetOverlayFS(ofs *OverlayFS) {
-	fs.overlayFS = ofs
+	session  *ssh.Session
+	terminal *term.Terminal
+	writer   *utils.SlowWriter
+	created  time.Time
+	stats    *FakeShellStats
+	prompt   string
+	cwd      string
+	logger   *glog.Logger
 }
 
 func (fs *FakeShell) User() string {
@@ -73,7 +68,7 @@ func (fs *FakeShell) RecordWriteLn(output string) {
 
 func (fs *FakeShell) RecordWrite(output string) {
 	fs.writer.Write(output)
-	// TODO do we need to record this seperately?
+	// TODO do we need to record this separately?
 	fs.stats.recording.AddOutputEvent(output)
 }
 
@@ -273,7 +268,6 @@ func (fs *FakeShell) Exec(line string, s *Session, iSeq, lSeq int) bool {
 
 	// 10) check if there is a go-implemented command for this
 	if goCmd, found := CmdLookup[instrCmd]; found {
-		SrvOSSH.initOverlayFS(fs, s)
 		return goCmd(fs, instr)
 	}
 
@@ -355,14 +349,13 @@ func NewFakeShell(s *Session) *FakeShell {
 			User:             (*s.SSHSession).User(),
 			recording:        utils.NewASCIICastV2(fakeShellInitialWidth, fakeShellInitialHeight),
 		},
-		overlayFS: nil,
-		logger:    glog.NewLogger("Fake Shell", glog.OliveGreen, Conf.Debug.FakeShell, false, false, logMessageHandler),
+		logger: glog.NewLogger("Fake Shell", glog.OliveGreen, Conf.Debug.FakeShell, false, false, logMessageHandler),
 	}
 
 	fs.terminal = term.NewTerminal(*s.SSHSession, "")
 	fs.writer = utils.NewSlowWriter(Conf.Ratelimit, fs.terminal)
 	if s.Whitelisted {
-		fs.writer.SetRatelimit(10000) // set ridicuously high to effectively disable rate limit
+		fs.writer.SetRatelimit(10000) // set ridiculously high to effectively disable rate limit
 	}
 	fs.stats.Host = fs.Host()
 	fs.cwd = "/home/" + (*s.SSHSession).User()

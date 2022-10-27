@@ -258,11 +258,6 @@ func (ss *Sessions) Remove(sessionID, reason string) {
 	defer ss.Unlock()
 	if ss.has(sessionID) {
 		s := ss.get(sessionID)
-
-		if s.Shell != nil && s.Shell.overlayFS != nil {
-			s.Shell.overlayFS.Close()
-		}
-
 		sh := s.Host
 		tw := 0
 		cid := colorConnID("", sh, s.Port)
@@ -281,13 +276,29 @@ func (ss *Sessions) Remove(sessionID, reason string) {
 		active := ss.countActiveSessions(sh)
 
 		if reason == "" {
-			ss.logger.OK(
-				"%s: Session removed, host now uses %s of %s. It was active for %s.",
-				cid, glog.Int(active), glog.IntAmount(cnts, "active session", "active sessions"), glog.Duration(uint(tw)))
+			if cnts == 0 {
+				ss.logger.OK(
+					"%s: Session removed, host has no more active sessions. It was active for %s.",
+					cid, glog.Duration(uint(tw)),
+				)
+			} else {
+				ss.logger.OK(
+					"%s: Session removed, host now uses %s of %s. It was active for %s.",
+					cid, glog.Int(active), glog.IntAmount(cnts, "active session", "active sessions"), glog.Duration(uint(tw)),
+				)
+			}
 		} else {
-			ss.logger.OK(
-				"%s: Session removed, host now uses %s of %s. It was active for %s and removed because %s.",
-				cid, glog.Int(active), glog.IntAmount(cnts, "active session", "active sessions"), glog.Duration(uint(tw)), glog.Reason(reason))
+			if cnts == 0 {
+				ss.logger.OK(
+					"%s: Session removed, host has no more active sessions. It was active for %s and removed because %s.",
+					cid, glog.Int(active), glog.IntAmount(cnts, "active session", "active sessions"), glog.Duration(uint(tw)), glog.Reason(reason),
+				)
+			} else {
+				ss.logger.OK(
+					"%s: Session removed, host now uses %s of %s. It was active for %s and removed because %s.",
+					cid, glog.Int(active), glog.IntAmount(cnts, "active session", "active sessions"), glog.Duration(uint(tw)), glog.Reason(reason),
+				)
+			}
 		}
 	}
 }
