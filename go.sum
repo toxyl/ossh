@@ -255,10 +255,8 @@ github.com/stretchr/testify v1.7.2 h1:4jaiDzPyXQvSd7D0EjG45355tLlV3VOECpq10pLC+8
 github.com/stretchr/testify v1.7.2/go.mod h1:R6va5+xMeoiuVRoj+gSkQ7d3FALtqAAGI1FQKckRals=
 github.com/subosito/gotenv v1.4.0 h1:yAzM1+SmVcz5R4tXGsNMu1jUl2aOJXoiWUCEwwnGrvs=
 github.com/subosito/gotenv v1.4.0/go.mod h1:mZd6rFysKEcUhUHXJk0C/08wAgyDBFuwEYL7vWWGaGo=
-github.com/toxyl/glog v0.0.0-20220712190040-bd7dd7f54dfe h1:/baZ3rRmduqL2DU/FIwRBsYd0zWtuRx3ULipmsweP24=
-github.com/toxyl/glog v0.0.0-20220712190040-bd7dd7f54dfe/go.mod h1:Oo/Hv9YwDAdq6577wE/hUZ0uNJvBstLMF+rtsNNbgL8=
-github.com/toxyl/glog v0.0.0-20220924165749-728e391e4499 h1:GTke2E1Rk5RetOLXcPOL169+EMwind5vv3xLUbek+6Y=
-github.com/toxyl/glog v0.0.0-20220924165749-728e391e4499/go.mod h1:Oo/Hv9YwDAdq6577wE/hUZ0uNJvBstLMF+rtsNNbgL8=
+github.com/toxyl/glog v1.0.0-alpha.1 h1:F20r7tjnonykNrkuaEOAf5/efLWGogAFOGNIXt9i2M4=
+github.com/toxyl/glog v1.0.0-alpha.1/go.mod h1:9O3jnsSIofADRdzJ+7LN17N+NcmaoTSJvCsbFOQFjN8=
 github.com/toxyl/gutils v0.0.0-20220713042410-b539e3428793 h1:G5pkA32RPq/C7WXDtmyKOyRXCQnqb2fIgZ++M3LFBDI=
 github.com/toxyl/gutils v0.0.0-20220713042410-b539e3428793/go.mod h1:vwGE/QEaI/Elm2wzoFQ/YiDrI9qd7+jSq+CtzHz/p5M=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

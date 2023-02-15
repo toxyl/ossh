@@ -188,7 +188,7 @@ func NewSyncNodes() *SyncNodes {
 		nodes:   map[string]*SyncNode{},
 		clients: map[string]*SyncClient{},
 		stats:   map[string]*SyncNodeStats{},
-		logger:  glog.NewLogger("Sync Server", glog.DarkRed, Conf.Debug.SyncServer, false, false, logMessageHandler),
+		logger:  glog.NewLogger("Sync Server", glog.DarkRed, Conf.Debug.SyncServer, logMessageHandler),
 		lock:    &sync.Mutex{},
 	}
 }

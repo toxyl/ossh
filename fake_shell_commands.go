@@ -53,7 +53,7 @@ func cmdCd(fs *FakeShell, line string) (exit bool) {
 
 	path = toAbs(fs, path)
 
-	if !fs.overlayFS.DirExists(path) {
+	if !activeFS.DirExists(path) {
 		fs.RecordWriteLn(fmt.Sprintf("cd: %s: no such file or directory", parts[1]))
 		return
 	}
@@ -91,12 +91,12 @@ func cmdRm(fs *FakeShell, line string) (exit bool) {
 		}
 		path := toAbs(fs, pt)
 
-		if !fs.overlayFS.DirExists(path) && !fs.overlayFS.FileExists(path) {
+		if !activeFS.DirExists(path) && !activeFS.FileExists(path) {
 			fs.RecordWriteLn(fmt.Sprintf("rm: %s: no such file or directory", pt))
 			return
 		}
 
-		_ = fs.overlayFS.RemoveFile(path, false)
+		_ = activeFS.RemoveFile(path, false)
 	}
 
 	// rm runs way too fast without any output,
@@ -118,7 +118,7 @@ func cmdLs(fs *FakeShell, line string) (exit bool) {
 		dir = toAbs(fs, parts[1])
 	}
 
-	entries, err := fs.overlayFS.ReadDir(dir)
+	entries, err := activeFS.ReadDir(dir)
 	if err != nil {
 		if err.(*os.PathError).Err.Error() != "not a directory" {
 			fs.RecordWriteLn(fmt.Sprintf("ls: cannot access '%s': %s", dir, gutils.GetLastError(err.(*os.PathError).Err)))
@@ -159,7 +159,7 @@ func cmdCat(fs *FakeShell, line string) (exit bool) {
 	parts = gutils.RemoveCommandFlags(parts)
 
 	path := toAbs(fs, parts[1])
-	file, err := fs.overlayFS.OpenFile(path, os.O_RDONLY, 0)
+	file, err := activeFS.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {
 		fs.RecordWriteLn(fmt.Sprintf("cat: %s: %s", parts[1], gutils.GetLastError(err)))
 		return
@@ -199,7 +199,7 @@ func cmdTouch(fs *FakeShell, line string) (exit bool) {
 	parts = gutils.RemoveCommandFlags(parts)
 
 	path := toAbs(fs, parts[1])
-	file, err := fs.overlayFS.OpenFile(path, os.O_CREATE, 0)
+	file, err := activeFS.OpenFile(path, os.O_CREATE, 0)
 	if err != nil {
 		fs.RecordWriteLn(fmt.Sprintf("touch: %s: %s", parts[1], gutils.GetLastError(err)))
 		return
@@ -271,12 +271,12 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 				fs.WriteBinary(0b0) // ready to receive
 
 				path := toAbs(fs, msgFileNameFull)
-				if fs.overlayFS == nil {
+				if activeFS == nil {
 					fs.logger.Error("scp: %s: %s", msgFileNameStr, glog.Reason("no OverlayFS available!"))
 					return
 				}
 
-				file, err := fs.overlayFS.OpenFile(path, os.O_RDWR|os.O_CREATE, fso.FileMode(gutils.BytesToInt(msgMode, 0777)))
+				file, err := activeFS.OpenFile(path, os.O_RDWR|os.O_CREATE, fso.FileMode(gutils.BytesToInt(msgMode, 0777)))
 				if err != nil && gutils.GetLastError(err) != "is a directory" {
 					fs.logger.Error("scp: %s: %s", msgFileNameStr, gutils.GetLastError(err))
 					return
@@ -327,13 +327,13 @@ func cmdScp(fs *FakeShell, line string) (exit bool) {
 				msgDirNameStr := string(msgDirName)
 				msgDirNameStr = strings.Trim(msgDirNameStr, "'\"")
 
-				if fs.overlayFS == nil {
+				if activeFS == nil {
 					fs.logger.Error("scp: %s: %s", msgDirNameStr, glog.Reason("no OverlayFS available!"))
 					return
 				}
 
 				dirs = append(dirs, msgDirNameStr)
-				_ = fs.overlayFS.MkdirAll(strings.Join(dirs, "/"), fso.FileMode(gutils.BytesToInt(msgMode, 0777)))
+				_ = activeFS.MkdirAll(strings.Join(dirs, "/"), fso.FileMode(gutils.BytesToInt(msgMode, 0777)))
 
 				fs.WriteBinary(0b0) // data read
 				continue

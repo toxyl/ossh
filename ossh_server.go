@@ -2,11 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -33,13 +33,15 @@ func (twc *TimeWastedCounter) Add(n int) {
 	twc.val += n
 }
 
+var activeFS *FakeFS
+
 type OSSHServer struct {
 	Loot       *Loot
 	Logins     *Logins
 	Sessions   *Sessions
 	TimeWasted *TimeWastedCounter
 	server     []*ssh.Server
-	fs         *OverlayFSManager
+	fs         *FakeFSManager
 	logger     *glog.Logger
 }
 
@@ -99,7 +101,7 @@ func (ossh *OSSHServer) loadDataFile(path, contentType string, fnAdd func(s stri
 		}
 		items := strings.Split(string(content), "\n")
 
-		ossh.logger.OK("Loading %s %s", glog.Int(len(items)), contentType)
+		ossh.logger.OK("Loading %s %s", glog.Int(len(items)), glog.Highlight(contentType))
 		for _, fp := range items {
 			_ = fnAdd(fp)
 		}
@@ -147,7 +149,7 @@ func (ossh *OSSHServer) addLoginFailure(s *Session, reason string) {
 		return // we don't want stats for whitelisted IPs
 	}
 
-	go ossh.syncCredentials(s.User, s.Password, s.Host)
+	// go ossh.syncCredentials(s.User, s.Password, s.Host)
 
 	ossh.Loot.AddUser(s.User)
 	ossh.Loot.AddPassword(s.Password)
@@ -175,67 +177,46 @@ func (ossh *OSSHServer) addLoginSuccess(s *Session, reason string) {
 		return // we don't want stats for whitelisted IPs
 	}
 
-	go ossh.syncCredentials(s.User, s.Password, s.Host)
-
 	ossh.Loot.AddUser(s.User)
 	ossh.Loot.AddPassword(s.Password)
 	ossh.Loot.AddHost(s.Host)
 	ossh.Logins.Get(s.Host).AddSuccess()
 	ossh.logger.OK(
-		"%s: Logged in with password %s: %s. (%d attempts; %d failed; %d success)",
+		"%s: Logged in with password %s: %s. (%s; %s; %s)",
 		s.LogID(),
 		glog.Password(s.Password),
 		glog.Reason(reason),
-		ossh.Logins.Get(s.Host).GetAttempts(),
-		ossh.Logins.Get(s.Host).GetFailures(),
-		ossh.Logins.Get(s.Host).GetSuccesses(),
+		glog.IntAmount(ossh.Logins.Get(s.Host).GetAttempts(), "attempts", "attempts"),
+		glog.IntAmount(ossh.Logins.Get(s.Host).GetFailures(), "failed", "failed"),
+		glog.IntAmount(ossh.Logins.Get(s.Host).GetSuccesses(), "success", "success"),
 	)
 }
 
-func (ossh *OSSHServer) GracefulCloseOnError(err error, s *Session, sess *ssh.Session, ofs *OverlayFS) {
-	// TODO  graceful fallback?
-	ossh.logger.Debug("Graceful close because %s.", glog.Error(err))
-	if ofs != nil {
-		ofs.Close()
-	}
-	(*sess).Close()
-	if s != nil {
-		ossh.Sessions.Remove(s.ID, err.Error())
-	}
-}
-
-func (ossh *OSSHServer) initOverlayFS(fs *FakeShell, s *Session) {
-	if fs == nil {
-		ossh.logger.Error("Can't create OverlayFS without FakeShell!")
-		return
-	}
-	overlayFS, err := ossh.fs.NewSession(s.Host)
+func (ossh *OSSHServer) initOverlayFS() {
+	overlayFS, err := ossh.fs.NewSession(fmt.Sprintf("%d", time.Now().Unix()))
 	if err != nil {
-		ossh.GracefulCloseOnError(err, s, s.SSHSession, overlayFS)
-		return
-	}
-
-	err = overlayFS.Mount()
-	if err != nil {
-		ossh.GracefulCloseOnError(err, s, s.SSHSession, overlayFS)
+		ossh.logger.Error("Failed to initialize fake file system: %s", glog.Error(err))
+		os.Exit(2)
 		return
 	}
 
 	if overlayFS != nil {
+		err = overlayFS.Mount()
+		if err != nil {
+			ossh.logger.Error("Failed to mount fake file system: %s", glog.Error(err))
+			os.Exit(3)
+			return
+		}
+
 		if !overlayFS.DirExists("/home") {
 			err := overlayFS.Mkdir("/home", 700)
 			if err != nil {
-				overlayFS.logger.Error("%s: mkdir failed: %s", s.LogID(), glog.Error(err))
+				ossh.logger.Error("Failed to create /home dir in fake file system: %s", glog.Error(err))
+				os.Exit(4)
 			}
 		}
 
-		if !overlayFS.DirExists("/home/" + (*s.SSHSession).User()) {
-			err := overlayFS.Mkdir("/home/"+(*s.SSHSession).User(), 700)
-			if err != nil {
-				overlayFS.logger.Error("%s: mkdir failed: %s", s.LogID(), glog.Error(err))
-			}
-		}
-		fs.SetOverlayFS(overlayFS)
+		activeFS = overlayFS
 	}
 }
 
@@ -248,7 +229,8 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 	}()
 	s := ossh.Sessions.Create(sess.RemoteAddr().String()).SetSSHSession(&sess)
 	if s == nil {
-		ossh.GracefulCloseOnError(errors.New("Failed to create oSSH session."), nil, &sess, nil)
+		ossh.logger.Error("Failed to create oSSH session!")
+		sess.Close()
 		return
 	}
 
@@ -259,7 +241,7 @@ func (ossh *OSSHServer) sessionHandler(sess ssh.Session) {
 	if !s.Whitelisted {
 		ossh.logger.Success("%s: Finished running %s command(s)",
 			s.LogID(),
-			glog.Int(int(stats.CommandsExecuted)),
+			glog.Int(stats.CommandsExecuted),
 		)
 	} else {
 		ossh.logger.Success("%s: %s",
@@ -282,7 +264,7 @@ func (ossh *OSSHServer) localPortForwardingCallback(ctx ssh.Context, bindHost st
 	s := ossh.Sessions.Create(ctx.RemoteAddr().String())
 	ossh.logger.Warning("%s: Tried to locally port forward to %s. Request denied!",
 		s.LogID(),
-		glog.AddrHostPort(bindHost, int(bindPort), true),
+		glog.AddrIPv4Port(bindHost, bindPort, true),
 	)
 	ossh.Sessions.Remove(s.ID, "local port forwarding denied")
 	return false
@@ -292,7 +274,7 @@ func (ossh *OSSHServer) reversePortForwardingCallback(ctx ssh.Context, bindHost 
 	s := ossh.Sessions.Create(ctx.RemoteAddr().String())
 	ossh.logger.Warning("%s: Tried to reverse port forward to %s:%s. Request denied!",
 		s.LogID(),
-		glog.AddrHostPort(bindHost, int(bindPort), true),
+		glog.AddrIPv4Port(bindHost, bindPort, true),
 	)
 	ossh.Sessions.Remove(s.ID, "reverse port forwarding denied")
 	return false
@@ -413,14 +395,9 @@ func (ossh *OSSHServer) publicKeyHandler(ctx ssh.Context, key ssh.PublicKey) boo
 		return true
 	}
 
-	// we already know the key, let's roll dice
-	if time.Now().Unix()%3 == 0 {
-		ossh.addLoginFailure(s, "public key rejected, host lost a game of dice")
-		return false
-	}
-
-	ossh.addLoginSuccess(s, "host gave us a known public key")
-	return true
+	// we already know the key, let's force the bot to retry
+	ossh.addLoginFailure(s, "public key rejected, host lost a game of dice")
+	return false
 }
 
 func (ossh *OSSHServer) updateStatsWorker() {
@@ -438,7 +415,23 @@ func (ossh *OSSHServer) updateStatsWorker() {
 		if err == nil && SrvUI != nil {
 			SrvUI.PushStats(string(jsonStats))
 		}
-
+		ms := runtime.MemStats{}
+		runtime.ReadMemStats(&ms)
+		ossh.logger.OK(
+			"[STATS UPDATE] %s up, %s wasted, %s, %s, %s, %s (%s, %s), %s, %s, %s, %s",
+			glog.Duration(hs.Uptime),
+			glog.Duration(hs.TimeWasted),
+			glog.IntAmount(hs.Sessions, "session", "sessions"),
+			glog.IntAmount(runtime.NumGoroutine(), "goroutine", "goroutines"),
+			glog.IntAmount(ms.HeapSys/1024/1024, "MB RAM", "MB RAM"),
+			glog.IntAmount(hs.AttemptedLogins, "login", "logins"),
+			glog.IntAmount(hs.FailedLogins, "failed", "failed"),
+			glog.IntAmount(hs.SuccessfulLogins, "successful", "successful"),
+			glog.IntAmount(hs.Hosts, "host", "hosts"),
+			glog.IntAmount(hs.Users, "user", "users"),
+			glog.IntAmount(hs.Passwords, "password", "passwords"),
+			glog.IntAmount(hs.Payloads, "payload", "payloads"),
+		)
 		time.Sleep(INTERVAL_UI_STATS_UPDATE)
 	}
 }
@@ -473,6 +466,17 @@ func (ossh *OSSHServer) broadcastStatsWorker() {
 func (ossh *OSSHServer) init() {
 	ossh.loadData()
 
+	ossh.fs = &FakeFSManager{}
+	path := filepath.Join(Conf.PathData, "ffs")
+	if Conf.PathFFS != "" {
+		path = Conf.PathFFS
+	}
+	err := ossh.fs.Init(path)
+	if err != nil {
+		ossh.fs.logger.Error("%s", glog.Error(err))
+	}
+	ossh.initOverlayFS()
+
 	for _, srv := range Conf.Servers {
 		ossh.server = append(ossh.server, &ssh.Server{
 			Addr:                          fmt.Sprintf("%s:%d", srv.Host, srv.Port),
@@ -490,16 +494,6 @@ func (ossh *OSSHServer) init() {
 			PublicKeyHandler:              ossh.publicKeyHandler,
 		})
 	}
-
-	ossh.fs = &OverlayFSManager{}
-	path := filepath.Join(Conf.PathData, "ffs")
-	if Conf.PathFFS != "" {
-		path = Conf.PathFFS
-	}
-	err := ossh.fs.Init(path)
-	if err != nil {
-		ossh.fs.logger.Error("%s", glog.Error(err))
-	}
 }
 
 func (ossh *OSSHServer) Start() {
@@ -512,7 +506,7 @@ func (ossh *OSSHServer) Start() {
 	for _, srv := range ossh.server {
 		go func(srv *ssh.Server) {
 			defer wg.Done()
-			ossh.logger.Default("Starting oSSH server on %s...", glog.Wrap("ssh://"+srv.Addr, glog.BrightYellow))
+			ossh.logger.Default("Starting oSSH server on %s...", glog.WrapBrightYellow("ssh://"+srv.Addr))
 			ossh.logger.Error("%s", glog.Error(srv.ListenAndServe()))
 		}(srv)
 	}
@@ -524,14 +518,13 @@ func NewOSSHServer() *OSSHServer {
 		Loot:     NewLoot(),
 		Logins:   NewLogins(),
 		server:   []*ssh.Server{},
-		Sessions: NewActiveSessions(Conf.MaxSessionAge, glog.NewLogger("Sessions", glog.DarkOrange, Conf.Debug.Sessions, false, false, logMessageHandler)),
+		Sessions: NewActiveSessions(Conf.MaxSessionAge, glog.NewLogger("Sessions", glog.DarkOrange, Conf.Debug.Sessions, logMessageHandler)),
 		TimeWasted: &TimeWastedCounter{
 			val:  0,
 			lock: &sync.Mutex{},
 		},
-		logger: glog.NewLogger("oSSH Server", glog.Lime, Conf.Debug.OSSHServer, false, false, logMessageHandler),
+		logger: glog.NewLogger("oSSH Server", glog.Lime, Conf.Debug.OSSHServer, logMessageHandler),
 	}
-
 	ossh.init()
 
 	return ossh

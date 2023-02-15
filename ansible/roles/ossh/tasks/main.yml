@@ -49,6 +49,31 @@
     state: stopped
   tags: update
 
+- name: Get list of old sandboxes
+  become: yes
+  find:
+    paths: /etc/ossh/ffs/sandboxes
+    patterns: '*'
+    hidden: yes
+    file_type: directory
+  register: sandboxes_list
+
+- name: Unmount old sandboxes
+  mount:
+    path: "{{ item.path }}/merge-data"
+    state: unmounted
+  with_items: "{{ sandboxes_list.files }}"
+  ignore_errors: yes
+
+- name: Remove old sandboxes
+  become: yes
+  file:
+    path: "{{ item.path }}"
+    state: absent
+    force: yes
+  with_items: "{{ sandboxes_list.files }}"
+  ignore_errors: yes
+
 - name: Install oSSH binary
   copy:
     src: /tmp/ossh

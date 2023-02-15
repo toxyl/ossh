@@ -150,7 +150,7 @@ func (sscs *SyncServerConnections) Create(conn net.Conn, host string, port int) 
 			Port:      port,
 			CreatedAt: time.Now(),
 			lock:      &sync.Mutex{},
-			logger:    glog.NewLogger("Sync Server", glog.DarkRed, Conf.Debug.SyncServer, false, false, logMessageHandler),
+			logger:    glog.NewLogger("Sync Server", glog.DarkRed, Conf.Debug.SyncServer, logMessageHandler),
 		}
 	}
 	return sscs.conns[sid]
@@ -272,6 +272,7 @@ func (ss *SyncServer) SyncWorker() {
 				continue
 			}
 
+			ss.logger.Info("%s: Sync started", colorConnID("", host, port))
 			for _, section := range sections {
 				switch section {
 				case "hosts":
@@ -284,6 +285,7 @@ func (ss *SyncServer) SyncWorker() {
 					client.SyncData("PAYLOADS", SrvOSSH.Loot.GetPayloads, client.AddPayload)
 				}
 			}
+			ss.logger.Info("%s: Sync complete", colorConnID("", host, port))
 		}
 
 		time.Sleep(time.Duration(Conf.Sync.Interval) * time.Minute)
@@ -348,7 +350,7 @@ func (ss *SyncServer) ConnectionHandler(listener net.Listener) {
 
 			err = ss.conns.Remove(host, port)
 			if err != nil {
-				ss.logger.Error("%s: Could not remove goroutine: %s", lid, err)
+				ss.logger.Error("%s: Could not remove goroutine: %s", lid, glog.Error(err))
 			}
 		}(host, port)
 	}
@@ -361,8 +363,8 @@ func (ss *SyncServer) CleanUpWorker() {
 		removed := ss.conns.CleanUp()
 		lr := len(removed)
 		l := ss.conns.Length()
-		hs := glog.Hosts(ss.conns.Hosts(), true)
-		hsr := glog.Hosts(removed, true)
+		hs := glog.IPs(ss.conns.Hosts(), true)
+		hsr := glog.IPs(removed, true)
 		if lr > 0 {
 			if l == 0 {
 				ss.logger.Info("Cleanup worker: Removed %s, none left", hsr)
@@ -376,7 +378,7 @@ func (ss *SyncServer) CleanUpWorker() {
 func (ss *SyncServer) Start() {
 	ss.UpdateClients()
 	srv := fmt.Sprintf("%s:%d", Conf.SyncServer.Host, Conf.SyncServer.Port)
-	ss.logger.Default("Starting sync server on %s...", glog.Wrap("tcp://"+srv, glog.BrightYellow))
+	ss.logger.Default("Starting sync server on %s...", glog.WrapBrightYellow("tcp://"+srv))
 	listener, err := net.Listen("tcp", srv)
 	if err != nil {
 		panic(err)
@@ -391,7 +393,7 @@ func NewSyncServer() *SyncServer {
 		listener: nil,
 		nodes:    NewSyncNodes(),
 		conns:    NewSyncServerConnections(),
-		logger:   glog.NewLogger("Sync Server", glog.DarkRed, Conf.Debug.SyncServer, false, false, logMessageHandler),
+		logger:   glog.NewLogger("Sync Server", glog.DarkRed, Conf.Debug.SyncServer, logMessageHandler),
 	}
 
 	return ss

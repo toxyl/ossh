@@ -178,7 +178,7 @@ func NewSyncClient(host string, port int) *SyncClient {
 	sc := &SyncClient{
 		Host:   host,
 		Port:   port,
-		logger: glog.NewLogger("Sync Client", glog.Blue, Conf.Debug.SyncClient, false, false, logMessageHandler),
+		logger: glog.NewLogger("Sync Client", glog.Blue, Conf.Debug.SyncClient, logMessageHandler),
 		lock:   &sync.Mutex{},
 	}
 	return sc

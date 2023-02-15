@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,6 +27,7 @@ type MetricsServer struct {
 	timeOnline                prometheus.Gauge
 	timeWasted                prometheus.Gauge
 	timeWastedPerSecond       prometheus.Gauge
+	host                      *prometheus.GaugeVec
 	last                      struct {
 		logins           int
 		loginsFailed     int
@@ -129,6 +131,16 @@ func (m *MetricsServer) AddTimeWasted(seconds float64) {
 	m.last.timeWasted += seconds
 }
 
+func (m *MetricsServer) SetHostInfo() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	ips := []string{}
+	for _, s := range Conf.Servers {
+		ips = append(ips, s.Host)
+	}
+	m.host.WithLabelValues(Conf.HostName, strings.Join(ips, ", ")).Add(1)
+}
+
 func (m *MetricsServer) Start() {
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
@@ -195,6 +207,15 @@ func NewMetricsServer() *MetricsServer {
 			Name: "ossh_time_wasted_per_second",
 			Help: "The number of bot seconds this instance has wasted per second of online time",
 		}),
+		host: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "ossh_host_info",
+			Help: "Info about the host oSSH runs on",
+		},
+			[]string{
+				"name",
+				"ip",
+			},
+		),
 		last: struct {
 			logins           int
 			loginsFailed     int
@@ -222,5 +243,6 @@ func NewMetricsServer() *MetricsServer {
 		},
 		lock: &sync.Mutex{},
 	}
+	m.SetHostInfo()
 	return m
 }

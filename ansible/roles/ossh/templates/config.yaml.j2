@@ -100,7 +100,7 @@ ratelimit: {{ ossh_ratelimit }}
 
 # Often bots run commands that produce little to no output. 
 # It's a shame to let them off the hook so easily. 
-# So we apply a delay of this many miliseconds per 
+# So we apply a delay of this many milliseconds per 
 # character of input before even evaluating the command.
 # Managed by Ansible.
 input_delay: {{ range(ossh_input_delay - ossh_input_delay_variability, ossh_input_delay + ossh_input_delay_variability) | random }}
@@ -136,8 +136,8 @@ sync_server:
 # Settings for the sync process.
 sync:
   # We sync with the other nodes in this interval of minutes. 
-  # Default is one sync every 10 minutes.
-  interval: 10 
+  # Default is one sync every 30 minutes.
+  interval: 30 
 
   # This is the list of nodes belonging to the cluster.
   # Managed by Ansible.
