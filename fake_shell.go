@@ -349,7 +349,7 @@ func NewFakeShell(s *Session) *FakeShell {
 			User:             (*s.SSHSession).User(),
 			recording:        utils.NewASCIICastV2(fakeShellInitialWidth, fakeShellInitialHeight),
 		},
-		logger: glog.NewLogger("Fake Shell", glog.OliveGreen, Conf.Debug.FakeShell, false, false, logMessageHandler),
+		logger: glog.NewLogger("Fake Shell", glog.OliveGreen, Conf.Debug.FakeShell, logMessageHandler),
 	}
 
 	fs.terminal = term.NewTerminal(*s.SSHSession, "")

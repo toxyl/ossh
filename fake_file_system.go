@@ -57,7 +57,7 @@ type FakeFSManager struct {
 var embeddedFS embed.FS
 
 func (ofsm *FakeFSManager) Init(baseDir string) error {
-	ofsm.logger = glog.NewLogger("Fake FS", glog.LightBlue, Conf.Debug.OverlayFS, false, false, logMessageHandler)
+	ofsm.logger = glog.NewLogger("Fake FS", glog.LightBlue, Conf.Debug.OverlayFS, logMessageHandler)
 	ofsm.logger.Debug("Init %s", glog.File(baseDir))
 	if !gutils.DirExists(baseDir) {
 		err := os.Mkdir(baseDir, 0755)
@@ -190,18 +190,12 @@ func (ofsm *FakeFSManager) DeactivateOverlay(fs *FakeFS) {
 
 // https://windsock.io/the-overlay-filesystem/
 type FakeFS struct {
-	manager *FakeFSManager
-
-	logger *glog.Logger
-
-	// The dir containing the merged layers
-	mergedDir string
-	// The upper most layer, containing all changed made if any
-	upperDir string
-	// The work dir
-	workDir string
-	// The lower layers, ordered by time
-	lowerDirs []string
+	manager   *FakeFSManager
+	logger    *glog.Logger
+	mergedDir string   // The dir containing the merged layers
+	upperDir  string   // The upper most layer, containing all changed made if any
+	workDir   string   // The work dir
+	lowerDirs []string // The lower layers, ordered by time
 }
 
 func (ofs *FakeFS) Mount() error {

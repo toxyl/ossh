@@ -178,7 +178,7 @@ func (uis *UIServer) AddSubscriptionHandler(path string, hub *Hub) *UIServer {
 			}
 			conn, err := upgrader.Upgrade(w, r, nil)
 			if err != nil {
-				uis.logger.Default("Connection connection upgrade failed: %s", err)
+				uis.logger.Default("Connection connection upgrade failed: %s", glog.Error(err))
 				return
 			}
 			client := &Client{
@@ -200,7 +200,7 @@ func (uis *UIServer) AddHandler(path string, messageHandler func(message []byte)
 		// Upgrade our raw HTTP connection to a websocket based one
 		conn, err := upgrader.Upgrade(wc, r, nil)
 		if err != nil {
-			uis.logger.Error("Error during connection upgrade: %s", err.Error())
+			uis.logger.Error("Error during connection upgrade: %s", glog.Error(err))
 			return
 		}
 		defer conn.Close()
@@ -211,7 +211,7 @@ func (uis *UIServer) AddHandler(path string, messageHandler func(message []byte)
 			if err != nil {
 				if !strings.Contains(err.Error(), "close 1000 (normal)") &&
 					!strings.Contains(err.Error(), "close 1001 (going away)") {
-					uis.logger.Error("Error during message reading: %s", err.Error())
+					uis.logger.Error("Error during message reading: %s", glog.Error(err))
 				}
 				break
 			}
@@ -219,7 +219,7 @@ func (uis *UIServer) AddHandler(path string, messageHandler func(message []byte)
 			message = messageHandler(message)
 			err = conn.WriteMessage(messageType, message)
 			if err != nil {
-				uis.logger.Error("Error during message writing: %s", err.Error())
+				uis.logger.Error("Error during message writing: %s", glog.Error(err))
 				break
 			}
 		}
@@ -233,7 +233,7 @@ func (uis *UIServer) MakeHTMLHandler(template string, data interface{}) func(w h
 		var tpl bytes.Buffer
 		err := ParseTemplateHTML(template, &tpl, data)
 		if err != nil {
-			uis.logger.Error("Failed to parse template: %s", err.Error())
+			uis.logger.Error("Failed to parse template: %s", glog.Error(err))
 			return
 		}
 
@@ -313,13 +313,13 @@ func (uis *UIServer) Start() {
 			}
 			rt := fmt.Sprintf("https://%s%s", addr, req.URL.Path)
 			http.Redirect(w, req, rt, 307) // let's give them their request back
-			uis.logger.OK("%s: Redirected request to source: %s", glog.Addr(req.RemoteAddr, true), glog.Highlight(req.URL.Path))
+			uis.logger.OK("%s: Redirected request to source: %s", glog.Addr(req.RemoteAddr, true), glog.URL(req.URL.String()))
 			return
 		}
 		mux.ServeHTTP(w, req)
 	})
 
-	uis.logger.Default("Starting UI server on %s...", glog.Wrap("https://"+srv, glog.BrightYellow))
+	uis.logger.Default("Starting UI server on %s...", glog.WrapBrightYellow("https://"+srv))
 	go uis.Serve()
 }
 
@@ -421,6 +421,6 @@ func NewUIServer() *UIServer {
 		Stats:    nil,
 		Console:  nil,
 		server:   nil,
-		logger:   glog.NewLogger("UI Server", glog.Cyan, Conf.Debug.UIServer, false, false, logMessageHandler),
+		logger:   glog.NewLogger("UI Server", glog.Cyan, Conf.Debug.UIServer, logMessageHandler),
 	}
 }

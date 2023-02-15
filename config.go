@@ -103,7 +103,7 @@ type Config struct {
 var cfgFile string = ""
 var Conf Config
 
-var LogGlobal *glog.Logger = glog.NewLogger("Global", glog.Gray, false, false, false, logMessageHandler)
+var LogGlobal *glog.Logger = glog.NewLogger("Global", glog.Gray, false, logMessageHandler)
 
 func logMessageHandler(msg string) {
 	fmt.Print(msg)
@@ -122,7 +122,7 @@ func isIPWhitelisted(ip string) bool {
 }
 
 func colorConnID(user, host string, port int) string {
-	addr := glog.AddrHostPort(host, port, true)
+	addr := glog.AddrIPv4Port(host, port, true)
 	if user == "" {
 		return addr
 	}
@@ -199,7 +199,7 @@ func initConfig() {
 	InitTemplaterFunctions()
 	InitTemplaterFunctionsHTML()
 
-	LogGlobal.OK("Config loaded from %s", glog.Wrap(cfgFile, glog.Orange))
+	LogGlobal.OK("Config loaded from %s", glog.WrapOrange(cfgFile))
 }
 
 func getConfig() string {
@@ -219,15 +219,15 @@ func updateConfig(config []byte) error {
 	pathBak := fmt.Sprintf("%s.bak", pathSrc)
 	err := gutils.CopyFile(pathSrc, pathBak)
 	if err != nil {
-		LogGlobal.Error("Failed to backup config from %s to %s!", pathSrc, pathBak)
+		LogGlobal.Error("Failed to backup config from %s to %s!", glog.File(pathSrc), glog.File(pathBak))
 		return err
 	}
 	err = os.WriteFile(pathSrc, config, 0644)
 	if err != nil {
-		LogGlobal.Error("Failed to backup config from %s to %s!", pathSrc, pathBak)
+		LogGlobal.Error("Failed to backup config from %s to %s!", glog.File(pathSrc), glog.File(pathBak))
 		return err
 	}
-	LogGlobal.Success("Written new config to: %s", pathSrc)
+	LogGlobal.Success("Written new config to: %s", glog.File(pathSrc))
 
 	initConfig()
 	SrvSync.UpdateClients()
