@@ -22,3 +22,11 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 
 For more information, please refer to <http://unlicense.org/>
+
+Some functions are not governed by this license, but fall under a 
+CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/) license
+because they are copied from or adapted from answers on StackOverflow,
+see https://stackoverflow.com/legal/terms-of-service#licensing for 
+details (retrieved on 2023-02-15 09:58:00 UTC). These functions are 
+marked with comments referring to the StackOverflow answer in question,
+and can be found by searching the source code for "stackoverflow.com".
