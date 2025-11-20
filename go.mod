@@ -1,6 +1,6 @@
 module github.com/toxyl/ossh
 
-go 1.18
+go 1.24.0
 
 require (
 	github.com/davecgh/go-spew v1.1.1
@@ -15,8 +15,8 @@ require (
 	github.com/toxyl/glog v1.0.0-alpha.1
 	github.com/toxyl/gutils v0.0.0-20220713042410-b539e3428793
 	golang.org/x/exp v0.0.0-20220706164943-b4a6d9510983
-	golang.org/x/sys v0.30.0
-	golang.org/x/term v0.29.0
+	golang.org/x/sys v0.38.0
+	golang.org/x/term v0.37.0
 )
 
 require (
@@ -39,8 +39,8 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.4.0 // indirect
-	golang.org/x/crypto v0.35.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
